@@ -1,0 +1,6 @@
+
+# Secrets
+api_key.md
+.env
+.env.*
+!.env.example
