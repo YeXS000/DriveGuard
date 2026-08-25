@@ -1,0 +1,48 @@
+{
+  "name": "driveguard",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Safety-aware driving service orchestration Agent Runtime",
+  "type": "module",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "packageManager": "npm@10.9.4",
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json && tsc --project packages/shared/tsconfig.json && tsc --project packages/domain/tsconfig.json && tsc --project packages/context/tsconfig.json",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "lint": "eslint . --max-warnings=0",
+    "start:api": "node dist/apps/api/src/server.js",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:contract": "vitest run tests/contract --passWithNoTests",
+    "test:integration": "vitest run tests/integration --passWithNoTests",
+    "test:phase2": "vitest run tests/unit/phase2-vehicle.test.ts tests/unit/phase2-trip-context.test.ts tests/unit/phase2-snapshot.test.ts tests/unit/phase2-freshness.test.ts tests/unit/phase2-conflict.test.ts tests/contract/phase2-fixture-compatibility.test.ts",
+    "test:phase2:coverage": "npm run test:phase2 -- --coverage --coverage.include=packages/domain/src/**/*.ts --coverage.include=packages/context/src/**/*.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html",
+    "test:phase2:packages": "npm run build --silent && node tests/contract/phase2-package-exports.mjs",
+    "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "0.84.3",
+    "@earendil-works/pi-ai": "0.84.3",
+    "typebox": "1.3.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "22.19.19",
+    "@types/pg": "8.23.1",
+    "@vitest/coverage-v8": "4.1.11",
+    "eslint": "10.9.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.68.0",
+    "vitest": "4.1.11"
+  }
+}

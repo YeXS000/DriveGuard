@@ -1,0 +1,31 @@
+# Secrets must never enter the Docker build context.
+api_key.md
+api-key.md
+.env
+.env.*
+**/.env
+**/.env.*
+.secrets
+.secrets.*
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local and generated content.
+.git/
+.github/
+node_modules/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
+.cache/
+
+# Files not required to build the Phase 0 API image.
+AGENTS.md
+DriveGuard.md
+docs/
+evals/
+tests/

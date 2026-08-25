@@ -1,0 +1,6 @@
+api_key.md
+DriveGuard.md
+node_modules/
+dist/
+coverage/
+package-lock.json

@@ -1,6 +1,30 @@
 
 # Secrets
 api_key.md
+api-key.md
 .env
 .env.*
 !.env.example
+**/.env
+**/.env.*
+!**/.env.example
+.secrets
+.secrets.*
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Dependencies and generated artifacts
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.cache/
+
+# Logs and local tooling
+*.log
+.DS_Store
+.idea/
+.vscode/
