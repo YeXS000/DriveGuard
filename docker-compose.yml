@@ -84,6 +84,29 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  vehicle-simulator:
+    image: driveguard-vehicle-simulator:phase3
+    build:
+      context: .
+      dockerfile: infra/docker/vehicle-simulator.Dockerfile
+    environment:
+      PORT: 3001
+    ports:
+      - "127.0.0.1:${VEHICLE_SIMULATOR_PORT:-3001}:3001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 3s
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:

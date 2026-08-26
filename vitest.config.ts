@@ -13,6 +13,9 @@ export default defineConfig({
       "@driveguard/shared": fileURLToPath(
         new URL("./packages/shared/src/index.ts", import.meta.url),
       ),
+      "@driveguard/vehicle-simulator": fileURLToPath(
+        new URL("./services/vehicle-simulator/src/index.ts", import.meta.url),
+      ),
     },
   },
   test: {
