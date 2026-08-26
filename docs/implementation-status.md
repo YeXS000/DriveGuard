@@ -400,4 +400,102 @@ Implementation, tests, acceptance metrics, coverage, architecture scans, package
 
 **PASS**
 
-Phase 3 has not been started.
+## Phase 3 — Vehicle Digital Twin / Simulator
+
+- Status: COMPLETE
+- Scope: Deterministic stateful vehicle simulator, seven built-in scenarios, data-plane and test/control-plane HTTP APIs, failure injection, container integration, and Phase 3 verification only.
+- Gate result: PASS
+- Verification date: 2026-08-26 (Asia/Shanghai)
+- Git baseline: local `main` and Phase 3 start HEAD `4057e068d19a82fc1e0394ab2661c82b4caf5f58`; branch `phase/03-vehicle-simulator` in the dedicated Phase 3 worktree.
+
+No Phase 4 Tool Contract, production capability registry, Policy Engine, confirmation, action state machine, Reliable Executor, persistence, HMI, Agent-to-Simulator connection, or safety-critical vehicle control was implemented. The two Phase 1 fixture tools remain unchanged and disconnected.
+
+### Implemented modules
+
+- `services/vehicle-simulator/src/types.ts`, `state.ts`, and `errors.ts`: simulator-only state and command contracts, complete runtime validation, cloning, and structured errors while reusing formal Phase 2 `VehicleState` and `TripState` unchanged.
+- `services/vehicle-simulator/src/scenarios.ts`: `city_idle`, `highway_driving`, `low_soc`, `charging`, `active_navigation`, `parked_no_navigation`, and `network_failure_ready`.
+- `services/vehicle-simulator/src/transitions.ts` and `simulator.ts`: validated atomic transitions, process-local serialization, domain-specific versions, simulator versioning, reset epochs, bounded history, and transaction-safe deterministic IDs.
+- `services/vehicle-simulator/src/determinism.ts` and `faults.ts`: seeded deterministic probability and monotonic route, reservation, and assistance identifiers.
+- `services/vehicle-simulator/src/http-input.ts` and `http.ts`: strict boundary parsing, structured errors, data-plane routes, and an explicit `/simulator/*` test/control plane.
+- `services/vehicle-simulator/src/server.ts` and `index.ts`: production process entry and public package exports.
+- `infra/docker/vehicle-simulator.Dockerfile` and `docker-compose.yml`: isolated multi-stage simulator image, loopback port 3001, and independent healthcheck.
+- Phase 3 unit, contract, and integration tests plus root scripts/Vitest discovery.
+- ADR 0004 records the determinism, version, stale-state, reset, failure, and control-plane decisions.
+
+### State, transition, and determinism semantics
+
+- Every mutation builds a complete candidate, validates the affected Phase 2 state and full simulator state, and commits once inside a process-local promise queue. Failed validation leaves state and deterministic ID counters unchanged.
+- `simulationVersion` increments on every successful mutation. `vehicle.version` and `trip.version` increment only when their corresponding formal domain state changes.
+- Reset reloads a validated scenario at version 1 and clears reservations, assistance requests, faults, bounded history, deterministic counters, and delayed-operation eligibility. A captured reset epoch prevents a delayed pre-reset HTTP mutation from committing after reset.
+- Production uses `SystemClock`; tests/replay use `FixedClock`. Core state and transition code do not call `Date.now()` or `Math.random()` directly.
+- Stable 32-bit seed hashing drives fault decisions. IDs are seed-qualified, namespace-specific, monotonic, and rolled back with a failed transition.
+- At most 10 validated states are retained. A stale vehicle/trip response selects the newest retained state whose corresponding domain version is lower; unrelated simulator-only mutations are skipped.
+- Concurrent mutations are serialized. Tests prove non-overlapping updates are retained and competing reservations for one remaining slot produce exactly one winner.
+
+### HTTP and failure behavior
+
+Data plane:
+
+- `GET /vehicle/state`, `GET /trip/state`.
+- Cabin temperature, seat heating, media volume, navigation destination/reroute, charging station/status/reservation/cancel, and roadside-assistance routes.
+
+Test/control plane:
+
+- `GET /simulator/state`, scenario/seed reset, fault list/set/clear, simulated speed, and simulated SOC.
+- `/simulator/*` is not a production Agent tool surface and must be excluded or protected by a future production gateway.
+
+Fault modes are `delay`, `timeout`, `http_500`, `http_503`, `connection_abort`, and `stale_response`, scoped to enumerated targets with validated probability and delay. `stale_response` is limited to vehicle/trip reads. Fastify 404, unsupported method/media type, and oversized-body errors are normalized into the structured simulator error envelope. Liveness has no dependency probes; readiness validates the registry and current simulator state only.
+
+### Tests and measured coverage
+
+Final local automated results after review remediation:
+
+| Check                              | Measured result                                       |
+| ---------------------------------- | ----------------------------------------------------- |
+| `npm run format`                   | PASS                                                  |
+| `npm run lint`                     | PASS; 0 errors and 0 warnings                         |
+| `npm run typecheck`                | PASS; 0 errors                                        |
+| `npm run build`                    | PASS; simulator and accepted public packages built    |
+| `npm test`                         | PASS; 15 files, 397 tests                             |
+| `npm run test:phase3`              | PASS; 4 files, 197 tests                              |
+| `npm run test:phase3:coverage`     | PASS; 4 files, 197 tests                              |
+| `npm run test:phase2:packages`     | PASS; all accepted workspace exports imported by Node |
+| `npm audit --audit-level=critical` | PASS; 0 vulnerabilities                               |
+| `git diff --check`                 | PASS                                                  |
+
+Measured V8 coverage excludes only the process entrypoints `server.ts` and `index.ts`:
+
+| Scope            | Statements | Branches | Functions |  Lines |
+| ---------------- | ---------: | -------: | --------: | -----: |
+| All Phase 3 core |     97.66% |   92.99% |      100% | 97.96% |
+| `transitions.ts` |     97.50% |   96.66% |      100% | 97.43% |
+| `faults.ts`      |       100% |   95.83% |      100% |   100% |
+| `http.ts`        |     99.03% |   87.50% |      100% | 98.96% |
+
+### Container, architecture, and security evidence
+
+- Docker Server 28.1.1 and Compose validated the final configuration with five services.
+- Two counted clean-start cycles each executed `down -v`, `up -d --build`, reached 5 / 5 healthy, returned HTTP 200 from simulator live/ready/vehicle/trip endpoints, passed the runtime-image forbidden-path check, and completed final `down -v`.
+- Cold Start Success = 2 / 2. The image check found none of Pi Agent, PostgreSQL, Redis, NATS client, API dist, or Agent Runtime paths in the simulator runtime image.
+- Phase 1 registered business tools = exactly 2. Agent/API-to-Simulator references = 0. Simulator-to-Phase-4 references = 0. Phase 4+ changed files = 0.
+- Tracked `api_key.md` or real environment-secret files = 0. No credential file or live provider credential was used.
+
+### Independent review and remediation
+
+- Reviewer A initially reported Critical 0, High 2, Medium 1, Low 1, then found one additional Medium closed-state-validation issue and one Low reset-history assertion gap during re-review. Transactional ID rollback, exact closed simulator state and dense-array validation, concurrency assertions, bounded-history evidence, and direct reset-history evidence were corrected. Final counts: Critical 0, High 0, Medium 0, Low 0; PASS recommendation; focused tests 197 / 197 passed.
+- Reviewer B initially reported Critical 0, High 1, Medium 1, Low 0. Delayed pre-reset mutation crossing and non-uniform native Fastify errors were corrected. Final counts: Critical 0, High 0, Medium 0, Low 0; PASS recommendation; the then-current focused tests 189 / 189 passed.
+- Reviewer C initially reported Critical 0, High 0, Medium 2, Low 0. Hidden failed-reroute ID consumption, over-broad simulator runtime-image contents, and Phase 3 status documentation were corrected. Final counts: Critical 0, High 0, Medium 0, Low 0; PASS recommendation.
+
+### Known limitations and gate conclusion
+
+- Mutation serialization, history, counters, and state are process-local and reset on process restart; Phase 3 does not provide distributed coordination or persistence.
+- This is a deterministic digital twin for contract and failure testing, not a physical vehicle model or live map/charging backend.
+- A configured timeout waits for its deterministic delay and returns HTTP 504 when the client remains connected; an earlier client-side timeout may end observation first.
+- The `/simulator/*` control plane is intentionally present for tests and must not be exposed as a production Agent capability.
+- Docker Desktop required removal of two stale, automatically regenerated local IPC socket files before the final counted cycles; no repository, image, or user data was deleted.
+
+Implementation, all automated checks, 397 / 397 total tests, 197 / 197 focused Phase 3 tests, measured coverage targets, two clean container starts, architecture/security scans, and all three independent reviews pass. State corruption, secret leakage, Phase 4+ leakage, unresolved Critical findings, and unresolved High findings are all zero. Therefore the Phase 3 gate result is:
+
+**PASS**
+
+Phase 4 has not been started.
