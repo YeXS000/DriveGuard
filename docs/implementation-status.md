@@ -499,3 +499,138 @@ Implementation, all automated checks, 397 / 397 total tests, 197 / 197 focused P
 **PASS**
 
 Phase 4 has not been started.
+
+## Phase 4 — Capability Model & Tool Registry
+
+- Status: COMPLETE
+- Scope: Formal capability availability model, 14 TypeBox-derived Tool Contracts, sealed Tool Registry, dynamic capability/service resolution, Simulator HTTP adapter, deterministic development providers, and Phase 4 verification only.
+- Gate result: PASS
+- Verification date: 2026-08-27 (Asia/Shanghai)
+- Git base: `9d2f38286ec637f876bdf8c0beeb7832dd98833d`; branch `phase/04-capability-tool-registry` in `/home/yej/work/Pi/DriveGuard_phase/04-capability-tool-registry`.
+
+No production Pi Agent integration, Policy Engine, `ALLOW` / `DENY` / `REQUIRE_CONFIRMATION` / `REPLAN` decision, confirmation, action state machine, Reliable Executor, retry, circuit breaker, Agent idempotency, persistence, HMI, or Agent Eval was implemented. The Phase 1 runtime and Phase 3 Simulator server remain unchanged.
+
+### Capability model and dynamic resolution
+
+- Phase 2 `VehicleCapabilities` is reused unchanged: `navigation`, `charging`, `cabinTemperature`, `seatHeating`, `media`, and `roadsideAssistance`.
+- Objective service availability is closed and explicit: `vehicleSimulator`, `weather`, and `emergencySupport`.
+- Resolution requires every declared capability and service. It does not inspect vehicle speed, context freshness, user role, risk policy, or any authorization result.
+- Zero optional vehicle capabilities exposes only `get_vehicle_state` and `get_weather` when their services are available. Unavailable services independently remove their dependent tools.
+- The explicit mapping is:
+  - navigation → `get_trip_state`, `set_navigation_destination`, `reroute_to_charger`;
+  - charging → `search_charging_stations`, `get_charging_status`, `reroute_to_charger`, `reserve_charging_slot`, `cancel_charging_reservation`;
+  - cabin temperature → `set_cabin_temperature`;
+  - seat heating → `set_seat_heating`;
+  - media → `set_media_volume`;
+  - roadside assistance → `request_roadside_assistance`, `request_emergency_support`.
+
+### Formal Tool Contracts
+
+R0, read-only:
+
+- `get_vehicle_state`
+- `get_trip_state`
+- `get_weather`
+- `search_charging_stations`
+- `get_charging_status`
+
+R1, low risk metadata:
+
+- `set_cabin_temperature`
+- `set_seat_heating`
+- `set_media_volume`
+
+R2, user-impact metadata:
+
+- `set_navigation_destination`
+- `reroute_to_charger`
+- `reserve_charging_slot`
+- `cancel_charging_reservation`
+
+R3, safety-support metadata:
+
+- `request_roadside_assistance`
+- `request_emergency_support`
+
+Every contract contains `name`, `label`, `description`, `inputSchema`, `outputSchema`, `riskLevel`, `requiredCapabilities`, `requiredServices`, `sideEffect`, `timeoutHintMs`, `idempotencyHint`, and `auditLevel`. Input and output types derive from their TypeBox schemas. Inputs, dependency responses, provider outputs, and cloneability boundaries are validated at runtime. The Tool error taxonomy is `TOOL_VALIDATION_ERROR`, `CAPABILITY_UNAVAILABLE`, `DEPENDENCY_UNAVAILABLE`, `DEPENDENCY_TIMEOUT`, `DEPENDENCY_RESPONSE_INVALID`, `RESOURCE_NOT_FOUND`, and `CONFLICT`; `POLICY_DENIED` does not exist in Phase 4.
+
+### RX boundary and Registry semantics
+
+- RX names are exactly `apply_brake`, `control_steering`, `set_throttle`, `disable_aeb`, and `disable_esc`.
+- RX registration attempts are rejected. RX formal definitions and dynamic exposure are both zero.
+- `ToolRegistry` supports `register`, `get`, `list`, `resolve`, `requireAvailable`, `seal`, and safe snapshots.
+- Formal registry creation registers all 14 definitions and seals the registry. Duplicate names, post-seal changes, invalid risk/capability/service metadata, invalid schema, invalid handler, and unsupported RX names are rejected.
+- Lists, definitions, schemas, availability arrays, and snapshots are immutable. List order is deterministic by Tool name. Snapshots contain safe metadata only and exclude provider clients, base URLs, schemas, and execute handlers.
+
+### Simulator and development-provider integration
+
+- `SimulatorClient` is the only Phase 4 source containing `fetch()`. It owns the credential-free base URL, request body, HTTP method/path, response validation, structured transport error mapping, and abort-based timeout boundary.
+- The adapter covers vehicle/trip reads, cabin temperature, seat heating, media volume, navigation destination, charging search/status/reservation/cancellation, and roadside assistance.
+- `reroute_to_charger` explicitly selects a station from `/charging/stations` and sends its name to `/navigation/destination`; the Phase 3 Simulator architecture and endpoints were not changed.
+- Weather and emergency support use deterministic implementations whose outputs contain `DEVELOPMENT_PROVIDER`. They are not represented as live external services.
+- No retry, circuit breaker, confirmation, Agent execution lifecycle, or idempotency enforcement is present.
+
+### Tests and measured coverage
+
+Final focused Phase 4 results:
+
+| Check                          | Measured result                                                   |
+| ------------------------------ | ----------------------------------------------------------------- |
+| `npm run test:phase4`          | PASS; 5 files, 223 tests                                          |
+| Contract tests                 | PASS; 98 tests                                                    |
+| Registry/capability unit tests | PASS; 73 tests                                                    |
+| SimulatorClient unit tests     | PASS; 24 tests                                                    |
+| Integration tests              | PASS; 20 tests; all 14 formal tools executed through one workflow |
+| Architecture/security tests    | PASS; 8 tests                                                     |
+| `npm run test:phase4:packages` | PASS; built package imports and 14-tool resolution                |
+| `npm test`                     | PASS; 20 files, 620 tests                                         |
+
+The integration suite uses a real loopback Fastify Phase 3 server and verifies Registry → resolution → formal Tool → `SimulatorClient` → Simulator API → validated structured result. Adapter error coverage includes successful reads/mutations, 404, 409, 400, 500, 503, malformed JSON, schema-invalid output, connection failure, and timeout.
+
+Measured V8 coverage from `npm run test:phase4:coverage` after review remediation:
+
+| Scope                          | Statements | Branches | Functions | Lines |
+| ------------------------------ | ---------: | -------: | --------: | ----: |
+| All Phase 4                    |     99.59% |   99.03% |      100% |  100% |
+| `packages/capabilities`        |       100% |     100% |      100% |  100% |
+| `packages/tools`               |     99.55% |   98.97% |      100% |  100% |
+| Capability resolver            |       100% |     100% |      100% |  100% |
+| `ToolRegistry` (`registry.ts`) |     98.48% |   97.95% |      100% |  100% |
+| `SimulatorClient`              |       100% |     100% |      100% |  100% |
+
+All requested line and critical Registry/Resolver branch targets were exceeded.
+
+### Architecture, security, and independent review
+
+- Formal DriveGuard tools = exactly 14.
+- RX exposed = 0.
+- Duplicate formal names = 0.
+- Invalid schema execution reaching a handler = 0 in measured tests.
+- Phase 1 fixture tools = exactly 2; Phase 1 runtime → formal Registry references = 0.
+- Changed Phase 1 Agent Runtime files = 0; changed Phase 3 Simulator server files = 0.
+- Phase 4 imports from Policy, Executor, Agent Runtime, Confirmation, or Action State Machine = 0.
+- Production policy/confirmation/executor implementation added = 0.
+- Tracked secret files, generated build artifacts, or coverage artifacts = 0. No credential source or live provider was used.
+
+Final independent read-only review results:
+
+- Reviewer A — Capability / Contract: Critical 0, High 0, Medium 0, Low 0.
+- Reviewer B — Registry / Integration: Critical 0, High 0, Medium 0, Low 0.
+- Reviewer C — Architecture / Security: Critical 0, High 0, Medium 0, Low 0.
+
+Pre-final review hardening normalized uncloneable capability contexts, Tool inputs, and provider outputs into the defined structured errors and made registered schemas deeply immutable. Focused tests increased to 223 and passed after those changes.
+
+### Known limitations and gate conclusion
+
+- The formal Registry is a library/test surface only; the production Pi Agent does not load it in Phase 4.
+- Risk, timeout, audit, and idempotency values are metadata. Phase 4 does not authorize, confirm, retry, deduplicate, or persist an action.
+- Development weather and emergency-support providers are deterministic substitutes, not live services.
+- The emergency-support provider sequence and Registry objects are process-local.
+- `SimulatorClient` performs one request attempt only. Retry and circuit breaker behavior belongs to Phase 8.
+- A GitHub-hosted Actions run and the opt-in paid Phase 1 DeepSeek live smoke were not run; Phase 1 model/runtime paths were unchanged.
+
+Implementation, focused and full regression tests, public package imports, real Simulator integration, error cases, measured coverage, architecture/security checks, and all three reviews pass. Formal Tool count is 14, RX exposure is zero, Phase 1 fixture count is two, and Phase 5+ leakage is zero. Therefore the Phase 4 gate result is:
+
+**PASS**
+
+Phase 5 has not been started.
