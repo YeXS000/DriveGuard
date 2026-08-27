@@ -14,7 +14,7 @@
     "services/*"
   ],
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && tsc --project packages/shared/tsconfig.json && tsc --project packages/domain/tsconfig.json && tsc --project packages/context/tsconfig.json && tsc --project services/vehicle-simulator/tsconfig.json",
+    "build": "tsc --project tsconfig.build.json && tsc --project packages/shared/tsconfig.json && tsc --project packages/domain/tsconfig.json && tsc --project packages/context/tsconfig.json && tsc --project packages/capabilities/tsconfig.json && tsc --project packages/tools/tsconfig.json && tsc --project services/vehicle-simulator/tsconfig.json",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "lint": "eslint . --max-warnings=0",
@@ -29,6 +29,9 @@
     "test:phase2:packages": "npm run build --silent && node tests/contract/phase2-package-exports.mjs",
     "test:phase3": "vitest run tests/unit/phase3-*.test.ts tests/contract/phase3-*.test.ts tests/integration/phase3-*.test.ts",
     "test:phase3:coverage": "npm run test:phase3 -- --coverage --coverage.include=services/vehicle-simulator/src/**/*.ts --coverage.exclude=services/vehicle-simulator/src/server.ts --coverage.exclude=services/vehicle-simulator/src/index.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html",
+    "test:phase4": "vitest run tests/unit/phase4-*.test.ts tests/contract/phase4-*.test.ts tests/integration/phase4-*.test.ts",
+    "test:phase4:coverage": "npm run test:phase4 -- --coverage --coverage.include=packages/capabilities/src/**/*.ts --coverage.include=packages/tools/src/**/*.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html",
+    "test:phase4:packages": "npm run build --silent && node tests/contract/phase4-package-exports.mjs",
     "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
   },
   "dependencies": {
