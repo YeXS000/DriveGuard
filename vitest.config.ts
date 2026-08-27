@@ -7,6 +7,9 @@ export default defineConfig({
       "@driveguard/context": fileURLToPath(
         new URL("./packages/context/src/index.ts", import.meta.url),
       ),
+      "@driveguard/agent-runtime": fileURLToPath(
+        new URL("./packages/agent-runtime/src/index.ts", import.meta.url),
+      ),
       "@driveguard/capabilities": fileURLToPath(
         new URL("./packages/capabilities/src/index.ts", import.meta.url),
       ),

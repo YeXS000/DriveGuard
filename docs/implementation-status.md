@@ -633,4 +633,177 @@ Implementation, focused and full regression tests, public package imports, real 
 
 **PASS**
 
-Phase 5 has not been started.
+## Phase 5 — Production Agent Runtime
+
+### Status and scope
+
+- Implementation status: **IMPLEMENTED** in the dedicated Phase 5 worktree.
+- Stage Gate: **PASS** after the required live DeepSeek read-only CASE 1–6 smoke completed successfully and the closure regression remained green.
+- Commit authorization: enabled only after the closure regression and staged secret/artifact review pass; `main` remains unmodified and unmerged.
+- Phase 1 fixture runtime and `PHASE_1_FIXTURE_ONLY` remain unchanged and isolated for regression.
+- Phase 6 Policy, Confirmation, Action State Machine, Reliable Executor, persistence, retry, circuit breaker, HMI, production telemetry, and Agent Eval were not implemented.
+
+Implemented modules and configuration:
+
+- `packages/agent-runtime/src/agent-run.ts`: explicit run identity, lifecycle, legal-transition matrix, immutable snapshots, and terminal states.
+- `packages/agent-runtime/src/context-loader.ts`: per-turn Vehicle, Trip, weather, user, capabilities, and service-availability loading; Phase 2 snapshot construction and freshness reporting.
+- `packages/agent-runtime/src/pi-tool-adapter.ts`: the single Phase 4 `ToolDefinition` to Pi `AgentTool` boundary, defensive input/output Schema validation, cancellation settlement tracking, and safe formal execution evidence.
+- `packages/agent-runtime/src/pi-event-adapter.ts`: strict Pi lifecycle to DriveGuard Runtime Event mapping, opaque Tool-call IDs, event pairing, and invalid-state rejection.
+- `packages/agent-runtime/src/session.ts`: private process-local Pi Agent state, active-run ownership, safe frozen summaries, transcript checkpoint/rollback, and multi-turn state.
+- `packages/agent-runtime/src/production-runtime.ts`: Context/Registry/Pi orchestration, dynamic exposure, concurrency, cancellation, structured failures, safe EventSink boundary, and run evidence.
+- `packages/agent-runtime/src/production-factory.ts`: installed Pi DeepSeek catalog selection, controlled dependency construction, runtime-mode parsing, and development Simulator origin enforcement.
+- `packages/agent-runtime/src/phase5-live-smoke.ts`: opt-in live DeepSeek read-only CASE 1–6 runner and measured summary format.
+- `packages/agent-runtime/src/runtime-errors.ts` and `runtime-events.ts`: closed Runtime error taxonomy and safe internal Event contracts.
+- `docs/adr/0006-phase-5-production-agent-runtime-boundaries.md`: Phase 5 architecture and temporary pre-Policy boundary decision.
+- Root/package scripts, workspace package exports, lockfile, Vitest alias, `.env.example`, and focused unit/contract/integration tests were updated for Phase 5.
+- Phase 3 Simulator implementation and accepted Phase 0–4 interfaces were not modified.
+
+### AgentRun lifecycle
+
+The implemented state model is:
+
+```text
+RUN_CREATED
+→ CONTEXT_LOADING
+→ CAPABILITY_RESOLUTION
+→ MODEL_RUNNING
+→ TOOL_REQUESTED
+→ TOOL_PROCESSING
+→ MODEL_RESUMED
+→ MODEL_RUNNING
+→ RUN_SUCCEEDED | RUN_FAILED | RUN_CANCELLED
+```
+
+- Every request has `runId`, `sessionId`, `traceId`, `createdAt`, one immutable `contextSnapshotId`, status, and full status history.
+- The complete 10 by 10 transition matrix is tested. Illegal transitions throw structured `INTERNAL_ERROR` and are never silent.
+- Throwing, malformed, or duplicate generated run/trace/event IDs produce unique fallback identities and a secret-safe structured failure rather than a raw rejection.
+
+### Context and World State refresh
+
+- Every user turn reloads current Vehicle and Trip state from the formal Simulator client, reloads current capability/service inputs, and creates a new Phase 2 `ContextSnapshot`.
+- Conversation memory persists only for conversational continuity; it is not used as current World State.
+- The two-turn Simulator integration changed SOC from 72 to 20 and verified the second turn observed 20 with increased Context and Vehicle versions.
+- Freshness reports cover `FRESH`, `STALE`, `INVALID_FUTURE_TIMESTAMP`, and `NOT_LATEST`. Non-fresh Context returns `CONTEXT_INVALID` before model execution.
+- `NOT_LATEST` is verified through the production factory's injectable authoritative latest-version provider. The default/live Simulator composition has no independent authoritative latest-version source and therefore live `NOT_LATEST` detection remains **NOT VERIFIED**; no claim is made beyond the injected production path.
+
+### Dynamic Tool exposure
+
+- Every turn resolves `ContextSnapshot.capabilities + current ServiceAvailability` through the Phase 4 sealed Registry.
+- Full development capability resolves exactly 14 formal Tools; default read-only mode exposes the five R0 Tools.
+- Charging capability removal hides every charging Tool; `seatHeating=false` hides `set_seat_heating`; per-turn service changes hide the corresponding Tools in the same Session.
+- Non-formal definitions, forbidden RX names, and any side-effect definition in read-only mode are rejected defensively.
+- RX exposure measured by architecture and runtime tests: **0**.
+
+### Pi Tool and Event adapters
+
+- Tool name, label, description, input Schema, handler, and formal output contract flow through the single `PiToolAdapter`.
+- Adapter-level Schema checks and safe cloning independently reject invalid or uncloneable input/output, even if an injected handler is defective.
+- Cancellation waits for already-dispatched dependency work to settle. Safe evidence records `outcome` and `completedAfterCancel`, so an action that actually completed after cancellation is not hidden.
+- `PiEventAdapter` accepts Tool starts only during valid model/parallel-processing states, enforces start/end/name pairing, rejects orphan/duplicate/incomplete lifecycles, and maps raw provider IDs to per-run opaque IDs.
+- Runtime Events contain required identity/timestamp fields and safe lifecycle metadata only. Prompts, raw Pi messages, Tool arguments/results, credentials, hidden reasoning, and provider-controlled IDs are absent.
+- An EventSink failure on `tool.requested` propagates before Pi handler dispatch; a real development-mode Simulator test measured zero side effect. Terminal sink failure cannot produce a failed result with `RUN_SUCCEEDED` state.
+
+### Session, concurrency, and runtime modes
+
+- One private Pi Agent is held per process-local Session. Raw Agent state and raw messages are not package exports; callers receive only frozen session summaries and safe run evidence.
+- Successful turns preserve conversation state. Failed/cancelled turns roll back additions from that turn, preventing raw provider errors or partial Tool messages from contaminating the next request.
+- Same-Session concurrent requests return `SESSION_BUSY`; different Sessions run concurrently with distinct run/event/context/message state.
+- `read_only` is the default and exposes only non-side-effect R0 definitions.
+- `development` requires explicit `NON_PRODUCTION` opt-in, a loopback Simulator origin, the controlled formal Registry, and `PRE_POLICY` / `NON_PRODUCTION` labeling.
+- The documented warning is: `Phase 5 execution path is pre-Policy and not production-safe for side-effect tools.`
+
+### Tests, coverage, and regression
+
+Final measured automated results on 2026-08-27:
+
+- `npm run format`: PASS.
+- `npm run lint`: PASS, zero warnings.
+- `npm run typecheck`: PASS.
+- `npm run build`: PASS.
+- `npm run test:phase5`: PASS, 6 files / **241 tests**.
+- `npm run test:phase5:packages`: PASS, **7/7** safe public exports; raw Runtime constructor and Session/Agent objects are not exported.
+- `npm test`: PASS, 26 files / **861 tests**. Phase 0–4 regression remains PASS.
+- `npm audit --audit-level=high`: PASS, **0 vulnerabilities**.
+- `git diff --check`: PASS.
+
+Measured Phase 5 coverage:
+
+| Module                       |  Lines | Branches | Functions |
+| ---------------------------- | -----: | -------: | --------: |
+| All selected Phase 5 modules | 97.31% |   93.44% |    98.24% |
+| AgentRun                     |   100% |     100% |      100% |
+| ContextLoader                |   100% |     100% |      100% |
+| PiEventAdapter               |   100% |     100% |      100% |
+| PiToolAdapter                |   100% |     100% |      100% |
+| Production factory           | 97.56% |      96% |      100% |
+| Production runtime           | 94.31% |   88.23% |    96.42% |
+| Runtime errors               |   100% |     100% |      100% |
+| Runtime events               |   100% |     100% |      100% |
+| Session                      | 97.87% |   83.33% |    96.29% |
+
+All requested line targets and the AgentRun, ContextLoader, Tool adapter, and Event adapter branch targets pass.
+
+### Architecture, security, and review
+
+- Production Runtime uses Phase 4 Registry: PASS.
+- Production Runtime uses Phase 2 Context: PASS.
+- Formal Tool source count: 14.
+- Default read-only Tool count: 5.
+- Dynamic exposure cases: PASS in automated integration tests.
+- RX exposed: 0.
+- Phase 1 fixture/runtime isolation: PASS; changed Phase 1 Runtime files = 0.
+- Production Policy/Confirmation/Action State Machine/Reliable Executor/Persistence implementations added: 0.
+- Raw Pi Session/Agent/message API package exports: 0.
+- Tracked `.env`, credential, key, generated build, coverage, cache, or log artifacts: 0.
+- `api_key.md` was not read, copied, logged, or used.
+- Secret leakage in Runtime result/event/factory/sink/provider error tests: 0.
+
+Three independent read-only reviews were performed and all correctness, architecture, security, and test-validity findings were remediated:
+
+- Reviewer A — Runtime Correctness final: Critical 0, High 0, Medium 0, Low 0.
+- Reviewer B — Tools / Events final: Critical 0, High 0, Medium 0, Low 0.
+- Reviewer C — Architecture / Security code findings: Critical 0, High 0, Medium 0, Low 0 after this status record replaces the stale “not started” entry.
+
+Notable review hardening included private raw Pi state, failed-turn rollback, live per-turn capability/service refresh, strict formal-name and development-origin boundaries, independent output validation, strict Pi event pairing/state checks, safe EventSink propagation, safe ID/Event factory fallback, deep-frozen in-memory events, and truthful post-cancellation execution evidence.
+
+### Live DeepSeek and known limitations
+
+The required live DeepSeek read-only Gate was executed successfully with these measured totals:
+
+| Field                  | Actual result        |
+| ---------------------- | -------------------- |
+| Provider               | `deepseek`           |
+| API                    | `openai-completions` |
+| Model                  | `deepseek-v4-flash`  |
+| Runtime mode           | `read_only`          |
+| Provider requests      | 13                   |
+| Formal Tool calls      | 7                    |
+| Formal Tool executions | 7                    |
+| Tool errors            | 0                    |
+
+Live CASE 1–6 results:
+
+| Case                         | Actual Tool behavior                                                  | Terminal result                                   | Gate result |
+| ---------------------------- | --------------------------------------------------------------------- | ------------------------------------------------- | ----------- |
+| CASE 1 — battery             | `get_vehicle_state`                                                   | `RUN_SUCCEEDED`                                   | PASS        |
+| CASE 2 — navigation          | `get_trip_state`                                                      | `RUN_SUCCEEDED`                                   | PASS        |
+| CASE 3 — charging stations   | `search_charging_stations`                                            | `RUN_SUCCEEDED`                                   | PASS        |
+| CASE 4 — multi-tool          | `get_vehicle_state` + `get_trip_state`; 2 executions                  | `RUN_SUCCEEDED`                                   | PASS        |
+| CASE 5 — ordinary chat       | 0 Tool calls                                                          | `RUN_SUCCEEDED`                                   | PASS        |
+| CASE 6 — World State refresh | 2 prompts; `get_vehicle_state` executed twice; `contextVersion` 6 → 7 | both runs `RUN_SUCCEEDED`; `expectationsMet=true` | PASS        |
+
+- Live Secret handling used the process environment only; no credential value or live-test log is stored in Git.
+- Automated tests continue to use Pi `fauxProvider()` and remain offline from the live LLM.
+- Sessions and Runtime Events are process-local and non-durable.
+- Development side effects remain direct pre-Policy execution and are not production-safe.
+- Retry, circuit breaker, durable idempotency, distributed session coordination, and durable audit belong to later phases and are absent.
+
+### Stage Gate conclusion
+
+Automated engineering, Phase 0–4 regression, Registry/Context integration, World State refresh, dynamic Tool exposure, RX isolation, lifecycle, concurrency, required event propagation, formal Tool integration, coverage, secret tests, three independent code reviews, and the required live DeepSeek read-only CASE 1–6 smoke all pass.
+
+The Phase 5 Stage Gate result is:
+
+**PASS**
+
+Per the phase workflow, the Phase 5 closure commit is created only after the final regression and staged security review pass. `main` is not merged or modified, and Phase 6 is not started.
