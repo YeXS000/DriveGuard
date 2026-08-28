@@ -9,6 +9,7 @@ export interface PiEventAdapterOptions {
   readonly exposedToolNames: readonly string[];
   readonly eventFactory: Pick<RuntimeEventFactory, "create">;
   readonly emit: (event: RuntimeEvent) => void | Promise<void>;
+  readonly boundary?: "PRE_POLICY" | "POLICY_GUARDED";
 }
 
 export class PiEventAdapter {
@@ -16,6 +17,7 @@ export class PiEventAdapter {
   readonly #exposedToolNames: ReadonlySet<string>;
   readonly #eventFactory: Pick<RuntimeEventFactory, "create">;
   readonly #emit: (event: RuntimeEvent) => void | Promise<void>;
+  readonly #boundary: "PRE_POLICY" | "POLICY_GUARDED";
   readonly #toolCallIds = new Map<string, string>();
   readonly #activeToolCalls = new Map<string, string>();
   readonly #completedToolCalls = new Set<string>();
@@ -27,6 +29,7 @@ export class PiEventAdapter {
     this.#exposedToolNames = new Set(options.exposedToolNames);
     this.#eventFactory = options.eventFactory;
     this.#emit = options.emit;
+    this.#boundary = options.boundary ?? "PRE_POLICY";
   }
 
   get toolErrorCount(): number {
@@ -67,7 +70,7 @@ export class PiEventAdapter {
       case "turn_start":
         if (this.#run.status === "MODEL_RESUMED") {
           this.#run.transition("MODEL_RUNNING");
-          await this.#runtimeEvent("model.started", { boundary: "PRE_POLICY" });
+          await this.#runtimeEvent("model.started", { boundary: this.#boundary });
         }
         return;
       case "tool_execution_start": {
@@ -95,7 +98,7 @@ export class PiEventAdapter {
         await this.#runtimeEvent("tool.requested", {
           toolName: this.#safeToolName(event.toolName),
           toolCallId: this.#safeToolCallId(event.toolCallId),
-          boundary: "PRE_POLICY",
+          boundary: this.#boundary,
         });
         return;
       }
@@ -118,7 +121,7 @@ export class PiEventAdapter {
           toolName: this.#safeToolName(event.toolName),
           toolCallId: this.#safeToolCallId(event.toolCallId),
           isError: event.isError,
-          boundary: "PRE_POLICY",
+          boundary: this.#boundary,
         });
         this.#activeToolCalls.delete(event.toolCallId);
         this.#completedToolCalls.add(event.toolCallId);
@@ -134,7 +137,7 @@ export class PiEventAdapter {
         if (event.toolResults.length > 0) {
           this.assertComplete();
           this.#run.transition("MODEL_RESUMED");
-          await this.#runtimeEvent("model.resumed", { boundary: "PRE_POLICY" });
+          await this.#runtimeEvent("model.resumed", { boundary: this.#boundary });
         }
         return;
       default:

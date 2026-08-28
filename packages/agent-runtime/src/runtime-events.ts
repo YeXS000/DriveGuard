@@ -7,6 +7,9 @@ export const RUNTIME_EVENT_TYPES = [
   "capabilities.resolved",
   "model.started",
   "tool.requested",
+  "policy.evaluation.started",
+  "policy.decision.made",
+  "policy.execution.blocked",
   "tool.completed",
   "model.resumed",
   "agent.run.completed",
@@ -24,7 +27,9 @@ export interface RuntimeEventMetadata {
   readonly isError?: boolean;
   readonly errorCode?: string;
   readonly runtimeMode?: string;
-  readonly boundary?: "PRE_POLICY";
+  readonly boundary?: "PRE_POLICY" | "POLICY_GUARDED";
+  readonly decision?: "ALLOW" | "DENY" | "REQUIRE_CONFIRMATION" | "REPLAN";
+  readonly ruleId?: string;
 }
 
 export interface RuntimeEvent {

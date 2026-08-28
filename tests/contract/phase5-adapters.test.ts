@@ -16,6 +16,17 @@ import {
 
 const clock = new FixedClock(Date.parse("2026-08-27T08:00:00.000Z"));
 
+function guardedAdapter(
+  mode: "read_only" | "development",
+  observer?: ConstructorParameters<typeof PiToolAdapter>[1],
+): PiToolAdapter {
+  const testOnlyPassThroughGuard = {
+    execute: (_definition: ToolDefinition, _arguments: unknown, handler: () => Promise<unknown>) =>
+      handler(),
+  };
+  return new PiToolAdapter(mode, observer, testOnlyPassThroughGuard as never);
+}
+
 function definition(name = "formal_test_tool"): ToolDefinition {
   const inputSchema = Type.Object(
     { value: Type.Integer({ minimum: 0, maximum: 10 }) },
@@ -74,7 +85,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
     "maps name, label, description and schema in %s mode",
     (mode) => {
       const source = definition();
-      const tool = new PiToolAdapter(mode).adapt(source);
+      const tool = guardedAdapter(mode).adapt(source);
 
       expect(tool.name).toBe(source.name);
       expect(tool.label).toBe(source.label);
@@ -87,7 +98,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
   it.each(["read_only", "development"] as const)(
     "executes the formal contract and returns validated details in %s mode",
     async (mode) => {
-      const result = await new PiToolAdapter(mode)
+      const result = await guardedAdapter(mode)
         .adapt(definition())
         .execute("pi-call-raw-id", { value: 4 });
 
@@ -96,8 +107,8 @@ describe("Phase 5 PiToolAdapter contract", () => {
         toolName: "formal_test_tool",
         result: { doubled: 8 },
         runtimeMode: mode,
-        safetyBoundary: "PRE_POLICY",
-        productionSafety: "NON_PRODUCTION",
+        safetyBoundary: "POLICY_GUARDED",
+        productionSafety: "PHASE_6_POLICY_ENFORCED",
       });
       expect(result.content).toEqual([
         {
@@ -110,7 +121,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
   );
 
   it("propagates formal input validation rejection without invoking a second handler", async () => {
-    const tool = new PiToolAdapter("read_only").adapt(definition());
+    const tool = guardedAdapter("read_only").adapt(definition());
 
     await expect(tool.execute("call-invalid", { value: 11 })).rejects.toMatchObject({
       code: "TOOL_VALIDATION_ERROR",
@@ -121,7 +132,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
   it("propagates a formal Tool error as a rejected Pi Tool execution", async () => {
     const source = definition();
     const failing = { ...source, execute: vi.fn(() => Promise.reject(new Error("failure"))) };
-    const tool = new PiToolAdapter("read_only").adapt(failing);
+    const tool = guardedAdapter("read_only").adapt(failing);
 
     await expect(tool.execute("call-failure", { value: 1 })).rejects.toThrow("failure");
     expect(failing.execute).toHaveBeenCalledOnce();
@@ -133,7 +144,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
       ...source,
       execute: vi.fn(() => Promise.resolve({ doubled: 99 })),
     } as ToolDefinition;
-    const tool = new PiToolAdapter("read_only").adapt(invalid);
+    const tool = guardedAdapter("read_only").adapt(invalid);
 
     await expect(tool.execute("call-invalid-output", { value: 1 })).rejects.toMatchObject({
       code: "DEPENDENCY_RESPONSE_INVALID",
@@ -143,7 +154,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
 
   it("rejects Tool input that cannot be safely cloned", async () => {
     const parameters = new Proxy({ value: 1 }, {});
-    const tool = new PiToolAdapter("read_only").adapt(definition());
+    const tool = guardedAdapter("read_only").adapt(definition());
 
     await expect(tool.execute("call-uncloneable-input", parameters)).rejects.toMatchObject({
       code: "TOOL_VALIDATION_ERROR",
@@ -159,7 +170,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
     } as ToolDefinition;
 
     await expect(
-      new PiToolAdapter("read_only").adapt(uncloneable).execute("call-uncloneable-output", {
+      guardedAdapter("read_only").adapt(uncloneable).execute("call-uncloneable-output", {
         value: 1,
       }),
     ).rejects.toMatchObject({
@@ -175,7 +186,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
     controller.abort();
 
     await expect(
-      new PiToolAdapter("development")
+      guardedAdapter("development")
         .adapt(source)
         .execute("call-pre-aborted", { value: 1 }, controller.signal),
     ).rejects.toMatchObject({ code: "DEPENDENCY_UNAVAILABLE" });
@@ -196,7 +207,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
       }),
     } as ToolDefinition;
     const evidence: unknown[] = [];
-    const adapter = new PiToolAdapter("development", (execution) => evidence.push(execution));
+    const adapter = guardedAdapter("development", (execution) => evidence.push(execution));
     const controller = new AbortController();
     const execution = adapter
       .adapt(delayed)
@@ -225,7 +236,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
 
   it("maps a deterministic list without changing source order", () => {
     const definitions = [definition("tool_c"), definition("tool_a"), definition("tool_b")];
-    const tools = new PiToolAdapter("read_only").adaptAll(definitions);
+    const tools = guardedAdapter("read_only").adaptAll(definitions);
 
     expect(tools.map((tool) => tool.name)).toEqual(["tool_c", "tool_a", "tool_b"]);
     expect(Object.isFrozen(tools)).toBe(true);
@@ -235,6 +246,15 @@ describe("Phase 5 PiToolAdapter contract", () => {
     expect(PHASE_5_PRE_POLICY_NOTICE).toBe(
       "Phase 5 execution path is pre-Policy and not production-safe for side-effect tools.",
     );
+  });
+
+  it("fails closed without a Policy guard and executes zero handlers", async () => {
+    const source = definition();
+    const execute = vi.spyOn(source, "execute");
+    await expect(
+      new PiToolAdapter("development").adapt(source).execute("missing-policy", { value: 2 }),
+    ).rejects.toMatchObject({ code: "DEPENDENCY_UNAVAILABLE" });
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 

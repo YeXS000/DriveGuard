@@ -233,6 +233,8 @@ describe("Phase 5 production Agent Runtime integration", () => {
       "capabilities.resolved",
       "model.started",
       "tool.requested",
+      "policy.evaluation.started",
+      "policy.decision.made",
       "tool.completed",
       "model.resumed",
       "model.started",
@@ -650,8 +652,10 @@ describe("Phase 5 production Agent Runtime integration", () => {
 
     expect(result.availableToolNames).toHaveLength(14);
     expect(result.runtimeMode).toBe("development");
-    expect(result.safetyNotice).toContain("pre-Policy");
-    expect(result.events.every((event) => event.metadata?.boundary === "PRE_POLICY")).toBe(true);
+    expect(result.safetyNotice).toContain("deterministic Policy is enforced");
+    expect(result.events.every((event) => event.metadata?.boundary === "POLICY_GUARDED")).toBe(
+      true,
+    );
   });
 
   it("rejects development mode without explicit NON_PRODUCTION opt-in", () => {
@@ -725,19 +729,16 @@ describe("Phase 5 production Agent Runtime integration", () => {
     expect(serviceAvailabilityProvider).toHaveBeenCalledTimes(2);
   });
 
-  it("reports NOT_LATEST through the production factory path", async () => {
+  it("retains NOT_LATEST evidence until a Tool request reaches Policy", async () => {
     const { runtime } = createRuntime([fauxAssistantMessage("unused")], {
       latestContextVersionProvider: (snapshotVersion) => snapshotVersion + 1,
     });
 
     const result = await runtime.run({ sessionId: "not-latest", prompt: "Hello." });
 
-    expect(result.status).toBe("failed");
-    expect(result.error).toMatchObject({
-      code: "CONTEXT_INVALID",
-      message: "Current context freshness is NOT_LATEST",
-    });
+    expect(result.status).toBe("succeeded");
     expect(result.context?.freshness.status).toBe("NOT_LATEST");
+    expect(result.policyDecisions).toEqual([]);
   });
 
   it("never exposes any RX name", async () => {

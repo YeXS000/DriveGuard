@@ -2,7 +2,14 @@ import { randomUUID } from "node:crypto";
 
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
+import { ContextConflictDetector, ContextFreshnessEvaluator } from "@driveguard/context";
 import { toUtcTimestamp, type ContextSnapshot } from "@driveguard/domain";
+import {
+  type PolicyDecision,
+  type PolicyEngine,
+  type PolicyEvaluationInput,
+  type ToolPolicyProfileRegistry,
+} from "@driveguard/policy";
 import type { Clock } from "@driveguard/shared";
 import {
   FORBIDDEN_TOOL_NAMES,
@@ -13,14 +20,22 @@ import {
 } from "@driveguard/tools";
 
 import { AgentRun, type AgentRunSnapshot } from "./agent-run.js";
-import { ContextLoader, type ContextFreshnessReport } from "./context-loader.js";
+import {
+  ContextLoader,
+  selectEffectiveFreshness,
+  type ContextFreshnessReport,
+} from "./context-loader.js";
 import { PiEventAdapter } from "./pi-event-adapter.js";
 import {
-  PHASE_5_PRE_POLICY_NOTICE,
   PiToolAdapter,
   type FormalToolExecutionEvidence,
   type Phase5RuntimeMode,
 } from "./pi-tool-adapter.js";
+import {
+  PHASE_6_POLICY_NOTICE,
+  PolicyGuardedToolHandler,
+  type RuntimePolicyControlResult,
+} from "./policy-guarded-tool-handler.js";
 import {
   AgentRuntimeError,
   safeRuntimeError,
@@ -49,6 +64,8 @@ export interface DriveGuardRuntimeOptions {
   readonly eventIdFactory?: () => string;
   readonly eventSink?: RuntimeEventSink;
   readonly sensitiveValues?: readonly string[];
+  readonly policyEngine: PolicyEngine;
+  readonly policyProfiles: ToolPolicyProfileRegistry;
 }
 
 export interface AgentRunRequest {
@@ -71,9 +88,10 @@ export interface AgentRunResult {
   readonly run: AgentRunSnapshot;
   readonly events: readonly RuntimeEvent[];
   readonly runtimeMode: Phase5RuntimeMode;
-  readonly safetyNotice: typeof PHASE_5_PRE_POLICY_NOTICE;
+  readonly safetyNotice: typeof PHASE_6_POLICY_NOTICE;
   readonly availableToolNames: readonly FormalToolName[];
   readonly toolExecutions: readonly FormalToolExecutionEvidence[];
+  readonly policyDecisions: readonly PolicyDecision[];
   readonly context?: AgentRunContextSummary;
   readonly error?: RuntimeFailure;
 }
@@ -82,6 +100,7 @@ interface MutableRunEvidence {
   context?: AgentRunContextSummary;
   availableToolNames: FormalToolName[];
   toolExecutions: FormalToolExecutionEvidence[];
+  policyDecisions: PolicyDecision[];
 }
 
 export interface ProductionDriveGuardRuntime {
@@ -135,6 +154,8 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   readonly #eventFactory: RuntimeEventFactory;
   readonly #eventSink: RuntimeEventSink | undefined;
   readonly #sensitiveValues: readonly string[];
+  readonly #policyEngine: PolicyEngine;
+  readonly #policyProfiles: ToolPolicyProfileRegistry;
   readonly #cancelledRunIds = new Set<string>();
   readonly #issuedRunIds = new Set<string>();
   readonly #issuedTraceIds = new Set<string>();
@@ -165,6 +186,8 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     });
     this.#eventSink = options.eventSink;
     this.#sensitiveValues = Object.freeze([...(options.sensitiveValues ?? [])]);
+    this.#policyEngine = options.policyEngine;
+    this.#policyProfiles = options.policyProfiles;
     this.#sessions = new AgentSessionStore(
       (sessionId) =>
         new AgentSession({
@@ -215,7 +238,11 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       this.#clock,
     );
     const events: RuntimeEvent[] = [];
-    const evidence: MutableRunEvidence = { availableToolNames: [], toolExecutions: [] };
+    const evidence: MutableRunEvidence = {
+      availableToolNames: [],
+      toolExecutions: [],
+      policyDecisions: [],
+    };
     let sinkFailed = false;
     const fallbackEventFactory = new RuntimeEventFactory({
       clock: { nowMs: () => Date.now() },
@@ -261,7 +288,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     };
     const startedEvent = createEvent("agent.run.started", {
       runtimeMode: this.mode,
-      boundary: "PRE_POLICY",
+      boundary: "POLICY_GUARDED",
     });
     if (runtimeBoundaryFailed || sinkFailed) {
       const error = new AgentRuntimeError(
@@ -275,7 +302,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         createEvent("agent.run.failed", {
           errorCode: error.code,
           runtimeMode: this.mode,
-          boundary: "PRE_POLICY",
+          boundary: "POLICY_GUARDED",
         }),
       );
       return this.#result("failed", "", run, events, evidence, error.toFailure());
@@ -288,7 +315,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         createEvent("agent.run.failed", {
           errorCode: error.code,
           runtimeMode: this.mode,
-          boundary: "PRE_POLICY",
+          boundary: "POLICY_GUARDED",
         }),
       );
       return this.#result("failed", "", run, events, evidence, error.toFailure());
@@ -305,7 +332,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         createEvent("agent.run.failed", {
           errorCode: error.code,
           runtimeMode: this.mode,
-          boundary: "PRE_POLICY",
+          boundary: "POLICY_GUARDED",
         }),
       );
       return this.#result("failed", "", run, events, evidence, error.toFailure());
@@ -328,16 +355,9 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         contextVersion: loaded.snapshot.contextVersion,
         contextFreshness: loaded.freshness.status,
         runtimeMode: this.mode,
-        boundary: "PRE_POLICY",
+        boundary: "POLICY_GUARDED",
       });
       this.#throwIfSinkFailed(sinkFailed);
-      if (loaded.freshness.status !== "FRESH") {
-        throw new AgentRuntimeError(
-          "CONTEXT_INVALID",
-          `Current context freshness is ${loaded.freshness.status}`,
-          loaded.freshness.status === "STALE",
-        );
-      }
       this.#throwIfCancelled(run);
 
       run.transition("CAPABILITY_RESOLUTION");
@@ -379,33 +399,137 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         availableToolCount: exposed.length,
         contextVersion: loaded.snapshot.contextVersion,
         runtimeMode: this.mode,
-        boundary: "PRE_POLICY",
+        boundary: "POLICY_GUARDED",
       });
       this.#throwIfSinkFailed(sinkFailed);
-      toolAdapter = new PiToolAdapter(this.mode, (execution) => {
-        evidence.toolExecutions.push(
-          Object.freeze({
-            toolName: execution.toolName,
-            outcome: execution.outcome,
-            completedAfterCancel: execution.completedAfterCancel,
-            ...(execution.result === undefined
-              ? {}
-              : { result: structuredClone(execution.result) }),
-          }),
-        );
+      const conflictDetector = new ContextConflictDetector();
+      const policyGuard = new PolicyGuardedToolHandler({
+        engine: this.#policyEngine,
+        clock: this.#clock,
+        isTrustedDefinition: (definition) => this.#toolRegistry.get(definition.name) === definition,
+        inputProvider: async (definition, validatedArguments): Promise<PolicyEvaluationInput> => {
+          const profile = this.#policyProfiles.get(definition.name);
+          if (profile === undefined) throw new Error("Policy profile is unavailable");
+          const evaluatedContext = definition.sideEffect
+            ? await this.#contextLoader.load()
+            : loaded;
+          const conflict = definition.sideEffect
+            ? conflictDetector.detect(
+                loaded.snapshot,
+                evaluatedContext.snapshot,
+                profile.relevantContextPaths,
+              )
+            : undefined;
+          const freshnessEvaluator = new ContextFreshnessEvaluator(this.#clock);
+          const latestVersion = profile.freshnessRequirement.requiresLatest
+            ? evaluatedContext.freshness.context.latestVersion
+            : undefined;
+          const freshness = selectEffectiveFreshness([
+            freshnessEvaluator.evaluate(
+              evaluatedContext.snapshot,
+              profile.freshnessRequirement,
+              latestVersion,
+            ),
+            freshnessEvaluator.evaluate(
+              {
+                ...evaluatedContext.snapshot,
+                capturedAt: evaluatedContext.snapshot.vehicle.timestamp,
+              },
+              profile.freshnessRequirement,
+              latestVersion,
+            ),
+            freshnessEvaluator.evaluate(
+              {
+                ...evaluatedContext.snapshot,
+                capturedAt: evaluatedContext.snapshot.trip.timestamp,
+              },
+              profile.freshnessRequirement,
+              latestVersion,
+            ),
+          ]);
+          return {
+            toolDefinition: definition,
+            validatedArguments,
+            trustedDefinition: true,
+            contextSnapshot: evaluatedContext.snapshot,
+            freshness,
+            availability: {
+              capabilities: evaluatedContext.snapshot.capabilities,
+              services: evaluatedContext.services,
+            },
+            ...(conflict === undefined ? {} : { conflict }),
+          };
+        },
+        observer: {
+          evaluationStarted: async (toolName) => {
+            await emitRuntime("policy.evaluation.started", {
+              toolName,
+              runtimeMode: this.mode,
+              boundary: "POLICY_GUARDED",
+            });
+            this.#throwIfSinkFailed(sinkFailed);
+          },
+          decisionMade: async (policyDecision) => {
+            evidence.policyDecisions.push(policyDecision);
+            await emitRuntime("policy.decision.made", {
+              toolName: policyDecision.toolName,
+              decision: policyDecision.decision,
+              ruleId: policyDecision.ruleId,
+              ...(policyDecision.contextVersion === null
+                ? {}
+                : { contextVersion: policyDecision.contextVersion }),
+              runtimeMode: this.mode,
+              boundary: "POLICY_GUARDED",
+            });
+            this.#throwIfSinkFailed(sinkFailed);
+          },
+          executionBlocked: async (policyDecision) => {
+            await emitRuntime("policy.execution.blocked", {
+              toolName: policyDecision.toolName,
+              decision: policyDecision.decision,
+              ruleId: policyDecision.ruleId,
+              ...(policyDecision.contextVersion === null
+                ? {}
+                : { contextVersion: policyDecision.contextVersion }),
+              runtimeMode: this.mode,
+              boundary: "POLICY_GUARDED",
+            });
+            this.#throwIfSinkFailed(sinkFailed);
+          },
+        },
       });
+      toolAdapter = new PiToolAdapter(
+        this.mode,
+        (execution) => {
+          evidence.toolExecutions.push(
+            Object.freeze({
+              toolName: execution.toolName,
+              outcome: execution.outcome,
+              completedAfterCancel: execution.completedAfterCancel,
+              ...(execution.result === undefined
+                ? {}
+                : { result: structuredClone(execution.result) }),
+              ...(execution.policyControlResult === undefined
+                ? {}
+                : { policyControlResult: execution.policyControlResult }),
+            }),
+          );
+        },
+        policyGuard,
+      );
       session.setTools(toolAdapter.adaptAll(exposed));
       this.#throwIfCancelled(run);
 
       run.transition("MODEL_RUNNING");
       await emitRuntime("model.started", {
         runtimeMode: this.mode,
-        boundary: "PRE_POLICY",
+        boundary: "POLICY_GUARDED",
       });
       this.#throwIfSinkFailed(sinkFailed);
       const piEvents = new PiEventAdapter({
         run,
         exposedToolNames: evidence.availableToolNames,
+        boundary: "POLICY_GUARDED",
         eventFactory: {
           create: (eventType, _identity, metadata) => createEvent(eventType, metadata),
         },
@@ -435,6 +559,16 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         );
       }
       piEvents.assertComplete();
+      const policyControl = evidence.toolExecutions.find(
+        (execution) => execution.policyControlResult !== undefined,
+      )?.policyControlResult;
+      if (policyControl !== undefined) {
+        throw new AgentRuntimeError(
+          policyControl,
+          this.#policyControlMessage(policyControl),
+          policyControl === "POLICY_REPLAN_REQUIRED",
+        );
+      }
       if (piEvents.toolErrorCount > 0) {
         throw new AgentRuntimeError(
           "TOOL_ERROR",
@@ -449,7 +583,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       }
       const completedEvent = createEvent("agent.run.completed", {
         runtimeMode: this.mode,
-        boundary: "PRE_POLICY",
+        boundary: "POLICY_GUARDED",
       });
       this.#throwIfRuntimeBoundaryFailed(runtimeBoundaryFailed);
       try {
@@ -477,7 +611,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         createEvent("agent.run.failed", {
           errorCode: failure.code,
           runtimeMode: this.mode,
-          boundary: "PRE_POLICY",
+          boundary: "POLICY_GUARDED",
         }),
       );
       return this.#result(
@@ -497,6 +631,17 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   #throwIfCancelled(run: AgentRun): void {
     if (this.#cancelledRunIds.has(run.runId)) {
       throw new AgentRuntimeError("RUN_CANCELLED", "Agent run was cancelled");
+    }
+  }
+
+  #policyControlMessage(control: RuntimePolicyControlResult): string {
+    switch (control) {
+      case "POLICY_DENIED":
+        return "Deterministic Policy denied Tool execution";
+      case "POLICY_REPLAN_REQUIRED":
+        return "Deterministic Policy requires a fresh plan";
+      case "POLICY_CONFIRMATION_REQUIRED":
+        return "Deterministic Policy requires the Phase 7 confirmation flow";
     }
   }
 
@@ -549,7 +694,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       run: run.snapshot(),
       events: Object.freeze([...events]),
       runtimeMode: this.mode,
-      safetyNotice: PHASE_5_PRE_POLICY_NOTICE,
+      safetyNotice: PHASE_6_POLICY_NOTICE,
       availableToolNames: Object.freeze([...evidence.availableToolNames]),
       toolExecutions: Object.freeze(
         evidence.toolExecutions.map((execution) =>
@@ -560,9 +705,13 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
             ...(execution.result === undefined
               ? {}
               : { result: structuredClone(execution.result) }),
+            ...(execution.policyControlResult === undefined
+              ? {}
+              : { policyControlResult: execution.policyControlResult }),
           }),
         ),
       ),
+      policyDecisions: Object.freeze([...evidence.policyDecisions]),
       ...(evidence.context === undefined ? {} : { context: evidence.context }),
       ...(error === undefined ? {} : { error }),
     });
