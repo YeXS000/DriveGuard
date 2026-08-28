@@ -1,6 +1,13 @@
 import { createModels, type Model, type MutableModels } from "@earendil-works/pi-ai";
 import { deepseekProvider } from "@earendil-works/pi-ai/providers/deepseek";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
+import {
+  ConfirmationService,
+  ContextRevalidator,
+  InMemoryActionLifecycleEventSink,
+  type ActionLifecycleEvent,
+  type ActionLifecycleEventSink,
+} from "@driveguard/action-lifecycle";
 import type { ServiceAvailability } from "@driveguard/capabilities";
 import {
   ContextFreshnessEvaluator,
@@ -26,6 +33,10 @@ import {
 } from "./production-runtime.js";
 import { AgentRuntimeError } from "./runtime-errors.js";
 import type { Phase5RuntimeMode } from "./pi-tool-adapter.js";
+import {
+  InMemoryTrustedConfirmationChallengeChannel,
+  type TrustedConfirmationChallengeChannel,
+} from "./trusted-confirmation-channel.js";
 
 const PREFERRED_DEEPSEEK_MODEL_ID = "deepseek-v4-flash";
 
@@ -56,6 +67,8 @@ export interface CreateProductionRuntimeOptions {
     DriveGuardRuntimeOptions,
     "runIdFactory" | "traceIdFactory" | "eventIdFactory" | "eventSink"
   >;
+  readonly actionLifecycleEventSink?: ActionLifecycleEventSink;
+  readonly trustedConfirmationChallengeChannel?: TrustedConfirmationChallengeChannel;
 }
 
 export const DEFAULT_PHASE_5_CAPABILITIES = Object.freeze({
@@ -172,6 +185,53 @@ export function createProductionDriveGuardRuntime(
   });
   const policyProfiles = createDefaultToolPolicyProfileRegistry();
   const policyEngine = new PolicyEngine({ profiles: policyProfiles });
+  const trustedConfirmationChallengeChannel =
+    options.trustedConfirmationChallengeChannel ??
+    new InMemoryTrustedConfirmationChallengeChannel(clock);
+  const configuredActionLifecycleEventSink =
+    options.actionLifecycleEventSink ?? new InMemoryActionLifecycleEventSink();
+  const actionLifecycleEventSink: ActionLifecycleEventSink = {
+    async emit(event: ActionLifecycleEvent): Promise<void> {
+      let deliveryFailure: unknown;
+      try {
+        await configuredActionLifecycleEventSink.emit(event);
+      } catch (error) {
+        deliveryFailure = error;
+      }
+      if (event.state !== "AWAITING_CONFIRMATION") {
+        try {
+          trustedConfirmationChallengeChannel.discard(event.actionId);
+        } catch (error) {
+          deliveryFailure ??= error;
+        }
+      }
+      if (deliveryFailure instanceof Error) throw deliveryFailure;
+      if (deliveryFailure !== undefined) {
+        throw new Error("Action lifecycle event delivery failed", { cause: deliveryFailure });
+      }
+    },
+  };
+  const confirmationService = new ConfirmationService({
+    clock,
+    eventSink: actionLifecycleEventSink,
+    isTrustedDefinition: (definition) => registry.get(definition.name) === definition,
+    revalidator: new ContextRevalidator({
+      freshnessEvaluator: new ContextFreshnessEvaluator(clock),
+      profiles: policyProfiles,
+      definitionProvider: (toolName) => registry.get(toolName),
+      currentContextProvider: async () => {
+        const current = await contextLoader.load();
+        return {
+          snapshot: current.snapshot,
+          latestContextVersion: current.freshness.context.latestVersion,
+          availability: {
+            capabilities: current.snapshot.capabilities,
+            services: current.services,
+          },
+        };
+      },
+    }),
+  });
   return new DriveGuardAgentRuntime({
     model: options.model,
     streamFn: options.streamFn,
@@ -180,6 +240,8 @@ export function createProductionDriveGuardRuntime(
     clock,
     policyEngine,
     policyProfiles,
+    confirmationService,
+    trustedConfirmationChallengeChannel,
     ...(options.mode === undefined ? {} : { mode: options.mode }),
     ...(options.developmentExecutionOptIn === undefined
       ? {}

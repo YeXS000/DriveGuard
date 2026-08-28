@@ -879,3 +879,57 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - The required live DeepSeek R0/R2 smoke passed using an explicitly authorized `.env` read that injected only `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, and `SIMULATOR_BASE_URL` into the one live-test child process. No credential value was printed, logged, copied, or committed, and `api_key.md` was not read.
 - Live R0 requested `get_vehicle_state`, received `DG-POL-010 / ALLOW`, and executed exactly once.
 - Live R2 requested `set_navigation_destination`, received `DG-POL-008 / REQUIRE_CONFIRMATION`, executed the underlying side effect zero times, left Simulator destination unchanged, and did not claim success.
+
+## Phase 7 — Confirmation & Action Lifecycle
+
+- Status: COMPLETE.
+- Scope: process-local PendingAction, centralized Action State Machine, trusted confirmation, Context/capability/service revalidation, one-time ExecutionAuthorization creation, Runtime integration, and Phase 7 verification only.
+- Gate result: **PASS**.
+- Verification date: 2026-08-29 (Asia/Shanghai).
+
+### Implemented modules
+
+- `packages/action-lifecycle`: canonical fingerprinting, immutable action models, internal in-memory repository, centralized state transitions, safe lifecycle events, ContextRevalidator, deterministic confirmation summary, and ConfirmationService.
+- `packages/agent-runtime/src/trusted-confirmation-channel.ts`: separate, one-time, TTL-enforced, non-model-visible application channel for plaintext confirmation challenges.
+- `packages/agent-runtime/src/policy-guarded-tool-handler.ts`: converts only `REQUIRE_CONFIRMATION` into PendingAction creation while preserving ALLOW and blocking DENY/REPLAN.
+- `packages/agent-runtime/src/production-runtime.ts` and `production-factory.ts`: safe confirmation-required results, trusted challenge channel, current Context reload, and zero Phase 7 R2/R3 execution.
+- `packages/agent-runtime/src/phase7-live-smoke.ts`: opt-in real DeepSeek R2 smoke; missing `DEEPSEEK_API_KEY` reports NOT RUN and exits non-zero.
+- `docs/adr/0008-phase-7-confirmation-action-lifecycle.md`: trust, token, TTL, fingerprint, revalidation, authorization, event, and Phase 7/8 boundary decisions.
+
+### Current measured verification
+
+| Check                                                  | Current result                                                                                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Phase 7 focused tests                                  | 259 / 259 PASS                                                                                                                             |
+| Package export boundary                                | PASS; repository mutation export = 0; confirmation Tool export = 0                                                                         |
+| Generated adversarial cases                            | 10,000 across valid, wrong-token, expired, replay, cross-session, cross-user, tamper, Context conflict, capability loss, and invalid state |
+| Confirmation bypass / replay success                   | 0 / 0                                                                                                                                      |
+| Unauthorized READY / duplicate authorization           | 0 / 0                                                                                                                                      |
+| Measured R2/R3 underlying handler executions in matrix | 0                                                                                                                                          |
+| Pure process-local lifecycle performance               | P95 0.157 ms; P99 0.270 ms; coverage-instrumented P95 0.235 ms / P99 0.369 ms                                                              |
+| Expanded Phase 7 coverage                              | Lines 97.48%; branches 95.07%                                                                                                              |
+| `packages/action-lifecycle` coverage                   | Lines 99.33%; branches 97.52%                                                                                                              |
+| Action State Machine                                   | Lines 100%; branches 100%                                                                                                                  |
+| ConfirmationService security paths                     | Lines 99.38%; branches 97.89%                                                                                                              |
+| Runtime integration selected files                     | Lines 95.80%; branches 92.64%; included in enforced global Phase 7 threshold                                                               |
+| Full engineering/regression Gate                       | PASS; format, lint, typecheck, build, 1,374 tests, diff check, audit, package boundary, and coverage                                       |
+| Live DeepSeek R2 smoke                                 | PASS; `REQUIRE_CONFIRMATION`, one PendingAction, side effects 0, unchanged Simulator, no success claim, no token on safe surfaces          |
+
+### Safety and architecture boundary
+
+- `LLM can self-confirm = 0`; confirmation is absent from the formal Tool Registry.
+- Runtime safe results and events contain no plaintext confirmation token. The token is delivered only through the trusted application channel.
+- Public action-lifecycle exports contain no repository mutation capability.
+- Confirmation token hashes are stored process-locally; plaintext is not stored in PendingAction records or events.
+- READY requires confirmation plus current Context, capability, and service revalidation. READY is terminal; a ready-event delivery failure is surfaced without adding an invalid rollback transition.
+- Integration Cases A–D pass against the loopback Simulator, and Simulator side effects remain unchanged throughout confirmation/revalidation.
+- Reliable Executor, authorization consumption, retry, circuit breaker, production idempotency, database/message persistence, and HMI/HTTP confirmation API implemented: 0.
+- `api_key.md` was not read, copied, logged, or used. Automated tests use the Pi faux provider.
+
+### Review and known limitations
+
+- Initial independent reviews found Critical 0, High 2, and Medium findings in repository exposure, coverage scope, challenge delivery, event ordering, metric validity, live-smoke enforcement, and missing documentation.
+- Repository mutation is now internal; trusted challenge delivery is mandatory, TTL-bounded, and discarded after leaving `AWAITING_CONFIRMATION`; READY is committed before its event and remains terminal on delivery failure; 10,000 handler/authorization counters are genuine; runtime files are included in a threshold-enforced coverage command; argument tampering, Tool substitution, and fingerprint mismatch are directly fail-closed tested; and live smoke passed without a side effect.
+- Final independent read-only reviews found no unresolved Critical, High, or Medium issue after remediation.
+- State, events, trusted challenges, and authorizations remain process-local and non-durable by explicit Phase 7 scope.
+- The final Gate passed. Phase 8 and project-level target metrics remain out of scope and unclaimed.

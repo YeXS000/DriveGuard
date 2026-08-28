@@ -15,7 +15,7 @@ export const RUNTIME_POLICY_CONTROL_RESULTS = [
 export type RuntimePolicyControlResult = (typeof RUNTIME_POLICY_CONTROL_RESULTS)[number];
 
 export const PHASE_6_POLICY_NOTICE =
-  "Phase 6 deterministic Policy is enforced; confirmation lifecycle is not yet implemented." as const;
+  "Phase 6 deterministic Policy is enforced; Phase 7 confirmation can authorize READY_FOR_EXECUTION but never executes the Tool." as const;
 
 export class PolicyControlError extends Error {
   readonly code: RuntimePolicyControlResult;
@@ -51,6 +51,12 @@ export interface PolicyGuardedToolHandlerOptions {
   ) => PolicyEvaluationInput | Promise<PolicyEvaluationInput>;
   readonly isTrustedDefinition: (definition: ToolDefinition) => boolean;
   readonly observer?: PolicyEvaluationLifecycleObserver;
+  readonly confirmationRequired?: (
+    definition: ToolDefinition,
+    validatedArguments: unknown,
+    decision: PolicyDecision,
+    input: PolicyEvaluationInput,
+  ) => void | Promise<void>;
 }
 
 function controlResult(
@@ -73,6 +79,7 @@ export class PolicyGuardedToolHandler {
   readonly #inputProvider: PolicyGuardedToolHandlerOptions["inputProvider"];
   readonly #isTrustedDefinition: PolicyGuardedToolHandlerOptions["isTrustedDefinition"];
   readonly #observer: PolicyEvaluationLifecycleObserver | undefined;
+  readonly #confirmationRequired: PolicyGuardedToolHandlerOptions["confirmationRequired"];
 
   constructor(options: PolicyGuardedToolHandlerOptions) {
     this.#engine = options.engine;
@@ -80,6 +87,7 @@ export class PolicyGuardedToolHandler {
     this.#inputProvider = options.inputProvider;
     this.#isTrustedDefinition = options.isTrustedDefinition;
     this.#observer = options.observer;
+    this.#confirmationRequired = options.confirmationRequired;
   }
 
   async execute<T>(
@@ -95,8 +103,10 @@ export class PolicyGuardedToolHandler {
     }
 
     let input: unknown;
+    let providedInput: PolicyEvaluationInput | undefined;
     try {
       const provided = await this.#inputProvider(definition, validatedArguments);
+      providedInput = provided;
       input =
         provided === undefined
           ? {
@@ -129,6 +139,17 @@ export class PolicyGuardedToolHandler {
         await this.#observer?.executionBlocked(decision);
       } catch {
         throw new PolicyLifecycleError();
+      }
+      if (
+        decision.decision === "REQUIRE_CONFIRMATION" &&
+        providedInput !== undefined &&
+        this.#confirmationRequired !== undefined
+      ) {
+        try {
+          await this.#confirmationRequired(definition, validatedArguments, decision, providedInput);
+        } catch {
+          throw new PolicyLifecycleError();
+        }
       }
       throw new PolicyControlError(controlResult(decision.decision), decision);
     }

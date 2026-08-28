@@ -17,3 +17,4 @@ export * from "./runtime.js";
 export * from "./runtime-errors.js";
 export * from "./runtime-events.js";
 export type { AgentSessionSnapshot } from "./session.js";
+export * from "./trusted-confirmation-channel.js";
