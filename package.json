@@ -14,7 +14,7 @@
     "services/*"
   ],
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && tsc --project packages/shared/tsconfig.json && tsc --project packages/domain/tsconfig.json && tsc --project packages/context/tsconfig.json && tsc --project packages/capabilities/tsconfig.json && tsc --project packages/tools/tsconfig.json && tsc --project packages/agent-runtime/tsconfig.json && tsc --project services/vehicle-simulator/tsconfig.json",
+    "build": "tsc --project tsconfig.build.json && tsc --project packages/shared/tsconfig.json && tsc --project packages/domain/tsconfig.json && tsc --project packages/context/tsconfig.json && tsc --project packages/capabilities/tsconfig.json && tsc --project packages/tools/tsconfig.json && tsc --project packages/policy/tsconfig.json && tsc --project packages/agent-runtime/tsconfig.json && tsc --project services/vehicle-simulator/tsconfig.json",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "lint": "eslint . --max-warnings=0",
@@ -36,6 +36,10 @@
     "test:phase5:coverage": "npm run test:phase5 -- --coverage --coverage.include=packages/agent-runtime/src/agent-run.ts --coverage.include=packages/agent-runtime/src/context-loader.ts --coverage.include=packages/agent-runtime/src/pi-tool-adapter.ts --coverage.include=packages/agent-runtime/src/pi-event-adapter.ts --coverage.include=packages/agent-runtime/src/session.ts --coverage.include=packages/agent-runtime/src/production-runtime.ts --coverage.include=packages/agent-runtime/src/production-factory.ts --coverage.include=packages/agent-runtime/src/runtime-errors.ts --coverage.include=packages/agent-runtime/src/runtime-events.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html",
     "test:phase5:packages": "npm run build --silent && node tests/contract/phase5-package-exports.mjs",
     "test:phase5:live": "npm run build --silent && node dist/packages/agent-runtime/src/phase5-live-smoke.js",
+    "test:phase6": "vitest run tests/unit/phase6-*.test.ts tests/contract/phase6-*.test.ts tests/integration/phase6-*.test.ts",
+    "test:phase6:coverage": "npm run test:phase6 -- --coverage --coverage.include=packages/policy/src/**/*.ts --coverage.exclude=packages/policy/src/index.ts --coverage.include=packages/agent-runtime/src/policy-guarded-tool-handler.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html",
+    "test:phase6:packages": "npm run build --silent && node tests/contract/phase6-package-exports.mjs",
+    "test:phase6:live": "npm run build --silent && node dist/packages/agent-runtime/src/phase6-live-smoke.js",
     "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
   },
   "dependencies": {

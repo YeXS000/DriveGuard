@@ -18,6 +18,7 @@ const productionModules = [
   "context-loader.ts",
   "pi-event-adapter.ts",
   "pi-tool-adapter.ts",
+  "policy-guarded-tool-handler.ts",
   "production-factory.ts",
   "production-runtime.ts",
   "runtime-errors.ts",
@@ -64,20 +65,22 @@ describe("Phase 5 architecture and security boundaries", () => {
     expect(phase1Runtime).not.toContain("DriveGuardAgentRuntime");
   });
 
-  it("does not import Policy, Executor, Persistence, Confirmation, or Action State Machine", () => {
+  it("adds Policy without crossing into Executor, Persistence, Confirmation, or Action State Machine", () => {
     const combined = productionModules.map(source).join("\n");
 
+    expect(combined).toContain("@driveguard/policy");
     expect(combined).not.toMatch(
-      /@driveguard\/(?:policy|executor|persistence)|from\s+["'][^"']*(?:confirmation|action-state)/u,
+      /@driveguard\/(?:executor|persistence)|from\s+["'][^"']*(?:confirmation|action-state)/u,
     );
   });
 
-  it("does not add Phase 6 policy decision or confirmation error codes", () => {
+  it("adds only the Phase 6 policy control error codes", () => {
     const errors = source("runtime-errors.ts");
 
-    expect(errors).not.toMatch(
-      /POLICY_DENIED|CONFIRMATION_REQUIRED|REQUIRE_CONFIRMATION|\bALLOW\b|\bDENY\b|\bREPLAN\b/u,
-    );
+    expect(errors).toContain('"POLICY_DENIED"');
+    expect(errors).toContain('"POLICY_REPLAN_REQUIRED"');
+    expect(errors).toContain('"POLICY_CONFIRMATION_REQUIRED"');
+    expect(errors).not.toMatch(/EXECUTOR|PERSISTENCE|ACTION_STATE/u);
   });
 
   it("centralizes production HTTP transport outside the Agent Runtime core", () => {
@@ -96,8 +99,21 @@ describe("Phase 5 architecture and security boundaries", () => {
     expect(combined).not.toContain("api_key.md");
   });
 
-  it("does not introduce policy/executor/persistence implementation files", () => {
-    for (const packageName of ["policy", "executor", "persistence"] as const) {
+  it("introduces only the Phase 6 policy implementation package", () => {
+    expect(
+      readdirSync(`${repositoryRoot}/packages/policy`, { recursive: true })
+        .map(String)
+        .filter((name) => name.startsWith("src/") && name.endsWith(".ts"))
+        .sort(),
+    ).toEqual([
+      "src/engine.ts",
+      "src/index.ts",
+      "src/profiles.ts",
+      "src/registry.ts",
+      "src/rules.ts",
+      "src/types.ts",
+    ]);
+    for (const packageName of ["executor", "persistence"] as const) {
       const packageRoot = `${repositoryRoot}/packages/${packageName}`;
       const files = readdirSync(packageRoot, { recursive: true }).map(String);
       expect(files.filter((name) => name.endsWith(".ts"))).toEqual([]);

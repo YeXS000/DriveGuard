@@ -10,6 +10,7 @@ import {
 } from "@driveguard/context";
 import type { DrivingUser, VehicleCapabilities, WeatherState } from "@driveguard/domain";
 import { SystemClock, type Clock } from "@driveguard/shared";
+import { createDefaultToolPolicyProfileRegistry, PolicyEngine } from "@driveguard/policy";
 import {
   createDriveGuardToolRegistry,
   DevelopmentEmergencySupportProvider,
@@ -169,12 +170,16 @@ export function createProductionDriveGuardRuntime(
     }),
     emergencySupportProvider: new DevelopmentEmergencySupportProvider(),
   });
+  const policyProfiles = createDefaultToolPolicyProfileRegistry();
+  const policyEngine = new PolicyEngine({ profiles: policyProfiles });
   return new DriveGuardAgentRuntime({
     model: options.model,
     streamFn: options.streamFn,
     contextLoader,
     toolRegistry: registry,
     clock,
+    policyEngine,
+    policyProfiles,
     ...(options.mode === undefined ? {} : { mode: options.mode }),
     ...(options.developmentExecutionOptIn === undefined
       ? {}

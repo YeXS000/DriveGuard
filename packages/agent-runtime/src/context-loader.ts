@@ -49,14 +49,20 @@ export interface ContextLoaderOptions {
   readonly latestVersionProvider?: (snapshot: ContextSnapshot) => unknown;
 }
 
-function effectiveFreshness(results: readonly ContextFreshnessResult[]): ContextFreshnessStatus {
+export function selectEffectiveFreshness(
+  results: readonly [ContextFreshnessResult, ...ContextFreshnessResult[]],
+): ContextFreshnessResult {
   const precedence: readonly ContextFreshnessStatus[] = [
     "INVALID_FUTURE_TIMESTAMP",
     "NOT_LATEST",
     "STALE",
     "FRESH",
   ];
-  return precedence.find((status) => results.some((result) => result.status === status)) ?? "STALE";
+  for (const status of precedence) {
+    const result = results.find((candidate) => candidate.status === status);
+    if (result !== undefined) return result;
+  }
+  return { ...results[0], status: "STALE" };
 }
 
 export class ContextLoader {
@@ -134,7 +140,7 @@ export class ContextLoader {
         snapshot,
         services: structuredClone(source.services),
         freshness: Object.freeze({
-          status: effectiveFreshness([context, vehicle, trip]),
+          status: selectEffectiveFreshness([context, vehicle, trip]).status,
           context,
           vehicle,
           trip,

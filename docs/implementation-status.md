@@ -807,3 +807,75 @@ The Phase 5 Stage Gate result is:
 **PASS**
 
 Per the phase workflow, the Phase 5 closure commit is created only after the final regression and staged security review pass. `main` is not merged or modified, and Phase 6 is not started.
+
+## Phase 6 — Deterministic Policy Engine
+
+- Status: COMPLETE.
+- Scope: deterministic Policy decision model, stable rule engine, explicit profiles for all 14 formal Tools, Phase 2 freshness/conflict reuse, one Runtime Policy interception layer, Policy control results/events, and Phase 6 verification only.
+- Gate result: PASS.
+- Verification date: 2026-08-28 (Asia/Shanghai).
+
+### Implemented modules
+
+- `packages/policy/src/types.ts`: safe `PolicyDecision`, evidence, evaluation input, and rule contracts.
+- `packages/policy/src/profiles.ts`: immutable, validated `ToolPolicyProfile` mapping for all 14 formal Tools using actual Phase 2 Context paths.
+- `packages/policy/src/registry.ts`: duplicate-safe, deterministic `PolicyRuleRegistry`.
+- `packages/policy/src/rules.ts`: fixed P0-P10 rule table with terminal `DEFAULT_DENY`.
+- `packages/policy/src/engine.ts`: synchronous, deterministic, fail-closed evaluation and boundary normalization.
+- `packages/agent-runtime/src/policy-guarded-tool-handler.ts`: one guard between schema validation and formal handler dispatch.
+- Phase 5 Runtime factory, Tool/Event adapters, Runtime errors/events, session prompt, and production run evidence were extended for Phase 6 enforcement.
+- `packages/agent-runtime/src/phase6-live-smoke.ts`: opt-in real DeepSeek R0/R2 smoke using `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, and `SIMULATOR_BASE_URL` from the process environment.
+- `docs/adr/0007-phase-6-deterministic-policy-engine.md`: decision model, precedence, fail-closed, profile, Context, Runtime, and Phase 7 boundary decision.
+- Phase 6 unit, contract, integration, package-export, matrix, performance, and security tests were added; obsolete Phase 5 pre-Policy assertions were converted into Phase 6-aware regression assertions.
+
+### Current measured verification
+
+| Check                               | Current result                                                |
+| ----------------------------------- | ------------------------------------------------------------- |
+| Phase 6 focused tests               | 253 / 253 PASS                                                |
+| Full Phase 0–6 regression           | 1,115 / 1,115 PASS                                            |
+| Phase 5 focused regression          | 242 / 242 PASS                                                |
+| Defined machine-readable matrix     | 20 / 20 rows match decision and rule                          |
+| Generated Policy cases              | 10,000 unique case IDs across 11 scenarios                    |
+| Determinism/performance evaluations | 20,000 (each generated case evaluated twice)                  |
+| Decision mismatch                   | 0                                                             |
+| Rule mismatch                       | 0                                                             |
+| Non-deterministic result            | 0                                                             |
+| Critical Policy recall              | 7,335 / 7,335 = 100%                                          |
+| Pure Policy p95                     | 0.112 ms (final full non-coverage run, rounded)               |
+| Pure Policy p99                     | 0.198 ms (final full non-coverage run, rounded)               |
+| Phase 6 package exports             | PASS                                                          |
+| Live DeepSeek R0/R2 smoke           | PASS — R0 ALLOW/executed once; R2 confirmation/0 side effects |
+
+Measured Phase 6 coverage (barrel export file excluded because it contains no executable policy logic):
+
+| Module                            |  Lines | Branches | Functions |
+| --------------------------------- | -----: | -------: | --------: |
+| All selected Phase 6 modules      |  99.6% |   98.02% |      100% |
+| `packages/policy`                 | 99.54% |   97.96% |      100% |
+| PolicyEngine (`engine.ts`)        | 99.11% |   98.06% |      100% |
+| RuleRegistry (`registry.ts`)      |   100% |   95.65% |      100% |
+| ToolPolicyProfile (`profiles.ts`) |   100% |   97.95% |      100% |
+| Critical rules (`rules.ts`)       |   100% |     100% |      100% |
+| Runtime Policy Gate               |   100% |     100% |      100% |
+
+### Safety and phase boundary
+
+- Formal Tool profiles: 14 / 14.
+- Normal R0/R1/R2/R3 decisions and all required freshness/conflict states are covered.
+- RX forged/direct requests, malformed input, unknown risk/profile, missing/invalid Context, missing capability/service, and Policy exceptions fail closed in automated tests.
+- Runtime tests prove `ALLOW` executes once while `DENY`, `REPLAN`, and `REQUIRE_CONFIRMATION` execute the underlying side effect zero times.
+- The Engine contains no LLM call, prompt judgment, network/database I/O, clock, or randomness.
+- Phase 7 Confirmation, Pending Action, Action State Machine, Reliable Executor, persistence, retry, circuit breaker, production idempotency, and urgent-event automation implemented: 0.
+- `api_key.md` was not read, copied, logged, or used. Automated tests use the Pi faux provider.
+- Engineering checks pass: format, lint, typecheck, build, `git diff --check`, and `npm audit` with 0 vulnerabilities.
+- Three independent read-only reviews report PASS with 0 Critical, 0 High, and no unresolved safety/correctness/architecture/test-validity Medium findings.
+
+### Known limitations and pending closure evidence
+
+- `REQUIRE_CONFIRMATION` is a control result only; no confirmation lifecycle exists until Phase 7.
+- Runtime events and Policy decision evidence are process-local and non-durable.
+- The development Simulator/provider remains non-production infrastructure.
+- The required live DeepSeek R0/R2 smoke passed using an explicitly authorized `.env` read that injected only `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, and `SIMULATOR_BASE_URL` into the one live-test child process. No credential value was printed, logged, copied, or committed, and `api_key.md` was not read.
+- Live R0 requested `get_vehicle_state`, received `DG-POL-010 / ALLOW`, and executed exactly once.
+- Live R2 requested `set_navigation_destination`, received `DG-POL-008 / REQUIRE_CONFIRMATION`, executed the underlying side effect zero times, left Simulator destination unchanged, and did not claim success.

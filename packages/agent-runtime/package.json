@@ -15,6 +15,7 @@
     "@driveguard/capabilities": "0.0.0",
     "@driveguard/context": "0.0.0",
     "@driveguard/domain": "0.0.0",
+    "@driveguard/policy": "0.0.0",
     "@driveguard/shared": "0.0.0",
     "@driveguard/tools": "0.0.0",
     "typebox": "1.3.7"

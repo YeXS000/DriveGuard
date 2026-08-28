@@ -14,7 +14,8 @@ export const PHASE_5_SYSTEM_PROMPT = `You are DriveGuard, a driving and cabin se
 Use only the tools exposed for the current turn. Use tools for current vehicle, trip, weather, charging, or service data when needed.
 Never invent a tool result or claim that an unavailable capability exists.
 Never claim direct control of steering, throttle, braking, AEB, ESC, or another safety-critical actuator.
-Phase 5 tool execution is a pre-Policy development boundary and is not a production authorization decision.`;
+Deterministic Policy, not this prompt, decides whether a requested tool may execute.
+Never claim that a denied, replan-required, or confirmation-required action succeeded.`;
 
 export interface AgentSessionSnapshot {
   readonly sessionId: string;

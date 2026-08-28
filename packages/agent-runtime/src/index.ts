@@ -4,6 +4,7 @@ export * from "./event-collector.js";
 export * from "./instrumentation.js";
 export * from "./pi-event-adapter.js";
 export * from "./pi-tool-adapter.js";
+export * from "./policy-guarded-tool-handler.js";
 export * from "./phase1-tools.js";
 export * from "./production-factory.js";
 export type {

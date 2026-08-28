@@ -3,6 +3,12 @@ import { ToolExecutionError, type ToolDefinition } from "@driveguard/tools";
 import type { Static, TSchema } from "typebox";
 import Schema from "typebox/schema";
 
+import {
+  PolicyControlError,
+  type PolicyGuardedToolHandler,
+  type RuntimePolicyControlResult,
+} from "./policy-guarded-tool-handler.js";
+
 export type Phase5RuntimeMode = "read_only" | "development";
 
 export const PHASE_5_PRE_POLICY_NOTICE =
@@ -13,8 +19,8 @@ export interface FormalToolDetails {
   readonly toolName: string;
   readonly result: unknown;
   readonly runtimeMode: Phase5RuntimeMode;
-  readonly safetyBoundary: "PRE_POLICY";
-  readonly productionSafety: "NON_PRODUCTION";
+  readonly safetyBoundary: "PRE_POLICY" | "POLICY_GUARDED";
+  readonly productionSafety: "NON_PRODUCTION" | "PHASE_6_POLICY_ENFORCED";
 }
 
 export interface FormalToolExecutionEvidence {
@@ -22,6 +28,7 @@ export interface FormalToolExecutionEvidence {
   readonly outcome: "succeeded" | "failed";
   readonly completedAfterCancel: boolean;
   readonly result?: unknown;
+  readonly policyControlResult?: RuntimePolicyControlResult;
 }
 
 export type FormalToolExecutionObserver = (evidence: FormalToolExecutionEvidence) => void;
@@ -37,11 +44,17 @@ function signalAborted(signal: AbortSignal | undefined): boolean {
 export class PiToolAdapter {
   readonly #runtimeMode: Phase5RuntimeMode;
   readonly #observer: FormalToolExecutionObserver | undefined;
+  readonly #policyGuard: PolicyGuardedToolHandler | undefined;
   readonly #activeExecutions = new Set<Promise<void>>();
 
-  constructor(runtimeMode: Phase5RuntimeMode, observer?: FormalToolExecutionObserver) {
+  constructor(
+    runtimeMode: Phase5RuntimeMode,
+    observer?: FormalToolExecutionObserver,
+    policyGuard?: PolicyGuardedToolHandler,
+  ) {
     this.#runtimeMode = runtimeMode;
     this.#observer = observer;
+    this.#policyGuard = policyGuard;
   }
 
   adapt(definition: ToolDefinition): AgentTool<TSchema, FormalToolDetails> {
@@ -77,7 +90,23 @@ export class PiToolAdapter {
             "Tool input failed the formal schema",
           );
         }
-        const execution = definition.execute(safeInput);
+        if (this.#policyGuard === undefined) {
+          throw new ToolExecutionError(
+            "DEPENDENCY_UNAVAILABLE",
+            definition.name,
+            "Deterministic Policy guard is required before Tool dispatch",
+          );
+        }
+        const execution = this.#policyGuard.execute(definition, safeInput, () => {
+          if (signalAborted(signal)) {
+            throw new ToolExecutionError(
+              "DEPENDENCY_UNAVAILABLE",
+              definition.name,
+              "Tool execution was cancelled before guarded dispatch",
+            );
+          }
+          return definition.execute(safeInput);
+        });
         const settled = execution.then(
           () => undefined,
           () => undefined,
@@ -93,6 +122,7 @@ export class PiToolAdapter {
               toolName: definition.name,
               outcome: "failed",
               completedAfterCancel: signalAborted(signal),
+              ...(error instanceof PolicyControlError ? { policyControlResult: error.code } : {}),
             }),
           );
           throw error;
@@ -151,8 +181,14 @@ export class PiToolAdapter {
             toolName: definition.name,
             result: safeResult,
             runtimeMode: this.#runtimeMode,
-            safetyBoundary: "PRE_POLICY" as const,
-            productionSafety: "NON_PRODUCTION" as const,
+            safetyBoundary:
+              this.#policyGuard === undefined
+                ? ("PRE_POLICY" as const)
+                : ("POLICY_GUARDED" as const),
+            productionSafety:
+              this.#policyGuard === undefined
+                ? ("NON_PRODUCTION" as const)
+                : ("PHASE_6_POLICY_ENFORCED" as const),
           },
         };
       },
