@@ -14,7 +14,7 @@
     "services/*"
   ],
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && tsc --project packages/shared/tsconfig.json && tsc --project packages/domain/tsconfig.json && tsc --project packages/context/tsconfig.json && tsc --project packages/capabilities/tsconfig.json && tsc --project packages/tools/tsconfig.json && tsc --project packages/policy/tsconfig.json && tsc --project packages/action-lifecycle/tsconfig.json && tsc --project packages/agent-runtime/tsconfig.json && tsc --project services/vehicle-simulator/tsconfig.json",
+    "build": "tsc --project tsconfig.build.json && tsc --project packages/shared/tsconfig.json && tsc --project packages/domain/tsconfig.json && tsc --project packages/context/tsconfig.json && tsc --project packages/capabilities/tsconfig.json && tsc --project packages/tools/tsconfig.json && tsc --project packages/policy/tsconfig.json && tsc --project packages/action-lifecycle/tsconfig.json && tsc --project packages/executor/tsconfig.json && tsc --project packages/agent-runtime/tsconfig.json && tsc --project services/vehicle-simulator/tsconfig.json",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "lint": "eslint . --max-warnings=0",
@@ -44,6 +44,10 @@
     "test:phase7:coverage": "vitest run tests/unit/phase7-*.test.ts tests/contract/phase7-*.test.ts tests/integration/phase7-*.test.ts tests/unit/phase5-*.test.ts tests/integration/phase5-*.test.ts tests/unit/phase6-policy-guard.test.ts tests/integration/phase6-runtime-policy.test.ts --coverage --coverage.include=packages/action-lifecycle/src/**/*.ts --coverage.exclude=packages/action-lifecycle/src/index.ts --coverage.include=packages/agent-runtime/src/policy-guarded-tool-handler.ts --coverage.include=packages/agent-runtime/src/production-runtime.ts --coverage.include=packages/agent-runtime/src/production-factory.ts --coverage.include=packages/agent-runtime/src/trusted-confirmation-channel.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html --coverage.thresholds.lines=95 --coverage.thresholds.branches=95",
     "test:phase7:packages": "npm run build --silent && node tests/contract/phase7-package-exports.mjs",
     "test:phase7:live": "npm run build --silent && node dist/packages/agent-runtime/src/phase7-live-smoke.js",
+    "test:phase8": "vitest run tests/unit/phase8-*.test.ts tests/contract/phase8-*.test.ts tests/integration/phase8-*.test.ts",
+    "test:phase8:coverage": "npm run test:phase8 -- --coverage --coverage.include=packages/executor/src/**/*.ts --coverage.exclude=packages/executor/src/index.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html --coverage.thresholds.lines=95 --coverage.thresholds.branches=95",
+    "test:phase8:authorization-coverage": "vitest run tests/unit/phase8-authorization-consumption.test.ts --coverage --coverage.include=packages/action-lifecycle/src/authorization-consumption.ts --coverage.reporter=text --coverage.thresholds.lines=100 --coverage.thresholds.branches=100",
+    "test:phase8:packages": "npm run build --silent && node tests/contract/phase8-package-exports.mjs",
     "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
   },
   "dependencies": {

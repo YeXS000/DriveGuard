@@ -87,7 +87,11 @@ export function createPhase7Harness(
       if (definition.riskLevel !== "R2" && definition.riskLevel !== "R3") {
         throw new Error(`Phase 7 fixture requires R2/R3, received ${definition.riskLevel}`);
       }
-      const input = policyInput(toolName, { contextSnapshot: current });
+      const input = policyInput(toolName, {
+        toolDefinition: definition,
+        validatedArguments: PHASE6_VALID_ARGUMENTS[toolName],
+        contextSnapshot: current,
+      });
       const decision = new PolicyEngine({ profiles }).evaluate(input, PHASE_2_NOW);
       return {
         definition,

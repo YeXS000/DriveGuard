@@ -57,6 +57,13 @@ export interface PolicyGuardedToolHandlerOptions {
     decision: PolicyDecision,
     input: PolicyEvaluationInput,
   ) => void | Promise<void>;
+  readonly allowedExecution?: (
+    definition: ToolDefinition,
+    validatedArguments: unknown,
+    decision: PolicyDecision,
+    input: PolicyEvaluationInput,
+    handler: () => Promise<unknown>,
+  ) => Promise<unknown>;
 }
 
 function controlResult(
@@ -80,6 +87,7 @@ export class PolicyGuardedToolHandler {
   readonly #isTrustedDefinition: PolicyGuardedToolHandlerOptions["isTrustedDefinition"];
   readonly #observer: PolicyEvaluationLifecycleObserver | undefined;
   readonly #confirmationRequired: PolicyGuardedToolHandlerOptions["confirmationRequired"];
+  readonly #allowedExecution: PolicyGuardedToolHandlerOptions["allowedExecution"];
 
   constructor(options: PolicyGuardedToolHandlerOptions) {
     this.#engine = options.engine;
@@ -88,6 +96,7 @@ export class PolicyGuardedToolHandler {
     this.#isTrustedDefinition = options.isTrustedDefinition;
     this.#observer = options.observer;
     this.#confirmationRequired = options.confirmationRequired;
+    this.#allowedExecution = options.allowedExecution;
   }
 
   async execute<T>(
@@ -152,6 +161,15 @@ export class PolicyGuardedToolHandler {
         }
       }
       throw new PolicyControlError(controlResult(decision.decision), decision);
+    }
+    if (this.#allowedExecution !== undefined && providedInput !== undefined) {
+      return (await this.#allowedExecution(
+        definition,
+        validatedArguments,
+        decision,
+        providedInput,
+        handler,
+      )) as T;
     }
     return handler();
   }

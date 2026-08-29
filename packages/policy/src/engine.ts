@@ -1,3 +1,5 @@
+import { isDeepStrictEqual } from "node:util";
+
 import {
   CAPABILITY_NAMES,
   CapabilityResolutionContextSchema,
@@ -56,6 +58,26 @@ const conflictStatuses = new Set<string>([
   "RELEVANT_STATE_CHANGED",
   "UNKNOWN_RELEVANT_PATH",
 ]);
+const issuedPolicyDecisions = new WeakSet<object>();
+const issuedPolicyDecisionBindings = new WeakMap<
+  object,
+  {
+    readonly definition: object;
+    readonly validatedArguments: unknown;
+    readonly executionBinding: {
+      readonly runId: string;
+      readonly sessionId: string;
+      readonly traceId: string;
+      readonly actionFingerprint: string;
+      readonly contextSnapshotId: string;
+      readonly contextVersion: number;
+    } | null;
+    consumed: boolean;
+  }
+>();
+
+const executionIdentityPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u;
+const fingerprintPattern = /^[a-f0-9]{64}$/u;
 
 interface NormalizedPolicyInput extends PolicyRuleInput {
   readonly contextSnapshotId: string | null;
@@ -334,7 +356,7 @@ function decision(
   decisionType: PolicyDecision["decision"],
   reasonCode: PolicyReasonCode,
 ): PolicyDecision {
-  return Object.freeze({
+  const issued = Object.freeze({
     decision: decisionType,
     ruleId,
     reasonCode,
@@ -345,6 +367,107 @@ function decision(
     evaluatedAt: input.evaluatedAt,
     evidence: evidence(input),
   });
+  issuedPolicyDecisions.add(issued);
+  return issued;
+}
+
+/** Process-local provenance check for decisions returned by the deterministic PolicyEngine. */
+export function isPolicyDecisionIssuedByEngine(value: unknown): value is PolicyDecision {
+  return typeof value === "object" && value !== null && issuedPolicyDecisions.has(value);
+}
+
+export function isPolicyDecisionIssuedFor(
+  value: unknown,
+  definition: ToolDefinition,
+  validatedArguments: unknown,
+): value is PolicyDecision {
+  if (!isPolicyDecisionIssuedByEngine(value)) return false;
+  const binding = issuedPolicyDecisionBindings.get(value);
+  return (
+    binding?.definition === definition &&
+    isDeepStrictEqual(binding.validatedArguments, validatedArguments)
+  );
+}
+
+export interface PolicyExecutionBinding {
+  readonly runId: string;
+  readonly sessionId: string;
+  readonly traceId: string;
+  readonly actionFingerprint: string;
+  readonly contextSnapshotId: string;
+  readonly contextVersion: number;
+}
+
+/** Checks the process-local execution identity captured when Policy evaluated the request. */
+export function isPolicyDecisionIssuedForExecution(
+  value: unknown,
+  definition: ToolDefinition,
+  validatedArguments: unknown,
+  executionBinding: PolicyExecutionBinding,
+): value is PolicyDecision {
+  if (!isPolicyDecisionIssuedFor(value, definition, validatedArguments)) return false;
+  const binding = issuedPolicyDecisionBindings.get(value);
+  return isDeepStrictEqual(binding?.executionBinding, executionBinding);
+}
+
+/** Atomically consumes a process-local R0/R1 Policy permit exactly once. */
+export function consumePolicyDecisionForExecution(
+  value: unknown,
+  definition: ToolDefinition,
+  validatedArguments: unknown,
+  executionBinding: PolicyExecutionBinding,
+): value is PolicyDecision {
+  if (
+    !isPolicyDecisionIssuedForExecution(value, definition, validatedArguments, executionBinding)
+  ) {
+    return false;
+  }
+  const binding = issuedPolicyDecisionBindings.get(value);
+  if (binding === undefined || binding.consumed) return false;
+  binding.consumed = true;
+  return true;
+}
+
+function bindIssuedDecision(issued: PolicyDecision, input: unknown): PolicyDecision {
+  const candidate = record(input);
+  const definition = read(candidate, "toolDefinition");
+  if (typeof definition !== "object" || definition === null) return issued;
+  try {
+    const context = validateContext(read(candidate, "contextSnapshot"));
+    const rawExecutionBinding = record(read(candidate, "executionBinding"));
+    const runId = read(rawExecutionBinding, "runId");
+    const sessionId = read(rawExecutionBinding, "sessionId");
+    const traceId = read(rawExecutionBinding, "traceId");
+    const actionFingerprint = read(rawExecutionBinding, "actionFingerprint");
+    const executionBinding =
+      context !== undefined &&
+      typeof runId === "string" &&
+      executionIdentityPattern.test(runId) &&
+      typeof sessionId === "string" &&
+      executionIdentityPattern.test(sessionId) &&
+      typeof traceId === "string" &&
+      executionIdentityPattern.test(traceId) &&
+      typeof actionFingerprint === "string" &&
+      fingerprintPattern.test(actionFingerprint)
+        ? {
+            runId,
+            sessionId,
+            traceId,
+            actionFingerprint,
+            contextSnapshotId: context.snapshotId,
+            contextVersion: context.contextVersion,
+          }
+        : null;
+    issuedPolicyDecisionBindings.set(issued, {
+      definition,
+      validatedArguments: structuredClone(read(candidate, "validatedArguments")),
+      executionBinding,
+      consumed: false,
+    });
+  } catch {
+    // Invalid/uncloneable arguments deliberately leave the decision without trusted provenance.
+  }
+  return issued;
 }
 
 export interface PolicyEngineOptions {
@@ -388,11 +511,17 @@ export class PolicyEngine {
       for (const policyRule of this.#rules) {
         if (!policyRule.appliesTo(normalized)) continue;
         const result = policyRule.evaluate(normalized);
-        return decision(normalized, policyRule.ruleId, result.decision, result.reasonCode);
+        return bindIssuedDecision(
+          decision(normalized, policyRule.ruleId, result.decision, result.reasonCode),
+          input,
+        );
       }
-      return decision(normalized, "DG-POL-011", "DENY", "DEFAULT_DENY");
+      return bindIssuedDecision(decision(normalized, "DG-POL-011", "DENY", "DEFAULT_DENY"), input);
     } catch {
-      return decision(normalized, "DG-POL-002", "DENY", "POLICY_EXCEPTION");
+      return bindIssuedDecision(
+        decision(normalized, "DG-POL-002", "DENY", "POLICY_EXCEPTION"),
+        input,
+      );
     }
   }
 }

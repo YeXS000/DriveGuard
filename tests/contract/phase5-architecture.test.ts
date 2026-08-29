@@ -65,12 +65,13 @@ describe("Phase 5 architecture and security boundaries", () => {
     expect(phase1Runtime).not.toContain("DriveGuardAgentRuntime");
   });
 
-  it("adds Policy and Phase 7 confirmation without crossing into Executor or Persistence", () => {
+  it("preserves Policy and confirmation while Phase 8 adds Executor but not Persistence", () => {
     const combined = productionModules.map(source).join("\n");
 
     expect(combined).toContain("@driveguard/policy");
     expect(combined).toContain("@driveguard/action-lifecycle");
-    expect(combined).not.toMatch(/@driveguard\/(?:executor|persistence)/u);
+    expect(combined).toContain("@driveguard/executor");
+    expect(combined).not.toContain("@driveguard/persistence");
   });
 
   it("adds only the Phase 6 policy control error codes", () => {
@@ -98,7 +99,7 @@ describe("Phase 5 architecture and security boundaries", () => {
     expect(combined).not.toContain("api_key.md");
   });
 
-  it("introduces only the Phase 6 policy implementation package", () => {
+  it("keeps the exact Phase 6 and Phase 8 packages without adding Persistence", () => {
     expect(
       readdirSync(`${repositoryRoot}/packages/policy`, { recursive: true })
         .map(String)
@@ -112,11 +113,27 @@ describe("Phase 5 architecture and security boundaries", () => {
       "src/rules.ts",
       "src/types.ts",
     ]);
-    for (const packageName of ["executor", "persistence"] as const) {
-      const packageRoot = `${repositoryRoot}/packages/${packageName}`;
-      const files = readdirSync(packageRoot, { recursive: true }).map(String);
-      expect(files.filter((name) => name.endsWith(".ts"))).toEqual([]);
-    }
+    expect(
+      readdirSync(`${repositoryRoot}/packages/executor/src`)
+        .map(String)
+        .filter((name) => name.endsWith(".ts"))
+        .sort(),
+    ).toEqual([
+      "circuit-breaker.ts",
+      "errors.ts",
+      "events.ts",
+      "executor.ts",
+      "idempotency.ts",
+      "index.ts",
+      "lifecycle.ts",
+      "retry.ts",
+      "timeout.ts",
+      "types.ts",
+    ]);
+    const persistenceFiles = readdirSync(`${repositoryRoot}/packages/persistence`, {
+      recursive: true,
+    }).map(String);
+    expect(persistenceFiles.filter((name) => name.endsWith(".ts"))).toEqual([]);
   });
 
   it("keeps event metadata free of prompt, message, arguments, result, and reasoning fields", () => {

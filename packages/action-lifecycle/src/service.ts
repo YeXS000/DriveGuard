@@ -4,8 +4,10 @@ import { toUtcTimestamp, timestampToEpochMs } from "@driveguard/domain";
 import type { Clock } from "@driveguard/shared";
 import { FORMAL_TOOL_NAMES } from "@driveguard/tools";
 import Schema from "typebox/schema";
+import { isPolicyDecisionIssuedFor } from "@driveguard/policy";
 
 import { createActionFingerprint } from "./canonical.js";
+import { verifyExecutionAuthorizationForConsumption } from "./authorization-consumption.js";
 import { ActionLifecycleError } from "./errors.js";
 import {
   InMemoryActionLifecycleEventSink,
@@ -21,6 +23,7 @@ import type {
   ActionRevalidationResult,
   BoundActionCommand,
   ConfirmActionCommand,
+  ConsumeExecutionAuthorizationCommand,
   CreatePendingActionCommand,
   ExecutionAuthorization,
   PendingAction,
@@ -189,6 +192,7 @@ export class ConfirmationService {
     })();
     if (
       command.policyDecision.decision !== "REQUIRE_CONFIRMATION" ||
+      !isPolicyDecisionIssuedFor(command.policyDecision, definition, command.validatedArguments) ||
       !trustedDefinition ||
       command.policyDecision.toolName !== definition.name ||
       command.policyDecision.riskLevel !== definition.riskLevel ||
@@ -284,6 +288,7 @@ export class ConfirmationService {
       tokenHash: tokenHash(confirmationToken),
       confirmationId: null,
       authorization: null,
+      authorizationConsumedAt: null,
     });
     try {
       await this.#emit(
@@ -320,6 +325,46 @@ export class ConfirmationService {
 
   get(actionId: string): PendingAction | undefined {
     return this.#repository.get(actionId)?.action;
+  }
+
+  async consumeExecutionAuthorization(
+    command: ConsumeExecutionAuthorizationCommand,
+  ): Promise<ExecutionAuthorization> {
+    if (
+      typeof command.actionId !== "string" ||
+      !safeIdPattern.test(command.actionId) ||
+      typeof command.sessionId !== "string" ||
+      !safeIdPattern.test(command.sessionId) ||
+      typeof command.authorizationId !== "string" ||
+      !safeIdPattern.test(command.authorizationId) ||
+      typeof command.actionFingerprint !== "string" ||
+      !/^[a-f0-9]{64}$/u.test(command.actionFingerprint) ||
+      !formalNames.has(command.toolName) ||
+      typeof command.contextSnapshotId !== "string" ||
+      !safeIdPattern.test(command.contextSnapshotId) ||
+      !Number.isSafeInteger(command.contextVersion) ||
+      command.contextVersion < 1
+    ) {
+      throw new ActionLifecycleError(
+        "AUTHORIZATION_MISMATCH",
+        "ExecutionAuthorization binding is invalid",
+        command.actionId,
+      );
+    }
+    return this.#repository.runExclusive(command.actionId, () => {
+      const record = this.#repository.get(command.actionId);
+      if (record === undefined) {
+        throw new ActionLifecycleError(
+          "AUTHORIZATION_MISMATCH",
+          "ExecutionAuthorization does not match a trusted action",
+          command.actionId,
+        );
+      }
+      const nowMs = this.#clock.nowMs();
+      const authorization = verifyExecutionAuthorizationForConsumption(record, command, nowMs);
+      this.#repository.consumeAuthorization(command.actionId, toUtcTimestamp(nowMs));
+      return Promise.resolve(authorization);
+    });
   }
 
   async confirm(command: ConfirmActionCommand): Promise<ConfirmationOutcome> {

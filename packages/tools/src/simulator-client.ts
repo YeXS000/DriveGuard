@@ -2,7 +2,7 @@ import { TripStateSchema, VehicleStateSchema } from "@driveguard/domain";
 import { Type, type Static, type TSchema } from "typebox";
 import Schema from "typebox/schema";
 
-import { ToolExecutionError } from "./contracts.js";
+import { ToolExecutionError, type ToolExecutionContext } from "./contracts.js";
 import {
   ChargingReservationSchema,
   ChargingStatusOutputSchema,
@@ -41,6 +41,8 @@ export interface SimulatorClientOptions {
   readonly defaultTimeoutMs?: number;
 }
 
+type SimulatorRequestContext = Pick<ToolExecutionContext, "signal" | "idempotencyKey">;
+
 function normalizeBaseUrl(value: string): string {
   let parsed: URL;
   try {
@@ -78,99 +80,122 @@ export class SimulatorClient {
     this.#defaultTimeoutMs = timeoutValue(options.defaultTimeoutMs ?? 2_000);
   }
 
-  getVehicleState(timeoutMs?: number) {
+  getVehicleState(timeoutMs?: number, context?: SimulatorRequestContext) {
     return this.#request("get_vehicle_state", "GET", "/vehicle/state", VehicleStateSchema, {
       timeoutMs,
+      ...context,
     });
   }
 
-  getTripState(timeoutMs?: number) {
-    return this.#request("get_trip_state", "GET", "/trip/state", TripStateSchema, { timeoutMs });
+  getTripState(timeoutMs?: number, context?: SimulatorRequestContext) {
+    return this.#request("get_trip_state", "GET", "/trip/state", TripStateSchema, {
+      timeoutMs,
+      ...context,
+    });
   }
 
-  setCabinTemperature(temperatureC: number, timeoutMs?: number) {
+  setCabinTemperature(temperatureC: number, timeoutMs?: number, context?: SimulatorRequestContext) {
     return this.#request(
       "set_cabin_temperature",
       "POST",
       "/cabin/temperature",
       CabinTemperatureResponseSchema,
-      { body: { temperatureC }, timeoutMs },
+      { body: { temperatureC }, timeoutMs, ...context },
     );
   }
 
-  setSeatHeating(seat: "driver" | "front_passenger", level: 0 | 1 | 2 | 3, timeoutMs?: number) {
+  setSeatHeating(
+    seat: "driver" | "front_passenger",
+    level: 0 | 1 | 2 | 3,
+    timeoutMs?: number,
+    context?: SimulatorRequestContext,
+  ) {
     return this.#request(
       "set_seat_heating",
       "POST",
       "/cabin/seat-heating",
       SeatHeatingResponseSchema,
-      { body: { seat, level }, timeoutMs },
+      { body: { seat, level }, timeoutMs, ...context },
     );
   }
 
-  setMediaVolume(volume: number, timeoutMs?: number) {
+  setMediaVolume(volume: number, timeoutMs?: number, context?: SimulatorRequestContext) {
     return this.#request("set_media_volume", "POST", "/media/volume", MediaVolumeResponseSchema, {
       body: { volume },
       timeoutMs,
+      ...context,
     });
   }
 
-  setNavigationDestination(destination: string, timeoutMs?: number) {
+  setNavigationDestination(
+    destination: string,
+    timeoutMs?: number,
+    context?: SimulatorRequestContext,
+  ) {
     return this.#request(
       "set_navigation_destination",
       "POST",
       "/navigation/destination",
       TripStateSchema,
-      { body: { destination }, timeoutMs },
+      { body: { destination }, timeoutMs, ...context },
     );
   }
 
-  listChargingStations(timeoutMs?: number) {
+  listChargingStations(timeoutMs?: number, context?: SimulatorRequestContext) {
     return this.#request(
       "search_charging_stations",
       "GET",
       "/charging/stations",
       SearchChargingStationsOutputSchema,
-      { timeoutMs },
+      { timeoutMs, ...context },
     );
   }
 
-  getChargingStatus(timeoutMs?: number) {
+  getChargingStatus(timeoutMs?: number, context?: SimulatorRequestContext) {
     return this.#request(
       "get_charging_status",
       "GET",
       "/charging/status",
       ChargingStatusOutputSchema,
-      { timeoutMs },
+      { timeoutMs, ...context },
     );
   }
 
-  createChargingReservation(stationId: string, timeoutMs?: number) {
+  createChargingReservation(
+    stationId: string,
+    timeoutMs?: number,
+    context?: SimulatorRequestContext,
+  ) {
     return this.#request(
       "reserve_charging_slot",
       "POST",
       "/charging/reservations",
       ReservationResponseSchema,
-      { body: { stationId }, timeoutMs },
+      { body: { stationId }, timeoutMs, ...context },
     );
   }
 
-  async cancelChargingReservation(reservationId: string, timeoutMs?: number): Promise<void> {
+  async cancelChargingReservation(
+    reservationId: string,
+    timeoutMs?: number,
+    context?: SimulatorRequestContext,
+  ): Promise<void> {
     await this.#requestEmpty(
       "cancel_charging_reservation",
       "DELETE",
       `/charging/reservations/${encodeURIComponent(reservationId)}`,
       timeoutMs,
+      context,
     );
   }
 
-  requestRoadsideAssistance(reason: string, timeoutMs?: number) {
+  requestRoadsideAssistance(reason: string, timeoutMs?: number, context?: SimulatorRequestContext) {
     return this.#request(
       "request_roadside_assistance",
       "POST",
       "/assistance/roadside",
       RoadsideAssistanceOutputSchema,
-      { body: { reason }, timeoutMs },
+      { body: { reason }, timeoutMs, ...context },
     );
   }
 
@@ -179,7 +204,12 @@ export class SimulatorClient {
     method: "GET" | "POST",
     path: string,
     schema: TSchemaValue,
-    options: { readonly body?: object; readonly timeoutMs?: number | undefined },
+    options: {
+      readonly body?: object;
+      readonly timeoutMs?: number | undefined;
+      readonly signal?: AbortSignal;
+      readonly idempotencyKey?: string;
+    },
   ): Promise<Static<TSchemaValue>> {
     const response = await this.#fetchResponse(toolName, method, path, options);
     let value: unknown;
@@ -208,8 +238,9 @@ export class SimulatorClient {
     method: "DELETE",
     path: string,
     timeoutMs?: number,
+    context?: SimulatorRequestContext,
   ): Promise<void> {
-    const response = await this.#fetchResponse(toolName, method, path, { timeoutMs });
+    const response = await this.#fetchResponse(toolName, method, path, { timeoutMs, ...context });
     if (response.status !== 204) {
       throw new ToolExecutionError(
         "DEPENDENCY_RESPONSE_INVALID",
@@ -223,19 +254,34 @@ export class SimulatorClient {
     toolName: string,
     method: "GET" | "POST" | "DELETE",
     path: string,
-    options: { readonly body?: object; readonly timeoutMs?: number | undefined },
+    options: {
+      readonly body?: object;
+      readonly timeoutMs?: number | undefined;
+      readonly signal?: AbortSignal;
+      readonly idempotencyKey?: string;
+    },
   ): Promise<Response> {
     const controller = new AbortController();
     const timeoutMs = timeoutValue(options.timeoutMs ?? this.#defaultTimeoutMs);
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      const signal =
+        options.signal === undefined
+          ? controller.signal
+          : AbortSignal.any([controller.signal, options.signal]);
+      const headers = {
+        ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+        ...(options.idempotencyKey === undefined
+          ? {}
+          : { "idempotency-key": options.idempotencyKey }),
+      };
       const response = await this.#fetch(`${this.#baseUrl}${path}`, {
         method,
-        signal: controller.signal,
+        signal,
+        ...(Object.keys(headers).length === 0 ? {} : { headers }),
         ...(options.body === undefined
           ? {}
           : {
-              headers: { "content-type": "application/json" },
               body: JSON.stringify(options.body),
             }),
       });
@@ -245,6 +291,13 @@ export class SimulatorClient {
       if (error instanceof ToolExecutionError) throw error;
       if (controller.signal.aborted) {
         throw new ToolExecutionError("DEPENDENCY_TIMEOUT", toolName, "Simulator request timed out");
+      }
+      if (options.signal?.aborted === true) {
+        throw new ToolExecutionError(
+          "DEPENDENCY_UNAVAILABLE",
+          toolName,
+          "Simulator request aborted",
+        );
       }
       throw new ToolExecutionError("DEPENDENCY_UNAVAILABLE", toolName, "Simulator request failed");
     } finally {

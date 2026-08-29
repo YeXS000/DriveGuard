@@ -3,7 +3,9 @@ import { randomUUID } from "node:crypto";
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
 import {
+  createActionFingerprint,
   type ConfirmationService,
+  type ConfirmActionCommand,
   type SafeConfirmationRequiredResult,
 } from "@driveguard/action-lifecycle";
 import { ContextConflictDetector, ContextFreshnessEvaluator } from "@driveguard/context";
@@ -15,12 +17,14 @@ import {
   type ToolPolicyProfileRegistry,
 } from "@driveguard/policy";
 import type { Clock } from "@driveguard/shared";
+import type { ExecutionResult, ReliableToolExecutor } from "@driveguard/executor";
 import {
   FORBIDDEN_TOOL_NAMES,
   FORMAL_TOOL_NAMES,
   type FormalToolName,
   type ToolDefinition,
   type ToolRegistry,
+  ToolExecutionError,
 } from "@driveguard/tools";
 
 import { AgentRun, type AgentRunSnapshot } from "./agent-run.js";
@@ -73,6 +77,7 @@ export interface DriveGuardRuntimeOptions {
   readonly policyProfiles: ToolPolicyProfileRegistry;
   readonly confirmationService: ConfirmationService;
   readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
+  readonly reliableExecutor: ReliableToolExecutor;
 }
 
 export interface AgentRunRequest {
@@ -121,6 +126,7 @@ export interface ProductionDriveGuardRuntime {
   cancel(sessionId: string): boolean;
   sessionSnapshot(sessionId: string): AgentSessionSnapshot | undefined;
   sessionSnapshots(): readonly AgentSessionSnapshot[];
+  confirmAndExecute(command: ConfirmActionCommand): Promise<ExecutionResult>;
   run(request: AgentRunRequest): Promise<AgentRunResult>;
 }
 
@@ -168,6 +174,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   readonly #sensitiveValues: readonly string[];
   readonly #policyEngine: PolicyEngine;
   readonly #policyProfiles: ToolPolicyProfileRegistry;
+  readonly #reliableExecutor: ReliableToolExecutor;
   readonly confirmationService: ConfirmationService;
   readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   readonly #cancelledRunIds = new Set<string>();
@@ -202,6 +209,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     this.#sensitiveValues = Object.freeze([...(options.sensitiveValues ?? [])]);
     this.#policyEngine = options.policyEngine;
     this.#policyProfiles = options.policyProfiles;
+    this.#reliableExecutor = options.reliableExecutor;
     this.confirmationService = options.confirmationService;
     this.trustedConfirmationChallengeChannel = options.trustedConfirmationChallengeChannel;
     this.#sessions = new AgentSessionStore(
@@ -234,6 +242,38 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
 
   get sessionCount(): number {
     return this.#sessions.size;
+  }
+
+  async confirmAndExecute(command: ConfirmActionCommand): Promise<ExecutionResult> {
+    const confirmed = await this.confirmationService.confirm(command);
+    if (confirmed.authorization === null) {
+      throw new AgentRuntimeError(
+        "POLICY_REPLAN_REQUIRED",
+        "Confirmed action requires replanning before execution",
+      );
+    }
+    const definition = this.#toolRegistry.get(confirmed.action.toolName);
+    if (definition === undefined || definition.riskLevel !== confirmed.action.riskLevel) {
+      throw new AgentRuntimeError("INTERNAL_ERROR", "Confirmed Tool definition is unavailable");
+    }
+    const authorization = confirmed.authorization;
+    return this.#reliableExecutor.execute({
+      executionId: `execution:${randomUUID()}`,
+      toolName: confirmed.action.toolName,
+      validatedArguments: confirmed.action.validatedArguments,
+      actionFingerprint: confirmed.action.actionFingerprint,
+      runId: confirmed.action.runId,
+      sessionId: confirmed.action.sessionId,
+      traceId: confirmed.action.traceId,
+      riskLevel: confirmed.action.riskLevel,
+      policyDecision: confirmed.action.policyDecision,
+      actionId: confirmed.action.actionId,
+      authorizationId: authorization.authorizationId,
+      contextSnapshotId: authorization.contextSnapshotId,
+      contextVersion: authorization.contextVersion,
+      idempotencyKey: `confirmed:${confirmed.action.actionId}`,
+      createdAt: toUtcTimestamp(this.#clock.nowMs()),
+    });
   }
 
   async run(request: AgentRunRequest): Promise<AgentRunResult> {
@@ -472,6 +512,20 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
               capabilities: evaluatedContext.snapshot.capabilities,
               services: evaluatedContext.services,
             },
+            executionBinding: {
+              runId: run.runId,
+              sessionId: run.sessionId,
+              traceId: run.traceId,
+              actionFingerprint: createActionFingerprint({
+                toolName: definition.name,
+                validatedArguments,
+                sessionId: run.sessionId,
+                userId: evaluatedContext.snapshot.user.userId,
+                vehicleId: evaluatedContext.snapshot.vehicle.vehicleId,
+                contextSnapshotId: evaluatedContext.snapshot.snapshotId,
+                contextVersion: evaluatedContext.snapshot.contextVersion,
+              }),
+            },
             ...(conflict === undefined ? {} : { conflict }),
           };
         },
@@ -550,6 +604,42 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
             throw error;
           }
           evidence.confirmationRequired.push(created.safeResult);
+        },
+        allowedExecution: async (definition, validatedArguments, policyDecision, policyInput) => {
+          const actionFingerprint = createActionFingerprint({
+            toolName: definition.name,
+            validatedArguments,
+            sessionId: run.sessionId,
+            userId: policyInput.contextSnapshot.user.userId,
+            vehicleId: policyInput.contextSnapshot.vehicle.vehicleId,
+            contextSnapshotId: policyInput.contextSnapshot.snapshotId,
+            contextVersion: policyInput.contextSnapshot.contextVersion,
+          });
+          const execution = await this.#reliableExecutor.execute({
+            executionId: `execution:${randomUUID()}`,
+            toolName: definition.name,
+            validatedArguments,
+            actionFingerprint,
+            runId: run.runId,
+            sessionId: run.sessionId,
+            traceId: run.traceId,
+            riskLevel: definition.riskLevel,
+            policyDecision,
+            contextSnapshotId: policyInput.contextSnapshot.snapshotId,
+            contextVersion: policyInput.contextSnapshot.contextVersion,
+            idempotencyKey: `run:${run.runId}:${definition.name}:${actionFingerprint.slice(0, 24)}`,
+            createdAt: toUtcTimestamp(this.#clock.nowMs()),
+          });
+          if (execution.status !== "SUCCEEDED") {
+            throw new ToolExecutionError(
+              execution.error?.code === "DEPENDENCY_TIMEOUT"
+                ? "DEPENDENCY_TIMEOUT"
+                : "DEPENDENCY_UNAVAILABLE",
+              definition.name,
+              execution.error?.message ?? "Reliable execution failed safely",
+            );
+          }
+          return execution.result;
         },
       });
       toolAdapter = new PiToolAdapter(

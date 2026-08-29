@@ -41,6 +41,12 @@ export type IdempotencyHint = (typeof IDEMPOTENCY_HINTS)[number];
 export const AUDIT_LEVELS = ["BASIC", "STANDARD", "HIGH"] as const;
 export type AuditLevel = (typeof AUDIT_LEVELS)[number];
 
+export interface ToolExecutionContext {
+  readonly signal: AbortSignal;
+  readonly attempt: number;
+  readonly idempotencyKey: string;
+}
+
 export interface ToolDefinition<
   TInputSchema extends TSchema = TSchema,
   TOutputSchema extends TSchema = TSchema,
@@ -55,7 +61,10 @@ export interface ToolDefinition<
   readonly timeoutHintMs: number;
   readonly idempotencyHint: IdempotencyHint;
   readonly auditLevel: AuditLevel;
-  readonly execute: (input: Static<TInputSchema>) => Promise<Static<TOutputSchema>>;
+  readonly execute: (
+    input: Static<TInputSchema>,
+    context?: ToolExecutionContext,
+  ) => Promise<Static<TOutputSchema>>;
 }
 
 export interface ToolRegistrySnapshotEntry {

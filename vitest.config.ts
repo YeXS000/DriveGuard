@@ -19,6 +19,9 @@ export default defineConfig({
       "@driveguard/domain": fileURLToPath(
         new URL("./packages/domain/src/index.ts", import.meta.url),
       ),
+      "@driveguard/executor": fileURLToPath(
+        new URL("./packages/executor/src/index.ts", import.meta.url),
+      ),
       "@driveguard/policy": fileURLToPath(
         new URL("./packages/policy/src/index.ts", import.meta.url),
       ),
