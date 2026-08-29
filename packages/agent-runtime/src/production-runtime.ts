@@ -2,6 +2,10 @@ import { randomUUID } from "node:crypto";
 
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
+import {
+  type ConfirmationService,
+  type SafeConfirmationRequiredResult,
+} from "@driveguard/action-lifecycle";
 import { ContextConflictDetector, ContextFreshnessEvaluator } from "@driveguard/context";
 import { toUtcTimestamp, type ContextSnapshot } from "@driveguard/domain";
 import {
@@ -50,6 +54,7 @@ import {
   type RuntimeEventType,
 } from "./runtime-events.js";
 import { AgentSession, AgentSessionStore, type AgentSessionSnapshot } from "./session.js";
+import type { TrustedConfirmationChallengeChannel } from "./trusted-confirmation-channel.js";
 
 export interface DriveGuardRuntimeOptions {
   readonly model: Model<string>;
@@ -66,6 +71,8 @@ export interface DriveGuardRuntimeOptions {
   readonly sensitiveValues?: readonly string[];
   readonly policyEngine: PolicyEngine;
   readonly policyProfiles: ToolPolicyProfileRegistry;
+  readonly confirmationService: ConfirmationService;
+  readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
 }
 
 export interface AgentRunRequest {
@@ -92,6 +99,8 @@ export interface AgentRunResult {
   readonly availableToolNames: readonly FormalToolName[];
   readonly toolExecutions: readonly FormalToolExecutionEvidence[];
   readonly policyDecisions: readonly PolicyDecision[];
+  /** Safe for model/application display. Never contains a confirmation token. */
+  readonly confirmationRequired: readonly SafeConfirmationRequiredResult[];
   readonly context?: AgentRunContextSummary;
   readonly error?: RuntimeFailure;
 }
@@ -101,11 +110,14 @@ interface MutableRunEvidence {
   availableToolNames: FormalToolName[];
   toolExecutions: FormalToolExecutionEvidence[];
   policyDecisions: PolicyDecision[];
+  confirmationRequired: SafeConfirmationRequiredResult[];
 }
 
 export interface ProductionDriveGuardRuntime {
   readonly mode: Phase5RuntimeMode;
   readonly sessionCount: number;
+  readonly confirmationService: ConfirmationService;
+  readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   cancel(sessionId: string): boolean;
   sessionSnapshot(sessionId: string): AgentSessionSnapshot | undefined;
   sessionSnapshots(): readonly AgentSessionSnapshot[];
@@ -156,6 +168,8 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   readonly #sensitiveValues: readonly string[];
   readonly #policyEngine: PolicyEngine;
   readonly #policyProfiles: ToolPolicyProfileRegistry;
+  readonly confirmationService: ConfirmationService;
+  readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   readonly #cancelledRunIds = new Set<string>();
   readonly #issuedRunIds = new Set<string>();
   readonly #issuedTraceIds = new Set<string>();
@@ -188,6 +202,8 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     this.#sensitiveValues = Object.freeze([...(options.sensitiveValues ?? [])]);
     this.#policyEngine = options.policyEngine;
     this.#policyProfiles = options.policyProfiles;
+    this.confirmationService = options.confirmationService;
+    this.trustedConfirmationChallengeChannel = options.trustedConfirmationChallengeChannel;
     this.#sessions = new AgentSessionStore(
       (sessionId) =>
         new AgentSession({
@@ -242,6 +258,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       availableToolNames: [],
       toolExecutions: [],
       policyDecisions: [],
+      confirmationRequired: [],
     };
     let sinkFailed = false;
     const fallbackEventFactory = new RuntimeEventFactory({
@@ -290,12 +307,10 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       runtimeMode: this.mode,
       boundary: "POLICY_GUARDED",
     });
-    if (runtimeBoundaryFailed || sinkFailed) {
+    if (runtimeBoundaryFailed) {
       const error = new AgentRuntimeError(
         "INTERNAL_ERROR",
-        runtimeBoundaryFailed
-          ? "Runtime identity or Event factory failed safely"
-          : "Runtime event delivery failed safely",
+        "Runtime identity or Event factory failed safely",
       );
       run.transition("RUN_FAILED");
       await emit(
@@ -497,6 +512,45 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
             this.#throwIfSinkFailed(sinkFailed);
           },
         },
+        confirmationRequired: async (
+          definition: ToolDefinition,
+          validatedArguments: unknown,
+          policyDecision: PolicyDecision,
+          policyInput: PolicyEvaluationInput,
+        ) => {
+          const created = await this.confirmationService.create({
+            definition,
+            validatedArguments,
+            runId: run.runId,
+            sessionId: run.sessionId,
+            traceId: run.traceId,
+            userId: policyInput.contextSnapshot.user.userId,
+            vehicleId: policyInput.contextSnapshot.vehicle.vehicleId,
+            policyDecision,
+            contextSnapshot: policyInput.contextSnapshot,
+          });
+          try {
+            await this.trustedConfirmationChallengeChannel.publish(created.trustedChallenge);
+          } catch (error) {
+            try {
+              await this.confirmationService.cancel({
+                actionId: created.action.actionId,
+                sessionId: created.action.sessionId,
+                userId: created.action.userId,
+              });
+            } catch {
+              // Preserve the original trusted-publication failure. cancel() transitions before emit.
+            } finally {
+              try {
+                this.trustedConfirmationChallengeChannel.discard(created.action.actionId);
+              } catch {
+                // The original trusted-publication failure remains authoritative.
+              }
+            }
+            throw error;
+          }
+          evidence.confirmationRequired.push(created.safeResult);
+        },
       });
       toolAdapter = new PiToolAdapter(
         this.mode,
@@ -616,7 +670,9 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       );
       return this.#result(
         cancelled ? "cancelled" : "failed",
-        "",
+        failure.code === "POLICY_CONFIRMATION_REQUIRED"
+          ? "User confirmation is required before this action can proceed."
+          : "",
         run,
         events,
         evidence,
@@ -712,6 +768,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         ),
       ),
       policyDecisions: Object.freeze([...evidence.policyDecisions]),
+      confirmationRequired: Object.freeze([...evidence.confirmationRequired]),
       ...(evidence.context === undefined ? {} : { context: evidence.context }),
       ...(error === undefined ? {} : { error }),
     });

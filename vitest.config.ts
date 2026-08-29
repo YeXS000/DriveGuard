@@ -4,6 +4,9 @@ import { fileURLToPath } from "node:url";
 export default defineConfig({
   resolve: {
     alias: {
+      "@driveguard/action-lifecycle": fileURLToPath(
+        new URL("./packages/action-lifecycle/src/index.ts", import.meta.url),
+      ),
       "@driveguard/context": fileURLToPath(
         new URL("./packages/context/src/index.ts", import.meta.url),
       ),

@@ -154,7 +154,7 @@ describe("Phase 6 formal Runtime Policy enforcement", () => {
 
     expect(result.status).toBe("failed");
     expect(result.error?.code).toBe("POLICY_CONFIRMATION_REQUIRED");
-    expect(result.response).toBe("");
+    expect(result.response).toContain("confirmation is required");
     expect(result.policyDecisions).toMatchObject([
       { decision: "REQUIRE_CONFIRMATION", ruleId: "DG-POL-008" },
     ]);

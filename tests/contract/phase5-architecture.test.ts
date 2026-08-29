@@ -65,13 +65,12 @@ describe("Phase 5 architecture and security boundaries", () => {
     expect(phase1Runtime).not.toContain("DriveGuardAgentRuntime");
   });
 
-  it("adds Policy without crossing into Executor, Persistence, Confirmation, or Action State Machine", () => {
+  it("adds Policy and Phase 7 confirmation without crossing into Executor or Persistence", () => {
     const combined = productionModules.map(source).join("\n");
 
     expect(combined).toContain("@driveguard/policy");
-    expect(combined).not.toMatch(
-      /@driveguard\/(?:executor|persistence)|from\s+["'][^"']*(?:confirmation|action-state)/u,
-    );
+    expect(combined).toContain("@driveguard/action-lifecycle");
+    expect(combined).not.toMatch(/@driveguard\/(?:executor|persistence)/u);
   });
 
   it("adds only the Phase 6 policy control error codes", () => {
