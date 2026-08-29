@@ -31,6 +31,7 @@ async function withFault<T>(
   target: FaultTarget,
   reply: FastifyReply,
   operation: (fault: TriggeredFault | undefined, resetEpoch: number) => T | Promise<T>,
+  applyBeforeTimeout = false,
 ): Promise<T | FastifyReply> {
   const resetEpoch = simulator.resetEpoch();
   const fault = simulator.consumeFault(target);
@@ -40,6 +41,7 @@ async function withFault<T>(
     return operation(fault, resetEpoch);
   }
   if (fault.mode === "timeout") {
+    if (applyBeforeTimeout) await operation(fault, resetEpoch);
     await delay(fault.delayMs);
     throw new SimulatorError("FAULT_INJECTED", "Injected dependency timeout", 504);
   }
@@ -60,6 +62,18 @@ async function withFault<T>(
 export function buildVehicleSimulator(options: BuildVehicleSimulatorOptions = {}): FastifyInstance {
   const simulator = options.simulator ?? new VehicleSimulator();
   const app = Fastify({ logger: options.logger ?? false });
+  const reservationIdempotency = new Map<
+    string,
+    { readonly fingerprint: string; readonly result: Promise<unknown> }
+  >();
+
+  const reservationKey = (value: unknown): string | undefined => {
+    if (value === undefined) return undefined;
+    if (typeof value !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u.test(value)) {
+      throw new SimulatorError("VALIDATION_ERROR", "Idempotency-Key is invalid", 400);
+    }
+    return value;
+  };
 
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof SimulatorError) {
@@ -145,13 +159,38 @@ export function buildVehicleSimulator(options: BuildVehicleSimulatorOptions = {}
   app.get("/charging/status", (_request, reply) =>
     withFault(simulator, "charging.get_status", reply, () => simulator.chargingStatus()),
   );
-  app.post("/charging/reservations", (request, reply) =>
-    withFault(simulator, "charging.create_reservation", reply, async (_fault, resetEpoch) => {
-      const state = await simulator.createReservation(parseStationBody(request.body), resetEpoch);
-      const reservation = state.charging.reservations.at(-1);
-      return reply.status(201).send({ reservation });
-    }),
-  );
+  app.post("/charging/reservations", (request, reply) => {
+    const key = reservationKey(request.headers["idempotency-key"]);
+    const stationId = parseStationBody(request.body);
+    const fingerprint = JSON.stringify({ stationId });
+    const operation = async (_fault: TriggeredFault | undefined, resetEpoch: number) => {
+      if (key === undefined) {
+        const state = await simulator.createReservation(stationId, resetEpoch);
+        reply.status(201);
+        return { reservation: state.charging.reservations.at(-1) };
+      }
+      const existing = reservationIdempotency.get(key);
+      if (existing !== undefined) {
+        if (existing.fingerprint !== fingerprint) {
+          throw new SimulatorError("VALIDATION_ERROR", "Idempotency-Key conflicts", 409);
+        }
+        reply.status(201);
+        return existing.result;
+      }
+      const result = simulator
+        .createReservation(stationId, resetEpoch)
+        .then((state) => Object.freeze({ reservation: state.charging.reservations.at(-1) }));
+      reservationIdempotency.set(key, { fingerprint, result });
+      try {
+        reply.status(201);
+        return await result;
+      } catch (error) {
+        reservationIdempotency.delete(key);
+        throw error;
+      }
+    };
+    return withFault(simulator, "charging.create_reservation", reply, operation, key !== undefined);
+  });
   app.delete("/charging/reservations/:id", (request, reply) =>
     withFault(simulator, "charging.cancel_reservation", reply, async (_fault, resetEpoch) => {
       await simulator.cancelReservation(parseIdParameter(request.params), resetEpoch);
@@ -173,6 +212,7 @@ export function buildVehicleSimulator(options: BuildVehicleSimulatorOptions = {}
   app.get("/simulator/state", () => simulator.state());
   app.post("/simulator/reset", async (request) => {
     const body = parseResetBody(request.body);
+    reservationIdempotency.clear();
     return simulator.reset(body.scenario, body.seed);
   });
   app.post("/simulator/faults", (request, reply) =>

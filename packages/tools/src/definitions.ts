@@ -8,6 +8,7 @@ import {
   type IdempotencyHint,
   ToolExecutionError,
   type ToolDefinition,
+  type ToolExecutionContext,
   type ToolRiskLevel,
 } from "./contracts.js";
 import type { EmergencySupportProvider, WeatherProvider } from "./providers.js";
@@ -55,7 +56,7 @@ interface DefinitionOptions<I extends TSchema, O extends TSchema> {
   readonly timeoutHintMs: number;
   readonly idempotencyHint: IdempotencyHint;
   readonly auditLevel: AuditLevel;
-  readonly handler: (input: Static<I>) => Promise<unknown>;
+  readonly handler: (input: Static<I>, context?: ToolExecutionContext) => Promise<unknown>;
 }
 
 function defineTool<I extends TSchema, O extends TSchema>(
@@ -76,7 +77,7 @@ function defineTool<I extends TSchema, O extends TSchema>(
     timeoutHintMs: options.timeoutHintMs,
     idempotencyHint: options.idempotencyHint,
     auditLevel: options.auditLevel,
-    execute: async (input: Static<I>): Promise<Static<O>> => {
+    execute: async (input: Static<I>, context?: ToolExecutionContext): Promise<Static<O>> => {
       if (!inputValidator.Check(input)) {
         throw new ToolExecutionError(
           "TOOL_VALIDATION_ERROR",
@@ -96,7 +97,7 @@ function defineTool<I extends TSchema, O extends TSchema>(
       }
       let output: unknown;
       try {
-        output = await options.handler(clonedInput);
+        output = await options.handler(clonedInput, context);
       } catch (error) {
         if (error instanceof ToolExecutionError) throw error;
         throw new ToolExecutionError(
@@ -142,7 +143,7 @@ export function createFormalToolDefinitions(
       timeoutHintMs: 1_000,
       idempotencyHint: "READ_ONLY",
       auditLevel: "BASIC",
-      handler: () => simulator.getVehicleState(1_000),
+      handler: (_input, context) => simulator.getVehicleState(1_000, context),
     }),
     defineTool({
       name: "get_trip_state",
@@ -156,7 +157,7 @@ export function createFormalToolDefinitions(
       timeoutHintMs: 1_000,
       idempotencyHint: "READ_ONLY",
       auditLevel: "BASIC",
-      handler: () => simulator.getTripState(1_000),
+      handler: (_input, context) => simulator.getTripState(1_000, context),
     }),
     defineTool({
       name: "get_weather",
@@ -184,7 +185,7 @@ export function createFormalToolDefinitions(
       timeoutHintMs: 1_000,
       idempotencyHint: "READ_ONLY",
       auditLevel: "BASIC",
-      handler: () => simulator.listChargingStations(1_000),
+      handler: (_input, context) => simulator.listChargingStations(1_000, context),
     }),
     defineTool({
       name: "get_charging_status",
@@ -198,7 +199,7 @@ export function createFormalToolDefinitions(
       timeoutHintMs: 1_000,
       idempotencyHint: "READ_ONLY",
       auditLevel: "BASIC",
-      handler: () => simulator.getChargingStatus(1_000),
+      handler: (_input, context) => simulator.getChargingStatus(1_000, context),
     }),
     defineTool({
       name: "set_cabin_temperature",
@@ -210,11 +211,11 @@ export function createFormalToolDefinitions(
       requiredServices: ["vehicleSimulator"],
       sideEffect: true,
       timeoutHintMs: 2_000,
-      idempotencyHint: "IDEMPOTENT",
+      idempotencyHint: "NON_IDEMPOTENT",
       auditLevel: "STANDARD",
-      handler: async ({ temperatureC }) => {
-        const previous = await simulator.getVehicleState(2_000);
-        const current = await simulator.setCabinTemperature(temperatureC, 2_000);
+      handler: async ({ temperatureC }, context) => {
+        const previous = await simulator.getVehicleState(2_000, context);
+        const current = await simulator.setCabinTemperature(temperatureC, 2_000, context);
         return {
           applied: true,
           previousTemperatureC: previous.cabinTemperature,
@@ -232,10 +233,10 @@ export function createFormalToolDefinitions(
       requiredServices: ["vehicleSimulator"],
       sideEffect: true,
       timeoutHintMs: 2_000,
-      idempotencyHint: "IDEMPOTENT",
+      idempotencyHint: "NON_IDEMPOTENT",
       auditLevel: "STANDARD",
-      handler: async ({ seat, level }) => {
-        const result = await simulator.setSeatHeating(seat, level, 2_000);
+      handler: async ({ seat, level }, context) => {
+        const result = await simulator.setSeatHeating(seat, level, 2_000, context);
         return { applied: true, seat, level: result.seatHeating[seat] };
       },
     }),
@@ -249,11 +250,11 @@ export function createFormalToolDefinitions(
       requiredServices: ["vehicleSimulator"],
       sideEffect: true,
       timeoutHintMs: 2_000,
-      idempotencyHint: "IDEMPOTENT",
+      idempotencyHint: "NON_IDEMPOTENT",
       auditLevel: "STANDARD",
-      handler: async ({ volume }) => ({
+      handler: async ({ volume }, context) => ({
         applied: true,
-        volume: (await simulator.setMediaVolume(volume, 2_000)).volume,
+        volume: (await simulator.setMediaVolume(volume, 2_000, context)).volume,
       }),
     }),
     defineTool({
@@ -266,9 +267,10 @@ export function createFormalToolDefinitions(
       requiredServices: ["vehicleSimulator"],
       sideEffect: true,
       timeoutHintMs: 3_000,
-      idempotencyHint: "IDEMPOTENT",
+      idempotencyHint: "NON_IDEMPOTENT",
       auditLevel: "HIGH",
-      handler: ({ destination }) => simulator.setNavigationDestination(destination, 3_000),
+      handler: ({ destination }, context) =>
+        simulator.setNavigationDestination(destination, 3_000, context),
     }),
     defineTool({
       name: "reroute_to_charger",
@@ -280,10 +282,10 @@ export function createFormalToolDefinitions(
       requiredServices: ["vehicleSimulator"],
       sideEffect: true,
       timeoutHintMs: 3_000,
-      idempotencyHint: "IDEMPOTENT",
+      idempotencyHint: "NON_IDEMPOTENT",
       auditLevel: "HIGH",
-      handler: async ({ stationId }) => {
-        const stations = await simulator.listChargingStations(3_000);
+      handler: async ({ stationId }, context) => {
+        const stations = await simulator.listChargingStations(3_000, context);
         const station = stations.stations.find((candidate) => candidate.id === stationId);
         if (station === undefined) {
           throw new ToolExecutionError(
@@ -292,7 +294,7 @@ export function createFormalToolDefinitions(
             "Charging station was not found",
           );
         }
-        return simulator.setNavigationDestination(station.name, 3_000);
+        return simulator.setNavigationDestination(station.name, 3_000, context);
       },
     }),
     defineTool({
@@ -305,9 +307,10 @@ export function createFormalToolDefinitions(
       requiredServices: ["vehicleSimulator"],
       sideEffect: true,
       timeoutHintMs: 3_000,
-      idempotencyHint: "NON_IDEMPOTENT",
+      idempotencyHint: "IDEMPOTENT",
       auditLevel: "HIGH",
-      handler: ({ stationId }) => simulator.createChargingReservation(stationId, 3_000),
+      handler: ({ stationId }, context) =>
+        simulator.createChargingReservation(stationId, 3_000, context),
     }),
     defineTool({
       name: "cancel_charging_reservation",
@@ -319,10 +322,10 @@ export function createFormalToolDefinitions(
       requiredServices: ["vehicleSimulator"],
       sideEffect: true,
       timeoutHintMs: 3_000,
-      idempotencyHint: "IDEMPOTENT",
+      idempotencyHint: "NON_IDEMPOTENT",
       auditLevel: "HIGH",
-      handler: async ({ reservationId }) => {
-        await simulator.cancelChargingReservation(reservationId, 3_000);
+      handler: async ({ reservationId }, context) => {
+        await simulator.cancelChargingReservation(reservationId, 3_000, context);
         return { cancelled: true as const, reservationId };
       },
     }),
@@ -338,7 +341,7 @@ export function createFormalToolDefinitions(
       timeoutHintMs: 5_000,
       idempotencyHint: "NON_IDEMPOTENT",
       auditLevel: "HIGH",
-      handler: ({ reason }) => simulator.requestRoadsideAssistance(reason, 5_000),
+      handler: ({ reason }, context) => simulator.requestRoadsideAssistance(reason, 5_000, context),
     }),
     defineTool({
       name: "request_emergency_support",

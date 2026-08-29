@@ -933,3 +933,85 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - Final independent read-only reviews found no unresolved Critical, High, or Medium issue after remediation.
 - State, events, trusted challenges, and authorizations remain process-local and non-durable by explicit Phase 7 scope.
 - The final Gate passed. Phase 8 and project-level target metrics remain out of scope and unclaimed.
+
+## Phase 8 — Reliable Tool Executor
+
+- Status: COMPLETE.
+- Scope: process-local reliable execution, one-time authorization/Policy permit consumption,
+  idempotency and single-flight, bounded retry/timeout, circuit breaking, safe execution events,
+  formal Runtime integration, and Simulator downstream idempotency only.
+- Gate result: **PASS**.
+- Verification date: 2026-08-29 (Asia/Shanghai).
+
+### Implemented modules
+
+- `packages/executor`: `ReliableToolExecutor`, independent execution lifecycle/records/attempts,
+  full-request idempotency binding, retry classification/backoff, AbortController timeout, per-service
+  circuit breaker, safe result/error surface, and safe execution event sink.
+- `packages/action-lifecycle`: atomic process-local authorization consumption under the existing
+  per-action repository lock; fingerprint recomputation uses trusted user/vehicle/Context identity
+  plus the Executor's actual validated arguments.
+- `packages/policy`: process-local R0/R1 Policy decision provenance, exact definition/arguments and
+  run/session/trace/fingerprint/Context binding, plus atomic one-time execution consumption.
+- `packages/agent-runtime`: R0/R1 `ALLOW` and confirmed R2/R3 now converge on the Executor; the
+  accepted Phase 1 fixture Runtime remains unchanged.
+- `packages/tools` and `services/vehicle-simulator`: attempt context carries AbortSignal/attempt/key;
+  only `reserve_charging_slot` is retry-safe, backed by Simulator `Idempotency-Key` single-flight and
+  result reuse. All other mutations are explicitly `NON_IDEMPOTENT` in this phase.
+- `docs/adr/0009-phase-8-reliable-tool-executor.md`: execution, authorization, idempotency, retry,
+  timeout, breaker, concurrency, ambiguity, process-local limitations, and Phase 8/9 boundary.
+
+### Current measured verification
+
+| Check                                               | Current result                                                                                                                    |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 8 focused tests                               | 285 / 285 PASS across 6 files                                                                                                     |
+| Full Phase 0–8 regression                           | 1,659 / 1,659 PASS across 44 files                                                                                                |
+| Formal Runtime Executor scenarios                   | 5 / 5 PASS: R0, R1, confirmed R2, confirmed R3, unconfirmed execution = 0                                                         |
+| Generated reliability/adversarial cases             | 10,000; forbidden execution 0, duplicate side effects 0, authorization replay 0, idempotency collision accepted 0, unsafe retry 0 |
+| Retry-safe transient cases                          | 1,000 / 1,000 recovered (100%); duplicate side effects 0                                                                          |
+| Executor local overhead                             | non-coverage P95 0.057501 ms; P99 0.137656 ms over 10,000 operations                                                              |
+| Executor package coverage                           | lines 99.69%; branches 96.56%; statements 99.13%; functions 98.03%                                                                |
+| `ReliableToolExecutor` coverage                     | lines 99.49%; branches 95.50%; statements 99.01%; functions 100%                                                                  |
+| Idempotency / RetryPolicy / CircuitBreaker branches | 100% / 100% / 100%                                                                                                                |
+| Authorization verification coverage                 | lines 100%; branches 100%                                                                                                         |
+| Critical safety scenarios                           | 100% of defined Policy identity/Context fields, authorization mismatch/replay, RX, ambiguity, and downstream-dedup cases PASS     |
+| Simulator fault integration                         | delay, timeout, HTTP 500/503, connection abort, stale response, Cases A–D PASS                                                    |
+| Package export boundary                             | PASS                                                                                                                              |
+| Engineering/security checks                         | format, lint, typecheck, build, diff check PASS; npm audit 0 vulnerabilities                                                      |
+
+### Safety, architecture, and limitations
+
+- Formal Runtime bypasses Executor = 0 in the defined integration set; R2/R3 without trusted
+  `ExecutionAuthorization` = 0; authorization double consumption = 0; RX execution = 0; duplicate
+  side effects = 0; unsafe ambiguous retry = 0.
+- Exact same-request sequential/concurrent replays, including the same `executionId`, reuse one
+  terminal result. Altered fingerprint, arguments, authorization, session, trace, run, or Context
+  binding conflicts or rejects before Tool dispatch.
+- A conflicting same-`executionId` replay cannot transition or corrupt the legitimate owner's
+  record, including while the R2 owner is awaiting atomic authorization consumption.
+- A real client-side timeout after reservation application is retried with the same downstream key
+  and produces exactly one reservation. Non-idempotent ambiguous timeouts return `OUTCOME_UNKNOWN`,
+  including when audit delivery itself fails.
+- Circuit state settles before fallible event delivery; HALF_OPEN probes cannot remain permanently
+  active after business errors or audit failure, and every HALF_OPEN-to-CLOSED settlement emits
+  `circuit.closed`. Audit timestamps come from the Executor Clock and record attempts are deeply
+  frozen.
+- Reliability state, Policy permit provenance, authorizations, idempotency, records, events,
+  downstream Simulator deduplication, and breaker state are process-local and non-durable. Restart,
+  multi-process coordination, eviction/retention, persistence, and transactional outbox remain future
+  work and are not claimed.
+- PostgreSQL, Redis, NATS workflow, HMI, production OpenTelemetry, urgent-event handling, benchmark/
+  load infrastructure, and other Phase 9+ implementation were not added.
+- `api_key.md` was not read, copied, logged, or used; `.env`, credentials, tokens, logs, coverage, and
+  temporary benchmark artifacts are not part of the change set.
+
+### Review closure
+
+- Three independent read-only reviews initially found Critical 0 and High issues in request-bound
+  deduplication, downstream retry proof, R0/R1 Policy replay, HALF_OPEN settlement, and ambiguous
+  event-failure handling, plus relevant Medium findings in exact execution replay, audit time,
+  immutable attempts, and real client-timeout validity.
+- All findings were remediated with direct regression tests. Final independent review outcome is
+  Critical 0, High 0, and relevant Medium 0 across Executor correctness, exactly-once/idempotency,
+  and safety/architecture reviews.

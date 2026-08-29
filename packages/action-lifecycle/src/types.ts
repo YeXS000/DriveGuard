@@ -77,6 +77,17 @@ export interface ExecutionAuthorization {
   readonly expiresAt: UtcTimestamp;
 }
 
+export interface ConsumeExecutionAuthorizationCommand {
+  readonly authorizationId: string;
+  readonly actionId: string;
+  readonly actionFingerprint: string;
+  readonly toolName: FormalToolName;
+  readonly sessionId: string;
+  readonly contextSnapshotId: string;
+  readonly contextVersion: number;
+  readonly validatedArguments: unknown;
+}
+
 export interface CreatePendingActionCommand {
   readonly definition: ToolDefinition;
   readonly validatedArguments: unknown;

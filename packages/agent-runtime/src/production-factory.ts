@@ -16,6 +16,7 @@ import {
   ContextVersionAllocator,
 } from "@driveguard/context";
 import type { DrivingUser, VehicleCapabilities, WeatherState } from "@driveguard/domain";
+import { ReliableToolExecutor, type ExecutionEventSink } from "@driveguard/executor";
 import { SystemClock, type Clock } from "@driveguard/shared";
 import { createDefaultToolPolicyProfileRegistry, PolicyEngine } from "@driveguard/policy";
 import {
@@ -68,6 +69,7 @@ export interface CreateProductionRuntimeOptions {
     "runIdFactory" | "traceIdFactory" | "eventIdFactory" | "eventSink"
   >;
   readonly actionLifecycleEventSink?: ActionLifecycleEventSink;
+  readonly executionEventSink?: ExecutionEventSink;
   readonly trustedConfirmationChallengeChannel?: TrustedConfirmationChallengeChannel;
 }
 
@@ -232,6 +234,12 @@ export function createProductionDriveGuardRuntime(
       },
     }),
   });
+  const reliableExecutor = new ReliableToolExecutor({
+    registry,
+    authorizationConsumer: confirmationService,
+    clock,
+    ...(options.executionEventSink === undefined ? {} : { eventSink: options.executionEventSink }),
+  });
   return new DriveGuardAgentRuntime({
     model: options.model,
     streamFn: options.streamFn,
@@ -242,6 +250,7 @@ export function createProductionDriveGuardRuntime(
     policyProfiles,
     confirmationService,
     trustedConfirmationChallengeChannel,
+    reliableExecutor,
     ...(options.mode === undefined ? {} : { mode: options.mode }),
     ...(options.developmentExecutionOptIn === undefined
       ? {}

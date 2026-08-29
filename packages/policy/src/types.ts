@@ -63,6 +63,13 @@ export interface PolicyEvaluationInput {
   readonly freshness: ContextFreshnessResult;
   readonly availability: CapabilityResolutionContext;
   readonly conflict?: ContextConflictResult;
+  /** Runtime-owned identity used to bind an issued decision to one execution intent. */
+  readonly executionBinding?: {
+    readonly runId: string;
+    readonly sessionId: string;
+    readonly traceId: string;
+    readonly actionFingerprint: string;
+  };
 }
 
 export interface PolicyRuleResult {

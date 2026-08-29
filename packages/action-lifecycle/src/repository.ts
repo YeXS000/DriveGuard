@@ -10,6 +10,7 @@ export interface PendingActionRecord {
   readonly tokenHash: string | null;
   readonly confirmationId: string | null;
   readonly authorization: ExecutionAuthorization | null;
+  readonly authorizationConsumedAt?: PendingAction["updatedAt"] | null;
 }
 
 export interface PendingActionRepository {
@@ -26,6 +27,10 @@ export interface PendingActionRepository {
     actionId: string,
     authorization: ExecutionAuthorization,
     transitionedAt: PendingAction["updatedAt"],
+  ): PendingActionRecord;
+  consumeAuthorization(
+    actionId: string,
+    consumedAt: PendingAction["updatedAt"],
   ): PendingActionRecord;
 }
 
@@ -115,6 +120,24 @@ export class InMemoryPendingActionRepository implements PendingActionRepository 
       action: transitionPendingAction(record.action, "READY_FOR_EXECUTION", transitionedAt),
       authorization,
     });
+    this.#records.set(actionId, updated);
+    return cloneRecord(updated);
+  }
+
+  consumeAuthorization(
+    actionId: string,
+    consumedAt: PendingAction["updatedAt"],
+  ): PendingActionRecord {
+    const record = this.#require(actionId);
+    if (record.authorizationConsumedAt != null) {
+      throw new ActionLifecycleError(
+        "AUTHORIZATION_ALREADY_USED",
+        "ExecutionAuthorization was already consumed",
+        actionId,
+        record.action.state,
+      );
+    }
+    const updated = cloneRecord({ ...record, authorizationConsumedAt: consumedAt });
     this.#records.set(actionId, updated);
     return cloneRecord(updated);
   }
