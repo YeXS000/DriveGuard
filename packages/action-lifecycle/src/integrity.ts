@@ -1,5 +1,6 @@
 import { createActionFingerprint } from "./canonical.js";
 import { ActionLifecycleError } from "./errors.js";
+import type { PendingActionRecord } from "./repository.js";
 import type { PendingAction } from "./types.js";
 
 export function assertPendingActionIntegrity(action: PendingAction): void {
@@ -24,6 +25,24 @@ export function assertPendingActionIntegrity(action: PendingAction): void {
     throw new ActionLifecycleError(
       "ACTION_INTEGRITY_FAILED",
       "PendingAction integrity validation failed",
+      action.actionId,
+      action.state,
+    );
+  }
+}
+
+export function assertPendingActionRecordIntegrity(record: PendingActionRecord): void {
+  const { action, originalContext } = record;
+  assertPendingActionIntegrity(action);
+  if (
+    originalContext.snapshotId !== action.contextSnapshotId ||
+    originalContext.contextVersion !== action.contextVersion ||
+    originalContext.user.userId !== action.userId ||
+    originalContext.vehicle.vehicleId !== action.vehicleId
+  ) {
+    throw new ActionLifecycleError(
+      "ACTION_INTEGRITY_FAILED",
+      "PendingAction original Context integrity validation failed",
       action.actionId,
       action.state,
     );

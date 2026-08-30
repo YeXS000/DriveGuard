@@ -66,7 +66,7 @@ async function main(): Promise<void> {
   const pending =
     safeResult === undefined || runtime.confirmationService === undefined
       ? undefined
-      : runtime.confirmationService.get(safeResult.actionId);
+      : await runtime.confirmationService.get(safeResult.actionId);
   const safeSurfaces = JSON.stringify({
     response: result.response,
     events: result.events,

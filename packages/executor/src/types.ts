@@ -24,6 +24,8 @@ export interface ExecutionRequest {
   readonly actionFingerprint: string;
   readonly runId: string;
   readonly sessionId: string;
+  readonly userId: string;
+  readonly vehicleId: string;
   readonly traceId: string;
   readonly riskLevel: ToolRiskLevel;
   readonly policyDecision: PolicyDecision;
@@ -62,7 +64,7 @@ export interface ExecutionAttempt {
   readonly attempt: number;
   readonly startedAt: UtcTimestamp;
   readonly completedAt: UtcTimestamp;
-  readonly outcome: "SUCCEEDED" | "FAILED" | "TIMED_OUT";
+  readonly outcome: "SUCCEEDED" | "FAILED" | "TIMED_OUT" | "OUTCOME_UNKNOWN";
   readonly errorCode?: ExecutionErrorCode;
 }
 

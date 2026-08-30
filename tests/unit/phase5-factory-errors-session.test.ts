@@ -204,12 +204,12 @@ describe("Phase 5 process-local AgentSession", () => {
     });
   }
 
-  it("getOrCreate is stable and snapshots are sorted by sessionId", () => {
+  it("getOrCreate is stable and snapshots are sorted by sessionId", async () => {
     const store = new AgentSessionStore(session);
-    const beta = store.getOrCreate("beta");
-    const alpha = store.getOrCreate("alpha");
+    const beta = await store.getOrCreate("beta");
+    const alpha = await store.getOrCreate("alpha");
 
-    expect(store.getOrCreate("beta")).toBe(beta);
+    await expect(store.getOrCreate("beta")).resolves.toBe(beta);
     expect(store.get("alpha")).toBe(alpha);
     expect(store.snapshots().map((snapshot) => snapshot.sessionId)).toEqual(["alpha", "beta"]);
     expect(Object.isFrozen(store.snapshots())).toBe(true);

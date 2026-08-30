@@ -1,6 +1,7 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { createHash } from "node:crypto";
 
-import { canonicalSerialize } from "@driveguard/action-lifecycle";
+import { canonicalSerialize, createActionFingerprint } from "@driveguard/action-lifecycle";
 import { toUtcTimestamp, timestampToEpochMs } from "@driveguard/domain";
 import {
   consumePolicyDecisionForExecution,
@@ -18,6 +19,7 @@ import {
 import Schema from "typebox/schema";
 
 import { CircuitBreaker } from "./circuit-breaker.js";
+import type { DurableExecutionCoordinator } from "./durable.js";
 import {
   authorizationErrorCode,
   classifyToolError,
@@ -59,6 +61,7 @@ export interface ReliableToolExecutorOptions {
   readonly circuitBreaker?: CircuitBreaker;
   readonly eventSink?: ExecutionEventSink;
   readonly records?: ExecutionRecordStore;
+  readonly durableCoordinator?: DurableExecutionCoordinator;
 }
 
 function safeIdentity(value: unknown, fallback: string): string {
@@ -80,6 +83,8 @@ export class ReliableToolExecutor {
   readonly #circuitBreaker: CircuitBreaker;
   readonly #eventSink: ExecutionEventSink;
   readonly #records: ExecutionRecordStore;
+  readonly #durableCoordinator: DurableExecutionCoordinator | undefined;
+  readonly #durableOwnerContext = new AsyncLocalStorage<boolean>();
 
   constructor(options: ReliableToolExecutorOptions) {
     this.#registry = options.registry;
@@ -92,6 +97,7 @@ export class ReliableToolExecutor {
     this.#circuitBreaker = options.circuitBreaker ?? new CircuitBreaker({ clock: options.clock });
     this.#eventSink = options.eventSink ?? new InMemoryExecutionEventSink();
     this.#records = options.records ?? new ExecutionRecordStore();
+    this.#durableCoordinator = options.durableCoordinator;
   }
 
   record(executionId: string) {
@@ -118,6 +124,22 @@ export class ReliableToolExecutor {
         completedAt: fallbackAt,
         error: safeExecutionError(code),
       });
+    }
+
+    if (this.#durableCoordinator !== undefined && this.#durableOwnerContext.getStore() !== true) {
+      return this.#durableCoordinator.execute(request, requestBinding, async () =>
+        this.#durableOwnerContext.run(true, async () => {
+          const result = await this.execute(request);
+          const record = this.#records.get(request.executionId);
+          if (record === undefined) {
+            throw new ExecutorFault(
+              "INTERNAL_EXECUTION_ERROR",
+              "Durable execution owner did not produce an ExecutionRecord",
+            );
+          }
+          return { result, record };
+        }),
+      );
     }
 
     const acquisition = this.#idempotency.acquire(
@@ -240,6 +262,8 @@ export class ReliableToolExecutor {
       request.toolName,
       request.runId,
       request.sessionId,
+      request.userId,
+      request.vehicleId,
       request.traceId,
       request.idempotencyKey,
     ]) {
@@ -276,6 +300,25 @@ export class ReliableToolExecutor {
       request.policyDecision.riskLevel !== request.riskLevel
     ) {
       throw new ExecutorFault("EXECUTION_NOT_AUTHORIZED", "Policy binding does not match");
+    }
+    if (
+      (request.riskLevel === "R0" || request.riskLevel === "R1") &&
+      (request.contextSnapshotId === undefined ||
+        request.contextVersion === undefined ||
+        createActionFingerprint({
+          toolName: request.toolName,
+          validatedArguments: request.validatedArguments,
+          sessionId: request.sessionId,
+          userId: request.userId,
+          vehicleId: request.vehicleId,
+          contextSnapshotId: request.contextSnapshotId,
+          contextVersion: request.contextVersion,
+        }) !== request.actionFingerprint)
+    ) {
+      throw new ExecutorFault(
+        "EXECUTION_NOT_AUTHORIZED",
+        "Execution subject does not match the action fingerprint",
+      );
     }
     if (
       (request.riskLevel === "R0" || request.riskLevel === "R1") &&
@@ -319,6 +362,8 @@ export class ReliableToolExecutor {
       actionFingerprint: request.actionFingerprint,
       runId: request.runId,
       sessionId: request.sessionId,
+      userId: request.userId,
+      vehicleId: request.vehicleId,
       traceId: request.traceId,
       riskLevel: request.riskLevel,
       policyDecision: request.policyDecision,
@@ -363,6 +408,8 @@ export class ReliableToolExecutor {
           actionFingerprint: request.actionFingerprint,
           toolName: definition.name as (typeof FORMAL_TOOL_NAMES)[number],
           sessionId: request.sessionId,
+          userId: request.userId,
+          vehicleId: request.vehicleId,
           contextSnapshotId: request.contextSnapshotId,
           contextVersion: request.contextVersion,
           validatedArguments: request.validatedArguments,

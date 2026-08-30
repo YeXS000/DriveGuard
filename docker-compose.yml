@@ -9,6 +9,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-driveguard}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 2s
@@ -22,6 +24,8 @@ services:
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis-data:/data
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 2s
@@ -48,7 +52,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: driveguard-api:phase0
+    image: driveguard-api:phase9
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
@@ -56,8 +60,8 @@ services:
       PORT: 3000
       PGHOST: postgres
       PGPORT: 5432
-      PGUSER: ${POSTGRES_USER:-driveguard}
-      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      PGUSER: ${POSTGRES_APP_USER:-driveguard_app}
+      PGPASSWORD: ${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD must be set}
       PGDATABASE: ${POSTGRES_DB:-driveguard}
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
@@ -70,6 +74,8 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
+      persistence-migrate:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [
@@ -83,6 +89,25 @@ services:
       retries: 15
       start_period: 5s
     restart: unless-stopped
+
+  persistence-migrate:
+    image: driveguard-api:phase9
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    command: ["node", "dist/packages/persistence/src/migrate-cli.js"]
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-driveguard}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      PGDATABASE: ${POSTGRES_DB:-driveguard}
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:-driveguard_app}
+      POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?POSTGRES_APP_PASSWORD must be set}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
 
   vehicle-simulator:
     image: driveguard-vehicle-simulator:phase3

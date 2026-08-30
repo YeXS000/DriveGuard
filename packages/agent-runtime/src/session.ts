@@ -6,6 +6,7 @@ import {
 } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
 import { toUtcTimestamp, type UtcTimestamp } from "@driveguard/domain";
+import type { ConversationMessage, SessionIdentityBinding } from "@driveguard/memory";
 import type { Clock } from "@driveguard/shared";
 
 import type { AgentRun } from "./agent-run.js";
@@ -33,6 +34,36 @@ export interface AgentSessionOptions {
   readonly streamFn: StreamFn;
   readonly clock: Clock;
   readonly systemPrompt?: string;
+  readonly history?: readonly ConversationMessage[];
+}
+
+function restoredMessages(
+  history: readonly ConversationMessage[],
+  model: Model<string>,
+): import("@earendil-works/pi-agent-core").AgentMessage[] {
+  return history.map((message) => {
+    const timestamp = Date.parse(message.createdAt);
+    if (message.role === "user") {
+      return { role: "user" as const, content: message.content, timestamp };
+    }
+    return {
+      role: "assistant" as const,
+      content: [{ type: "text" as const, text: message.content }],
+      api: model.api,
+      provider: model.provider,
+      model: model.id,
+      usage: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 0,
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      },
+      stopReason: "stop" as const,
+      timestamp,
+    };
+  });
 }
 
 export class AgentSession {
@@ -54,7 +85,7 @@ export class AgentSession {
         model: options.model,
         thinkingLevel: "off",
         tools: [],
-        messages: [],
+        messages: restoredMessages(options.history ?? [], options.model),
       },
       streamFn: options.streamFn,
       sessionId: options.sessionId,
@@ -151,18 +182,38 @@ export class AgentSession {
 
 export class AgentSessionStore {
   readonly #sessions = new Map<string, AgentSession>();
-  readonly #factory: (sessionId: string) => AgentSession;
+  readonly #pending = new Map<string, Promise<AgentSession>>();
+  readonly #factory: (
+    sessionId: string,
+    identity?: SessionIdentityBinding,
+  ) => Promise<AgentSession>;
 
-  constructor(factory: (sessionId: string) => AgentSession) {
-    this.#factory = factory;
+  constructor(
+    factory: (
+      sessionId: string,
+      identity?: SessionIdentityBinding,
+    ) => Promise<AgentSession> | AgentSession,
+  ) {
+    this.#factory = async (sessionId, identity) => factory(sessionId, identity);
   }
 
-  getOrCreate(sessionId: string): AgentSession {
+  async getOrCreate(sessionId: string, identity?: SessionIdentityBinding): Promise<AgentSession> {
     const existing = this.#sessions.get(sessionId);
     if (existing !== undefined) return existing;
-    const created = this.#factory(sessionId);
-    this.#sessions.set(sessionId, created);
-    return created;
+    const pending = this.#pending.get(sessionId);
+    if (pending !== undefined) return pending;
+    const creating = this.#factory(sessionId, identity).then((created) => {
+      this.#sessions.set(sessionId, created);
+      this.#pending.delete(sessionId);
+      return created;
+    });
+    this.#pending.set(sessionId, creating);
+    try {
+      return await creating;
+    } catch (error) {
+      if (this.#pending.get(sessionId) === creating) this.#pending.delete(sessionId);
+      throw error;
+    }
   }
 
   get(sessionId: string): AgentSession | undefined {

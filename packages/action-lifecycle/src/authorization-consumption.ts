@@ -41,8 +41,8 @@ export function verifyExecutionAuthorizationForConsumption(
       toolName: command.toolName,
       validatedArguments: command.validatedArguments,
       sessionId: command.sessionId,
-      userId: record.action.userId,
-      vehicleId: record.action.vehicleId,
+      userId: command.userId,
+      vehicleId: command.vehicleId,
       contextSnapshotId: record.action.contextSnapshotId,
       contextVersion: record.action.contextVersion,
     });
@@ -60,6 +60,8 @@ export function verifyExecutionAuthorizationForConsumption(
     authorization.actionFingerprint !== command.actionFingerprint ||
     authorization.toolName !== command.toolName ||
     record.action.sessionId !== command.sessionId ||
+    record.action.userId !== command.userId ||
+    record.action.vehicleId !== command.vehicleId ||
     authorization.contextSnapshotId !== command.contextSnapshotId ||
     authorization.contextVersion !== command.contextVersion ||
     record.action.actionFingerprint !== command.actionFingerprint ||

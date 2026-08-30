@@ -1,6 +1,8 @@
 export * from "./canonical.js";
 export * from "./errors.js";
 export * from "./events.js";
+export * from "./integrity.js";
+export type { PendingActionRecord, PendingActionRepository } from "./repository.js";
 export * from "./revalidator.js";
 export * from "./service.js";
 export * from "./state-machine.js";

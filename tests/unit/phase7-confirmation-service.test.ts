@@ -50,7 +50,7 @@ describe("Phase 7 PendingAction creation and immutable binding", () => {
           policyDecision: { ...command.policyDecision, decision },
         }),
       ).rejects.toMatchObject({ code: "INVALID_COMMAND" });
-      expect(harness.service.get("action:1")).toBeUndefined();
+      expect(await harness.service.get("action:1")).toBeUndefined();
     },
   );
 
@@ -126,7 +126,9 @@ describe("Phase 7 trusted confirmation, expiry, replay, and identity", () => {
           userId: created.action.userId,
         }),
       ).rejects.toMatchObject({ code: "CONFIRMATION_TOKEN_INVALID" });
-      expect(harness.service.get(created.action.actionId)?.state).toBe("AWAITING_CONFIRMATION");
+      expect((await harness.service.get(created.action.actionId))?.state).toBe(
+        "AWAITING_CONFIRMATION",
+      );
     },
   );
 
@@ -144,7 +146,9 @@ describe("Phase 7 trusted confirmation, expiry, replay, and identity", () => {
         [field]: value,
       }),
     ).rejects.toMatchObject({ code: "CONFIRMATION_IDENTITY_MISMATCH" });
-    expect(harness.service.get(created.action.actionId)?.state).toBe("AWAITING_CONFIRMATION");
+    expect((await harness.service.get(created.action.actionId))?.state).toBe(
+      "AWAITING_CONFIRMATION",
+    );
   });
 
   it.each([
@@ -166,7 +170,7 @@ describe("Phase 7 trusted confirmation, expiry, replay, and identity", () => {
       expect(outcome.revalidation.reason).toBe("CONTEXT_STALE");
     } else {
       await expect(confirmation).rejects.toMatchObject({ code: "CONFIRMATION_EXPIRED" });
-      expect(harness.service.get(created.action.actionId)?.state).toBe("EXPIRED");
+      expect((await harness.service.get(created.action.actionId))?.state).toBe("EXPIRED");
     }
   });
 
@@ -181,7 +185,31 @@ describe("Phase 7 trusted confirmation, expiry, replay, and identity", () => {
     const first = await harness.service.confirm(command);
     await expect(harness.service.confirm(command)).rejects.toMatchObject({ code: "INVALID_STATE" });
     expect(first.authorization).not.toBeNull();
-    expect(harness.service.get(created.action.actionId)?.stateHistory).toHaveLength(3);
+    expect((await harness.service.get(created.action.actionId))?.stateHistory).toHaveLength(3);
+  });
+
+  it("resumes only an identity-bound READY action for durable execution hand-off", async () => {
+    const { harness, created } = await pending();
+    const identity = {
+      actionId: created.action.actionId,
+      sessionId: created.action.sessionId,
+      userId: created.action.userId,
+    };
+    await expect(harness.service.resumeReadyForExecution(identity)).rejects.toMatchObject({
+      code: "INVALID_STATE",
+    });
+    const confirmed = await harness.service.confirm({
+      ...identity,
+      confirmationToken: created.trustedChallenge.confirmationToken,
+    });
+    const resumed = await harness.service.resumeReadyForExecution(identity);
+    expect(resumed).toMatchObject({
+      action: { state: "READY_FOR_EXECUTION" },
+      authorization: { authorizationId: confirmed.authorization?.authorizationId },
+    });
+    await expect(
+      harness.service.resumeReadyForExecution({ ...identity, userId: "other-user" }),
+    ).rejects.toMatchObject({ code: "CONFIRMATION_IDENTITY_MISMATCH" });
   });
 
   it.each(["reject", "cancel"] as const)(
@@ -252,7 +280,7 @@ describe("Phase 7 trusted confirmation, expiry, replay, and identity", () => {
       ]);
       expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
       expect(["READY_FOR_EXECUTION", "CANCELLED", "EXPIRED"]).toContain(
-        harness.service.get(created.action.actionId)?.state,
+        (await harness.service.get(created.action.actionId))?.state,
       );
     },
   );

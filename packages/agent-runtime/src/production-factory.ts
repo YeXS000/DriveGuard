@@ -7,6 +7,7 @@ import {
   InMemoryActionLifecycleEventSink,
   type ActionLifecycleEvent,
   type ActionLifecycleEventSink,
+  type PendingActionRepository,
 } from "@driveguard/action-lifecycle";
 import type { ServiceAvailability } from "@driveguard/capabilities";
 import {
@@ -16,7 +17,12 @@ import {
   ContextVersionAllocator,
 } from "@driveguard/context";
 import type { DrivingUser, VehicleCapabilities, WeatherState } from "@driveguard/domain";
-import { ReliableToolExecutor, type ExecutionEventSink } from "@driveguard/executor";
+import {
+  ReliableToolExecutor,
+  type DurableExecutionCoordinator,
+  type ExecutionEventSink,
+} from "@driveguard/executor";
+import type { ConversationMemory, SessionCoordinator } from "@driveguard/memory";
 import { SystemClock, type Clock } from "@driveguard/shared";
 import { createDefaultToolPolicyProfileRegistry, PolicyEngine } from "@driveguard/policy";
 import {
@@ -71,6 +77,71 @@ export interface CreateProductionRuntimeOptions {
   readonly actionLifecycleEventSink?: ActionLifecycleEventSink;
   readonly executionEventSink?: ExecutionEventSink;
   readonly trustedConfirmationChallengeChannel?: TrustedConfirmationChallengeChannel;
+  readonly pendingActionRepository?: PendingActionRepository;
+  readonly durableExecutionCoordinator?: DurableExecutionCoordinator;
+  readonly conversationMemory?: ConversationMemory;
+  readonly sessionCoordinator?: SessionCoordinator;
+}
+
+export interface Phase9DurableRuntimeBindings {
+  readonly pendingActionRepository: PendingActionRepository;
+  readonly durableExecutionCoordinator: DurableExecutionCoordinator;
+  readonly executionEventSink: ExecutionEventSink;
+  readonly conversationMemory: ConversationMemory;
+  readonly sessionCoordinator: SessionCoordinator;
+}
+
+function requireBindingMethods(
+  bindingName: string,
+  binding: unknown,
+  methods: readonly string[],
+): void {
+  if (typeof binding !== "object" || binding === null) {
+    throw new AgentRuntimeError("CONFIGURATION_ERROR", `${bindingName} binding is required`);
+  }
+  for (const method of methods) {
+    if (typeof Reflect.get(binding, method) !== "function") {
+      throw new AgentRuntimeError(
+        "CONFIGURATION_ERROR",
+        `${bindingName}.${method} binding is required`,
+      );
+    }
+  }
+}
+
+function assertPhase9Bindings(bindings: Phase9DurableRuntimeBindings): void {
+  requireBindingMethods("pendingActionRepository", bindings?.pendingActionRepository, [
+    "create",
+    "get",
+    "runExclusive",
+    "transition",
+    "acceptConfirmation",
+    "authorize",
+    "consumeAuthorization",
+  ]);
+  requireBindingMethods("durableExecutionCoordinator", bindings?.durableExecutionCoordinator, [
+    "execute",
+  ]);
+  requireBindingMethods("executionEventSink", bindings?.executionEventSink, ["emit"]);
+  requireBindingMethods("conversationMemory", bindings?.conversationMemory, [
+    "restore",
+    "bindIdentity",
+    "appendTurn",
+  ]);
+  requireBindingMethods("sessionCoordinator", bindings?.sessionCoordinator, [
+    "acquire",
+    "renew",
+    "release",
+  ]);
+  if (
+    !Number.isSafeInteger(bindings.sessionCoordinator.leaseDurationMs) ||
+    bindings.sessionCoordinator.leaseDurationMs < 1
+  ) {
+    throw new AgentRuntimeError(
+      "CONFIGURATION_ERROR",
+      "sessionCoordinator.leaseDurationMs binding is invalid",
+    );
+  }
 }
 
 export const DEFAULT_PHASE_5_CAPABILITIES = Object.freeze({
@@ -233,12 +304,18 @@ export function createProductionDriveGuardRuntime(
         };
       },
     }),
+    ...(options.pendingActionRepository === undefined
+      ? {}
+      : { repository: options.pendingActionRepository }),
   });
   const reliableExecutor = new ReliableToolExecutor({
     registry,
     authorizationConsumer: confirmationService,
     clock,
     ...(options.executionEventSink === undefined ? {} : { eventSink: options.executionEventSink }),
+    ...(options.durableExecutionCoordinator === undefined
+      ? {}
+      : { durableCoordinator: options.durableExecutionCoordinator }),
   });
   return new DriveGuardAgentRuntime({
     model: options.model,
@@ -251,12 +328,40 @@ export function createProductionDriveGuardRuntime(
     confirmationService,
     trustedConfirmationChallengeChannel,
     reliableExecutor,
+    ...(options.conversationMemory === undefined
+      ? {}
+      : { conversationMemory: options.conversationMemory }),
+    ...(options.sessionCoordinator === undefined
+      ? {}
+      : { sessionCoordinator: options.sessionCoordinator }),
     ...(options.mode === undefined ? {} : { mode: options.mode }),
     ...(options.developmentExecutionOptIn === undefined
       ? {}
       : { developmentExecutionOptIn: options.developmentExecutionOptIn }),
     ...(options.sensitiveValues === undefined ? {} : { sensitiveValues: options.sensitiveValues }),
     ...(options.runtimeOverrides ?? {}),
+  });
+}
+
+export function createPhase9ProductionDriveGuardRuntime(
+  options: Omit<
+    CreateProductionRuntimeOptions,
+    | "pendingActionRepository"
+    | "durableExecutionCoordinator"
+    | "executionEventSink"
+    | "conversationMemory"
+    | "sessionCoordinator"
+  >,
+  bindings: Phase9DurableRuntimeBindings,
+): ProductionDriveGuardRuntime {
+  assertPhase9Bindings(bindings);
+  return createProductionDriveGuardRuntime({
+    ...options,
+    pendingActionRepository: bindings.pendingActionRepository,
+    durableExecutionCoordinator: bindings.durableExecutionCoordinator,
+    executionEventSink: bindings.executionEventSink,
+    conversationMemory: bindings.conversationMemory,
+    sessionCoordinator: bindings.sessionCoordinator,
   });
 }
 
@@ -284,4 +389,36 @@ export function createLiveProductionDriveGuardRuntime(
     sensitiveValues: [apiKey],
   });
   return { runtime, selection };
+}
+
+export function createLivePhase9ProductionDriveGuardRuntime(
+  bindings: Phase9DurableRuntimeBindings,
+  simulatorBaseUrl = process.env.SIMULATOR_BASE_URL ?? "http://127.0.0.1:3001",
+): { readonly runtime: ProductionDriveGuardRuntime; readonly selection: DeepSeekPhase5Selection } {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  if (apiKey === undefined || apiKey.trim().length === 0) {
+    throw new AgentRuntimeError(
+      "CONFIGURATION_ERROR",
+      "DEEPSEEK_API_KEY is required for the live Phase 9 runtime",
+    );
+  }
+  const mode = parsePhase5RuntimeMode(process.env.PHASE_5_RUNTIME_MODE);
+  const selection = createDeepSeekPhase5Selection();
+  return {
+    selection,
+    runtime: createPhase9ProductionDriveGuardRuntime(
+      {
+        model: selection.model,
+        streamFn: selection.models.streamSimple.bind(selection.models),
+        simulatorBaseUrl,
+        capabilities: DEFAULT_PHASE_5_CAPABILITIES,
+        serviceAvailability: DEFAULT_PHASE_5_SERVICES,
+        mode,
+        developmentExecutionOptIn:
+          mode === "development" && process.env.PHASE_5_DEVELOPMENT_OPT_IN === "NON_PRODUCTION",
+        sensitiveValues: [apiKey],
+      },
+      bindings,
+    ),
+  };
 }

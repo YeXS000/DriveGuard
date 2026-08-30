@@ -89,6 +89,8 @@ function request(definition: ToolDefinition, caseId: number, suffix = "base"): E
     actionFingerprint: hex(caseId + 1),
     runId: `run:matrix:${caseId}`,
     sessionId: "session:matrix",
+    userId: "user:matrix",
+    vehicleId: "vehicle:matrix",
     traceId: `trace:matrix:${caseId}`,
     riskLevel: definition.riskLevel,
     policyDecision: policy(definition),
