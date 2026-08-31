@@ -19,6 +19,8 @@ async function authorized() {
     actionFingerprint: authorization.actionFingerprint,
     toolName: authorization.toolName,
     sessionId: confirmed.action.sessionId,
+    userId: confirmed.action.userId,
+    vehicleId: confirmed.action.vehicleId,
     contextSnapshotId: authorization.contextSnapshotId,
     contextVersion: authorization.contextVersion,
     validatedArguments: confirmed.action.validatedArguments,
@@ -37,6 +39,8 @@ describe("Phase 8 trusted ExecutionAuthorization consumption", () => {
         actionFingerprint: created.action.actionFingerprint,
         toolName: created.action.toolName,
         sessionId: created.action.sessionId,
+        userId: created.action.userId,
+        vehicleId: created.action.vehicleId,
         contextSnapshotId: created.action.contextSnapshotId,
         contextVersion: created.action.contextVersion,
         validatedArguments: created.action.validatedArguments,
@@ -48,7 +52,7 @@ describe("Phase 8 trusted ExecutionAuthorization consumption", () => {
     const value = await authorized();
     const consumed = await value.harness.service.consumeExecutionAuthorization(value.command);
     expect(consumed).toEqual(value.authorization);
-    expect(value.harness.service.get(value.created.action.actionId)?.state).toBe(
+    expect((await value.harness.service.get(value.created.action.actionId))?.state).toBe(
       "READY_FOR_EXECUTION",
     );
   });
@@ -94,6 +98,8 @@ describe("Phase 8 trusted ExecutionAuthorization consumption", () => {
     ["actionFingerprint", "f".repeat(64)],
     ["toolName", "cancel_charging_reservation"],
     ["sessionId", "session:other"],
+    ["userId", "user:other"],
+    ["vehicleId", "vehicle:other"],
     ["contextSnapshotId", "context:other"],
     ["contextVersion", 99],
     ["validatedArguments", { stationId: "station-hongqiao-002" }],

@@ -15,8 +15,12 @@ import {
   type ActionLifecycleEventSink,
   type ActionLifecycleEventType,
 } from "./events.js";
-import { assertPendingActionIntegrity } from "./integrity.js";
-import { InMemoryPendingActionRepository, type PendingActionRecord } from "./repository.js";
+import { assertPendingActionRecordIntegrity } from "./integrity.js";
+import {
+  InMemoryPendingActionRepository,
+  type PendingActionRecord,
+  type PendingActionRepository,
+} from "./repository.js";
 import type { ContextRevalidator } from "./revalidator.js";
 import { createConfirmationSummary } from "./summary.js";
 import type {
@@ -46,6 +50,7 @@ export interface ConfirmationServiceOptions {
   readonly tokenGenerator?: () => string;
   readonly confirmationTtlMs?: number;
   readonly authorizationTtlMs?: number;
+  readonly repository?: PendingActionRepository;
 }
 
 export interface PendingActionCreation {
@@ -148,7 +153,7 @@ export class ConfirmationService {
   readonly #clock: Clock;
   readonly #revalidator: ContextRevalidator;
   readonly #isTrustedDefinition: ConfirmationServiceOptions["isTrustedDefinition"];
-  readonly #repository: InMemoryPendingActionRepository;
+  readonly #repository: PendingActionRepository;
   readonly #eventSink: ActionLifecycleEventSink;
   readonly #actionIdFactory: () => string;
   readonly #confirmationIdFactory: () => string;
@@ -162,7 +167,7 @@ export class ConfirmationService {
     this.#clock = options.clock;
     this.#revalidator = options.revalidator;
     this.#isTrustedDefinition = options.isTrustedDefinition;
-    this.#repository = new InMemoryPendingActionRepository();
+    this.#repository = options.repository ?? new InMemoryPendingActionRepository();
     this.#eventSink = options.eventSink ?? new InMemoryActionLifecycleEventSink();
     this.#actionIdFactory = options.actionIdFactory ?? (() => `action:${randomUUID()}`);
     this.#confirmationIdFactory =
@@ -282,7 +287,7 @@ export class ConfirmationService {
       ]),
     }) as PendingAction;
     const confirmationToken = generatedToken(this.#tokenGenerator);
-    this.#repository.create({
+    await this.#repository.create({
       action,
       originalContext,
       tokenHash: tokenHash(confirmationToken),
@@ -290,13 +295,22 @@ export class ConfirmationService {
       authorization: null,
       authorizationConsumedAt: null,
     });
-    try {
-      await this.#emit(
-        "action.pending.created",
-        this.#repository.get(actionId) as PendingActionRecord,
+    const stored = await this.#repository.get(actionId);
+    if (stored === undefined) {
+      throw new ActionLifecycleError(
+        "INTERNAL_ERROR",
+        "PendingAction was not durable after creation",
+        actionId,
       );
+    }
+    try {
+      await this.#emit("action.pending.created", stored);
     } catch (error) {
-      const cancelled = this.#repository.transition(actionId, "CANCELLED", createdAt);
+      const cancelled = await this.#repository.transition(
+        actionId,
+        "CANCELLED",
+        stored.action.updatedAt,
+      );
       try {
         await this.#emit("action.cancelled", cancelled, "PENDING_EVENT_DELIVERY_FAILED");
       } catch {
@@ -305,26 +319,55 @@ export class ConfirmationService {
       throw error;
     }
     return deepFreeze({
-      action,
+      action: stored.action,
       trustedChallenge: {
         actionId,
         confirmationToken,
         sessionId: command.sessionId,
         userId: command.userId,
-        expiresAt,
+        expiresAt: stored.action.expiresAt,
       },
       safeResult: {
         actionId,
-        toolName: action.toolName,
-        riskLevel: action.riskLevel,
-        expiresAt,
-        summary: action.confirmationSummary,
+        toolName: stored.action.toolName,
+        riskLevel: stored.action.riskLevel,
+        expiresAt: stored.action.expiresAt,
+        summary: stored.action.confirmationSummary,
       },
     });
   }
 
-  get(actionId: string): PendingAction | undefined {
-    return this.#repository.get(actionId)?.action;
+  async get(actionId: string): Promise<PendingAction | undefined> {
+    return (await this.#repository.get(actionId))?.action;
+  }
+
+  /**
+   * Recovers the durable hand-off after confirmation committed but before the
+   * execution coordinator acquired its idempotency owner. The authorization is
+   * never returned to an LLM/tool surface; Runtime must still execute it through
+   * the reliable executor and its stable action-scoped idempotency key.
+   */
+  async resumeReadyForExecution(command: BoundActionCommand): Promise<
+    Readonly<{
+      readonly action: PendingAction;
+      readonly authorization: ExecutionAuthorization;
+    }>
+  > {
+    requireBoundCommand(command);
+    return this.#repository.runExclusive(command.actionId, async () => {
+      const record = await this.#require(command.actionId);
+      this.#requireIdentity(record, command);
+      this.#requireIntegrity(record);
+      if (record.action.state !== "READY_FOR_EXECUTION" || record.authorization === null) {
+        throw new ActionLifecycleError(
+          "INVALID_STATE",
+          "Action is not ready for execution recovery",
+          command.actionId,
+          record.action.state,
+        );
+      }
+      return deepFreeze({ action: record.action, authorization: record.authorization });
+    });
   }
 
   async consumeExecutionAuthorization(
@@ -335,6 +378,10 @@ export class ConfirmationService {
       !safeIdPattern.test(command.actionId) ||
       typeof command.sessionId !== "string" ||
       !safeIdPattern.test(command.sessionId) ||
+      typeof command.userId !== "string" ||
+      !safeIdPattern.test(command.userId) ||
+      typeof command.vehicleId !== "string" ||
+      !safeIdPattern.test(command.vehicleId) ||
       typeof command.authorizationId !== "string" ||
       !safeIdPattern.test(command.authorizationId) ||
       typeof command.actionFingerprint !== "string" ||
@@ -351,8 +398,8 @@ export class ConfirmationService {
         command.actionId,
       );
     }
-    return this.#repository.runExclusive(command.actionId, () => {
-      const record = this.#repository.get(command.actionId);
+    return this.#repository.runExclusive(command.actionId, async () => {
+      const record = await this.#repository.get(command.actionId);
       if (record === undefined) {
         throw new ActionLifecycleError(
           "AUTHORIZATION_MISMATCH",
@@ -362,8 +409,8 @@ export class ConfirmationService {
       }
       const nowMs = this.#clock.nowMs();
       const authorization = verifyExecutionAuthorizationForConsumption(record, command, nowMs);
-      this.#repository.consumeAuthorization(command.actionId, toUtcTimestamp(nowMs));
-      return Promise.resolve(authorization);
+      await this.#repository.consumeAuthorization(command.actionId, toUtcTimestamp(nowMs));
+      return authorization;
     });
   }
 
@@ -381,11 +428,30 @@ export class ConfirmationService {
       );
     }
     return this.#repository.runExclusive(command.actionId, async () => {
-      let record = this.#require(command.actionId);
+      let record = await this.#require(command.actionId);
+      if (
+        record.action.state === "CONFIRMED" &&
+        record.tokenHash === null &&
+        record.confirmationId !== null
+      ) {
+        const recoveredAt = toUtcTimestamp(this.#clock.nowMs());
+        record = await this.#repository.transition(
+          command.actionId,
+          "REPLAN_REQUIRED",
+          recoveredAt,
+        );
+        const revalidation = terminalRevalidation("CONTEXT_RELOAD_FAILED");
+        await this.#emit("action.revalidation.failed", record, "CONTEXT_RELOAD_FAILED");
+        return deepFreeze({ action: record.action, authorization: null, revalidation });
+      }
       this.#requireAwaiting(record);
       const nowMs = this.#clock.nowMs();
       if (nowMs >= timestampToEpochMs(record.action.expiresAt, "expiresAt")) {
-        record = this.#repository.transition(command.actionId, "EXPIRED", toUtcTimestamp(nowMs));
+        record = await this.#repository.transition(
+          command.actionId,
+          "EXPIRED",
+          toUtcTimestamp(nowMs),
+        );
         await this.#emit("confirmation.expired", record);
         throw new ActionLifecycleError(
           "CONFIRMATION_EXPIRED",
@@ -409,8 +475,20 @@ export class ConfirmationService {
       }
       const confirmedAt = toUtcTimestamp(nowMs);
       const confirmationId = generatedId(this.#confirmationIdFactory, "confirmationId");
-      this.#repository.transition(command.actionId, "CONFIRMED", confirmedAt);
-      record = this.#repository.acceptConfirmation(command.actionId, confirmationId);
+      record = await this.#repository.acceptConfirmation(
+        command.actionId,
+        confirmationId,
+        confirmedAt,
+      );
+      if (record.action.state === "EXPIRED") {
+        await this.#emit("confirmation.expired", record);
+        throw new ActionLifecycleError(
+          "CONFIRMATION_EXPIRED",
+          "Confirmation has expired",
+          command.actionId,
+          record.action.state,
+        );
+      }
       try {
         await this.#emit("confirmation.accepted", record);
         await this.#emit("action.revalidation.started", record);
@@ -426,7 +504,7 @@ export class ConfirmationService {
       }
       const completionMs = this.#clock.nowMs();
       if (revalidation.status !== "VALID" || revalidation.currentContext === null) {
-        record = this.#repository.transition(
+        record = await this.#repository.transition(
           command.actionId,
           "REPLAN_REQUIRED",
           toUtcTimestamp(completionMs),
@@ -439,7 +517,7 @@ export class ConfirmationService {
       try {
         authorizationId = generatedId(this.#authorizationIdFactory, "authorizationId");
       } catch (error) {
-        record = this.#repository.transition(
+        record = await this.#repository.transition(
           command.actionId,
           "REPLAN_REQUIRED",
           toUtcTimestamp(completionMs),
@@ -460,9 +538,13 @@ export class ConfirmationService {
         issuedAt,
         expiresAt: toUtcTimestamp(completionMs + this.#authorizationTtlMs),
       }) as ExecutionAuthorization;
-      record = this.#repository.authorize(command.actionId, authorization, issuedAt);
+      record = await this.#repository.authorize(command.actionId, authorization, issuedAt);
       await this.#emit("action.ready_for_execution", record);
-      return deepFreeze({ action: record.action, authorization, revalidation });
+      return deepFreeze({
+        action: record.action,
+        authorization: record.authorization ?? authorization,
+        revalidation,
+      });
     });
   }
 
@@ -476,7 +558,7 @@ export class ConfirmationService {
 
   async expire(actionId: string): Promise<PendingAction> {
     return this.#repository.runExclusive(actionId, async () => {
-      let record = this.#require(actionId);
+      let record = await this.#require(actionId);
       if (record.action.state === "EXPIRED") return record.action;
       this.#requireAwaiting(record);
       const nowMs = this.#clock.nowMs();
@@ -488,7 +570,7 @@ export class ConfirmationService {
           record.action.state,
         );
       }
-      record = this.#repository.transition(actionId, "EXPIRED", toUtcTimestamp(nowMs));
+      record = await this.#repository.transition(actionId, "EXPIRED", toUtcTimestamp(nowMs));
       await this.#emit("confirmation.expired", record);
       return record.action;
     });
@@ -501,10 +583,10 @@ export class ConfirmationService {
   ): Promise<PendingAction> {
     requireBoundCommand(command);
     return this.#repository.runExclusive(command.actionId, async () => {
-      let record = this.#require(command.actionId);
+      let record = await this.#require(command.actionId);
       this.#requireAwaiting(record);
       this.#requireIdentity(record, command);
-      record = this.#repository.transition(
+      record = await this.#repository.transition(
         command.actionId,
         state,
         toUtcTimestamp(this.#clock.nowMs()),
@@ -514,8 +596,8 @@ export class ConfirmationService {
     });
   }
 
-  #require(actionId: string): PendingActionRecord {
-    const record = this.#repository.get(actionId);
+  async #require(actionId: string): Promise<PendingActionRecord> {
+    const record = await this.#repository.get(actionId);
     if (record === undefined) {
       throw new ActionLifecycleError("ACTION_NOT_FOUND", "PendingAction was not found", actionId);
     }
@@ -545,12 +627,12 @@ export class ConfirmationService {
   }
 
   #requireIntegrity(record: PendingActionRecord): void {
-    assertPendingActionIntegrity(record.action);
+    assertPendingActionRecordIntegrity(record);
   }
 
   async #replanAfterBoundaryFailure(record: PendingActionRecord, reason: string): Promise<void> {
     if (record.action.state !== "CONFIRMED") return;
-    const replanned = this.#repository.transition(
+    const replanned = await this.#repository.transition(
       record.action.actionId,
       "REPLAN_REQUIRED",
       toUtcTimestamp(this.#clock.nowMs()),

@@ -1,5 +1,6 @@
 import type { AddressInfo } from "node:net";
 
+import { createActionFingerprint } from "@driveguard/action-lifecycle";
 import {
   CircuitBreaker,
   InMemoryExecutionEventSink,
@@ -92,13 +93,21 @@ describe("Phase 8 Simulator fault integration", () => {
     sequence += 1;
     const definition = registry.get(toolName);
     if (definition === undefined) throw new Error("Missing Tool");
-    const actionFingerprint = sequence.toString(16).padStart(64, "0");
     const runId = `run:fault:${sequence}`;
     const sessionId = "session:fault";
     const traceId = `trace:fault:${sequence}`;
     const input = policyInput(definition.name as FormalToolName, {
       toolDefinition: definition,
       validatedArguments: argumentsValue,
+    });
+    const actionFingerprint = createActionFingerprint({
+      toolName,
+      validatedArguments: argumentsValue,
+      sessionId,
+      userId: input.contextSnapshot.user.userId,
+      vehicleId: input.contextSnapshot.vehicle.vehicleId,
+      contextSnapshotId: input.contextSnapshot.snapshotId,
+      contextVersion: input.contextSnapshot.contextVersion,
     });
     return {
       executionId: `execution:fault:${sequence}`,
@@ -107,6 +116,8 @@ describe("Phase 8 Simulator fault integration", () => {
       actionFingerprint,
       runId,
       sessionId,
+      userId: input.contextSnapshot.user.userId,
+      vehicleId: input.contextSnapshot.vehicle.vehicleId,
       traceId,
       riskLevel: definition.riskLevel,
       policyDecision: policy(definition, argumentsValue, {

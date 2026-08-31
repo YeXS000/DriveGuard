@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { setTimeout as delay } from "node:timers/promises";
 
 import type { StreamFn } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
@@ -18,6 +19,11 @@ import {
 } from "@driveguard/policy";
 import type { Clock } from "@driveguard/shared";
 import type { ExecutionResult, ReliableToolExecutor } from "@driveguard/executor";
+import type {
+  ConversationMemory,
+  SessionCoordinator,
+  SessionIdentityBinding,
+} from "@driveguard/memory";
 import {
   FORBIDDEN_TOOL_NAMES,
   FORMAL_TOOL_NAMES,
@@ -78,6 +84,8 @@ export interface DriveGuardRuntimeOptions {
   readonly confirmationService: ConfirmationService;
   readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   readonly reliableExecutor: ReliableToolExecutor;
+  readonly conversationMemory?: ConversationMemory;
+  readonly sessionCoordinator?: SessionCoordinator;
 }
 
 export interface AgentRunRequest {
@@ -175,6 +183,8 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   readonly #policyEngine: PolicyEngine;
   readonly #policyProfiles: ToolPolicyProfileRegistry;
   readonly #reliableExecutor: ReliableToolExecutor;
+  readonly #conversationMemory: ConversationMemory | undefined;
+  readonly #sessionCoordinator: SessionCoordinator | undefined;
   readonly confirmationService: ConfirmationService;
   readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   readonly #cancelledRunIds = new Set<string>();
@@ -210,17 +220,28 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     this.#policyEngine = options.policyEngine;
     this.#policyProfiles = options.policyProfiles;
     this.#reliableExecutor = options.reliableExecutor;
+    this.#conversationMemory = options.conversationMemory;
+    this.#sessionCoordinator = options.sessionCoordinator;
     this.confirmationService = options.confirmationService;
     this.trustedConfirmationChallengeChannel = options.trustedConfirmationChallengeChannel;
-    this.#sessions = new AgentSessionStore(
-      (sessionId) =>
-        new AgentSession({
-          sessionId,
-          model: options.model,
-          streamFn: options.streamFn,
-          clock: options.clock,
-        }),
-    );
+    this.#sessions = new AgentSessionStore(async (sessionId, identity) => {
+      if (options.conversationMemory !== undefined && identity === undefined) {
+        throw new AgentRuntimeError(
+          "CONFIGURATION_ERROR",
+          "Durable conversation restore requires a bound session identity",
+        );
+      }
+      return new AgentSession({
+        sessionId,
+        model: options.model,
+        streamFn: options.streamFn,
+        clock: options.clock,
+        history:
+          options.conversationMemory === undefined || identity === undefined
+            ? []
+            : await options.conversationMemory.restore(identity),
+      });
+    });
   }
 
   cancel(sessionId: string): boolean {
@@ -245,35 +266,68 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   }
 
   async confirmAndExecute(command: ConfirmActionCommand): Promise<ExecutionResult> {
-    const confirmed = await this.confirmationService.confirm(command);
-    if (confirmed.authorization === null) {
-      throw new AgentRuntimeError(
-        "POLICY_REPLAN_REQUIRED",
-        "Confirmed action requires replanning before execution",
-      );
+    const pending = await this.confirmationService.get(command.actionId);
+    if (pending === undefined) {
+      throw new AgentRuntimeError("INTERNAL_ERROR", "Pending action was not found");
     }
-    const definition = this.#toolRegistry.get(confirmed.action.toolName);
-    if (definition === undefined || definition.riskLevel !== confirmed.action.riskLevel) {
-      throw new AgentRuntimeError("INTERNAL_ERROR", "Confirmed Tool definition is unavailable");
+    const coordinated =
+      this.#sessionCoordinator === undefined
+        ? true
+        : await this.#sessionCoordinator.acquire(command.sessionId, pending.runId);
+    if (!coordinated) {
+      throw new AgentRuntimeError("SESSION_BUSY", "Agent session already has an active run");
     }
-    const authorization = confirmed.authorization;
-    return this.#reliableExecutor.execute({
-      executionId: `execution:${randomUUID()}`,
-      toolName: confirmed.action.toolName,
-      validatedArguments: confirmed.action.validatedArguments,
-      actionFingerprint: confirmed.action.actionFingerprint,
-      runId: confirmed.action.runId,
-      sessionId: confirmed.action.sessionId,
-      traceId: confirmed.action.traceId,
-      riskLevel: confirmed.action.riskLevel,
-      policyDecision: confirmed.action.policyDecision,
-      actionId: confirmed.action.actionId,
-      authorizationId: authorization.authorizationId,
-      contextSnapshotId: authorization.contextSnapshotId,
-      contextVersion: authorization.contextVersion,
-      idempotencyKey: `confirmed:${confirmed.action.actionId}`,
-      createdAt: toUtcTimestamp(this.#clock.nowMs()),
-    });
+    let leaseLost = false;
+    const leaseHeartbeat = this.#startSessionLeaseHeartbeat(
+      command.sessionId,
+      pending.runId,
+      () => {
+        leaseLost = true;
+      },
+    );
+    try {
+      const confirmed =
+        pending.state === "READY_FOR_EXECUTION"
+          ? await this.confirmationService.resumeReadyForExecution(command)
+          : await this.confirmationService.confirm(command);
+      if (leaseLost) throw new AgentRuntimeError("SESSION_BUSY", "Durable session lease was lost");
+      if (confirmed.authorization === null) {
+        throw new AgentRuntimeError(
+          "POLICY_REPLAN_REQUIRED",
+          "Confirmed action requires replanning before execution",
+        );
+      }
+      const definition = this.#toolRegistry.get(confirmed.action.toolName);
+      if (definition === undefined || definition.riskLevel !== confirmed.action.riskLevel) {
+        throw new AgentRuntimeError("INTERNAL_ERROR", "Confirmed Tool definition is unavailable");
+      }
+      const authorization = confirmed.authorization;
+      const result = await this.#reliableExecutor.execute({
+        executionId: `execution:${randomUUID()}`,
+        toolName: confirmed.action.toolName,
+        validatedArguments: confirmed.action.validatedArguments,
+        actionFingerprint: confirmed.action.actionFingerprint,
+        runId: confirmed.action.runId,
+        sessionId: confirmed.action.sessionId,
+        userId: confirmed.action.userId,
+        vehicleId: confirmed.action.vehicleId,
+        traceId: confirmed.action.traceId,
+        riskLevel: confirmed.action.riskLevel,
+        policyDecision: confirmed.action.policyDecision,
+        actionId: confirmed.action.actionId,
+        authorizationId: authorization.authorizationId,
+        contextSnapshotId: authorization.contextSnapshotId,
+        contextVersion: authorization.contextVersion,
+        idempotencyKey: `confirmed:${confirmed.action.actionId}`,
+        createdAt: toUtcTimestamp(this.#clock.nowMs()),
+      });
+      return result;
+    } finally {
+      await Promise.allSettled([
+        leaseHeartbeat.stop(),
+        this.#sessionCoordinator?.release(command.sessionId, pending.runId) ?? Promise.resolve(),
+      ]);
+    }
   }
 
   async run(request: AgentRunRequest): Promise<AgentRunResult> {
@@ -376,8 +430,11 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       return this.#result("failed", "", run, events, evidence, error.toFailure());
     }
 
-    const session = this.#sessions.getOrCreate(request.sessionId);
-    if (!session.acquire(run)) {
+    const coordinated =
+      this.#sessionCoordinator === undefined
+        ? true
+        : await this.#sessionCoordinator.acquire(request.sessionId, run.runId);
+    if (!coordinated) {
       const error = new AgentRuntimeError(
         "SESSION_BUSY",
         "Agent session already has an active run",
@@ -392,13 +449,77 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       );
       return this.#result("failed", "", run, events, evidence, error.toFailure());
     }
+    let sessionLeaseLost = false;
+    let reliableExecutionCommitted = false;
+    let reliableExecutionInFlight = false;
+    let sessionForLease: AgentSession | undefined;
+    const throwIfSessionLeaseLost = (): void => {
+      if (sessionLeaseLost) {
+        throw new AgentRuntimeError("SESSION_BUSY", "Durable session lease was lost");
+      }
+    };
+    const leaseHeartbeat = this.#startSessionLeaseHeartbeat(request.sessionId, run.runId, () => {
+      sessionLeaseLost = true;
+      if (!reliableExecutionCommitted && !reliableExecutionInFlight) sessionForLease?.abort();
+    });
+    let session: AgentSession;
+    let loaded: Awaited<ReturnType<ContextLoader["load"]>>;
+    try {
+      run.transition("CONTEXT_LOADING");
+      loaded = await this.#contextLoader.load();
+      run.attachContext(loaded.snapshot.snapshotId);
+      const identity: SessionIdentityBinding = {
+        sessionId: request.sessionId,
+        userId: loaded.snapshot.user.userId,
+        vehicleId: loaded.snapshot.vehicle.vehicleId,
+        updatedAt: toUtcTimestamp(this.#clock.nowMs()),
+      };
+      await this.#conversationMemory?.bindIdentity(identity);
+      session = await this.#sessions.getOrCreate(request.sessionId, identity);
+      sessionForLease = session;
+      throwIfSessionLeaseLost();
+    } catch (error) {
+      await leaseHeartbeat.stop();
+      await this.#sessionCoordinator?.release(request.sessionId, run.runId);
+      const failure = sessionLeaseLost
+        ? new AgentRuntimeError("SESSION_BUSY", "Durable session lease was lost")
+        : safeRuntimeError(
+            error,
+            new AgentRuntimeError("INTERNAL_ERROR", "Context or session restore failed safely"),
+            this.#sensitiveValues,
+          );
+      if (!run.isTerminal) run.transition("RUN_FAILED");
+      await emit(
+        createEvent("agent.run.failed", {
+          errorCode: failure.code,
+          runtimeMode: this.mode,
+          boundary: "POLICY_GUARDED",
+        }),
+      );
+      return this.#result("failed", "", run, events, evidence, failure.toFailure());
+    }
+    if (!session.acquire(run)) {
+      await leaseHeartbeat.stop();
+      await this.#sessionCoordinator?.release(request.sessionId, run.runId);
+      const error = new AgentRuntimeError(
+        "SESSION_BUSY",
+        "Agent session already has an active run",
+      );
+      run.transition("RUN_FAILED");
+      await emit(
+        createEvent("agent.run.failed", {
+          errorCode: error.code,
+          runtimeMode: this.mode,
+          boundary: "POLICY_GUARDED",
+        }),
+      );
+      return this.#result("failed", "", run, events, evidence, error.toFailure());
+    }
+    throwIfSessionLeaseLost();
     const transcriptCheckpoint = session.checkpoint();
     let toolAdapter: PiToolAdapter | undefined;
 
     try {
-      run.transition("CONTEXT_LOADING");
-      const loaded = await this.#contextLoader.load();
-      run.attachContext(loaded.snapshot.snapshotId);
       evidence.context = Object.freeze({
         snapshotId: loaded.snapshot.snapshotId,
         contextVersion: loaded.snapshot.contextVersion,
@@ -414,6 +535,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       });
       this.#throwIfSinkFailed(sinkFailed);
       this.#throwIfCancelled(run);
+      throwIfSessionLeaseLost();
 
       run.transition("CAPABILITY_RESOLUTION");
       let definitions: readonly ToolDefinition[];
@@ -572,6 +694,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           policyDecision: PolicyDecision,
           policyInput: PolicyEvaluationInput,
         ) => {
+          throwIfSessionLeaseLost();
           const created = await this.confirmationService.create({
             definition,
             validatedArguments,
@@ -606,6 +729,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           evidence.confirmationRequired.push(created.safeResult);
         },
         allowedExecution: async (definition, validatedArguments, policyDecision, policyInput) => {
+          throwIfSessionLeaseLost();
           const actionFingerprint = createActionFingerprint({
             toolName: definition.name,
             validatedArguments,
@@ -615,21 +739,28 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
             contextSnapshotId: policyInput.contextSnapshot.snapshotId,
             contextVersion: policyInput.contextSnapshot.contextVersion,
           });
-          const execution = await this.#reliableExecutor.execute({
-            executionId: `execution:${randomUUID()}`,
-            toolName: definition.name,
-            validatedArguments,
-            actionFingerprint,
-            runId: run.runId,
-            sessionId: run.sessionId,
-            traceId: run.traceId,
-            riskLevel: definition.riskLevel,
-            policyDecision,
-            contextSnapshotId: policyInput.contextSnapshot.snapshotId,
-            contextVersion: policyInput.contextSnapshot.contextVersion,
-            idempotencyKey: `run:${run.runId}:${definition.name}:${actionFingerprint.slice(0, 24)}`,
-            createdAt: toUtcTimestamp(this.#clock.nowMs()),
-          });
+          reliableExecutionInFlight = true;
+          const execution = await this.#reliableExecutor
+            .execute({
+              executionId: `execution:${randomUUID()}`,
+              toolName: definition.name,
+              validatedArguments,
+              actionFingerprint,
+              runId: run.runId,
+              sessionId: run.sessionId,
+              userId: policyInput.contextSnapshot.user.userId,
+              vehicleId: policyInput.contextSnapshot.vehicle.vehicleId,
+              traceId: run.traceId,
+              riskLevel: definition.riskLevel,
+              policyDecision,
+              contextSnapshotId: policyInput.contextSnapshot.snapshotId,
+              contextVersion: policyInput.contextSnapshot.contextVersion,
+              idempotencyKey: `run:${run.runId}:${definition.name}:${actionFingerprint.slice(0, 24)}`,
+              createdAt: toUtcTimestamp(this.#clock.nowMs()),
+            })
+            .finally(() => {
+              reliableExecutionInFlight = false;
+            });
           if (execution.status !== "SUCCEEDED") {
             throw new ToolExecutionError(
               execution.error?.code === "DEPENDENCY_TIMEOUT"
@@ -639,6 +770,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
               execution.error?.message ?? "Reliable execution failed safely",
             );
           }
+          reliableExecutionCommitted = true;
           return execution.result;
         },
       });
@@ -663,6 +795,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       );
       session.setTools(toolAdapter.adaptAll(exposed));
       this.#throwIfCancelled(run);
+      if (!reliableExecutionCommitted) throwIfSessionLeaseLost();
 
       run.transition("MODEL_RUNNING");
       await emitRuntime("model.started", {
@@ -693,6 +826,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       await toolAdapter.waitForIdle();
       this.#throwIfSinkFailed(sinkFailed);
       this.#throwIfCancelled(run);
+      if (!reliableExecutionCommitted) throwIfSessionLeaseLost();
       const response = sanitizeRuntimeText(session.lastAssistantText(), this.#sensitiveValues);
       const sessionErrorMessage = session.errorMessage();
       if (sessionErrorMessage !== undefined) {
@@ -725,6 +859,19 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           "AgentRun did not return from model execution",
         );
       }
+      if (!reliableExecutionCommitted) throwIfSessionLeaseLost();
+      if (!(reliableExecutionCommitted && sessionLeaseLost)) {
+        await this.#conversationMemory?.appendTurn({
+          sessionId: request.sessionId,
+          ownerId: run.runId,
+          userMessageId: `message:${randomUUID()}`,
+          userContent: sanitizeRuntimeText(request.prompt, this.#sensitiveValues),
+          assistantMessageId: `message:${randomUUID()}`,
+          assistantContent: response,
+          createdAt: toUtcTimestamp(this.#clock.nowMs()),
+        });
+      }
+      if (!reliableExecutionCommitted) throwIfSessionLeaseLost();
       const completedEvent = createEvent("agent.run.completed", {
         runtimeMode: this.mode,
         boundary: "POLICY_GUARDED",
@@ -742,14 +889,18 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     } catch (error) {
       await toolAdapter?.waitForIdle();
       const cancelled = this.#cancelledRunIds.has(run.runId);
-      const failure = cancelled
-        ? new AgentRuntimeError("RUN_CANCELLED", "Agent run was cancelled")
-        : safeRuntimeError(
-            error,
-            new AgentRuntimeError("INTERNAL_ERROR", "Agent runtime failed safely"),
-            this.#sensitiveValues,
-          );
-      if (!run.isTerminal) run.transition(cancelled ? "RUN_CANCELLED" : "RUN_FAILED");
+      const effectiveSessionLeaseLost = sessionLeaseLost && !reliableExecutionCommitted;
+      const failure = effectiveSessionLeaseLost
+        ? new AgentRuntimeError("SESSION_BUSY", "Durable session lease was lost")
+        : cancelled
+          ? new AgentRuntimeError("RUN_CANCELLED", "Agent run was cancelled")
+          : safeRuntimeError(
+              error,
+              new AgentRuntimeError("INTERNAL_ERROR", "Agent runtime failed safely"),
+              this.#sensitiveValues,
+            );
+      if (!run.isTerminal)
+        run.transition(cancelled && !effectiveSessionLeaseLost ? "RUN_CANCELLED" : "RUN_FAILED");
       session.rollback(transcriptCheckpoint);
       await emit(
         createEvent("agent.run.failed", {
@@ -759,7 +910,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         }),
       );
       return this.#result(
-        cancelled ? "cancelled" : "failed",
+        cancelled && !effectiveSessionLeaseLost ? "cancelled" : "failed",
         failure.code === "POLICY_CONFIRMATION_REQUIRED"
           ? "User confirmation is required before this action can proceed."
           : "",
@@ -771,7 +922,60 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     } finally {
       this.#cancelledRunIds.delete(run.runId);
       session.release(run.runId);
+      await Promise.allSettled([
+        leaseHeartbeat.stop(),
+        this.#sessionCoordinator?.release(request.sessionId, run.runId) ?? Promise.resolve(),
+      ]);
     }
+  }
+
+  #startSessionLeaseHeartbeat(
+    sessionId: string,
+    ownerId: string,
+    onLost: () => void,
+  ): { readonly stop: () => Promise<void> } {
+    const coordinator = this.#sessionCoordinator;
+    const leaseDurationMs = coordinator?.leaseDurationMs;
+    if (
+      coordinator?.renew === undefined ||
+      leaseDurationMs === undefined ||
+      !Number.isSafeInteger(leaseDurationMs) ||
+      leaseDurationMs < 1
+    ) {
+      return { stop: () => Promise.resolve() };
+    }
+    const controller = new AbortController();
+    const task = (async () => {
+      const intervalMs = Math.max(1, Math.floor(leaseDurationMs / 4));
+      while (!controller.signal.aborted) {
+        try {
+          await delay(intervalMs, undefined, { signal: controller.signal });
+        } catch {
+          return;
+        }
+        if (controller.signal.aborted) return;
+        try {
+          const renewal = coordinator.renew(sessionId, ownerId);
+          const renewed = await Promise.race([
+            renewal,
+            delay(Math.max(1, Math.floor(leaseDurationMs / 4))).then(() => false),
+          ]);
+          if (!renewed) {
+            onLost();
+            return;
+          }
+        } catch {
+          onLost();
+          return;
+        }
+      }
+    })();
+    return {
+      stop: async () => {
+        controller.abort();
+        await task;
+      },
+    };
   }
 
   #throwIfCancelled(run: AgentRun): void {

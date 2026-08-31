@@ -3,6 +3,7 @@ import {
   ContextRevalidator,
   InMemoryActionLifecycleEventSink,
   type CreatePendingActionCommand,
+  type PendingActionRepository,
 } from "@driveguard/action-lifecycle";
 import type { CapabilityResolutionContext } from "@driveguard/capabilities";
 import { ContextFreshnessEvaluator } from "@driveguard/context";
@@ -47,6 +48,8 @@ export interface Phase7Harness {
 export function createPhase7Harness(
   options: {
     readonly withEvents?: boolean;
+    readonly repository?: PendingActionRepository;
+    readonly confirmationTtlMs?: number;
   } = {},
 ): Phase7Harness {
   const clock = new MutableClock();
@@ -70,6 +73,10 @@ export function createPhase7Harness(
     revalidator,
     isTrustedDefinition: (definition) => registry.get(definition.name) === definition,
     ...(options.withEvents === false ? {} : { eventSink: events }),
+    ...(options.repository === undefined ? {} : { repository: options.repository }),
+    ...(options.confirmationTtlMs === undefined
+      ? {}
+      : { confirmationTtlMs: options.confirmationTtlMs }),
     actionIdFactory: () => next("action"),
     confirmationIdFactory: () => next("confirmation"),
     authorizationIdFactory: () => next("authorization"),

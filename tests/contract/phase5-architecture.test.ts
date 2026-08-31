@@ -99,7 +99,7 @@ describe("Phase 5 architecture and security boundaries", () => {
     expect(combined).not.toContain("api_key.md");
   });
 
-  it("keeps the exact Phase 6 and Phase 8 packages without adding Persistence", () => {
+  it("preserves Phase 5/6 core boundaries while Phase 9 injects durable interfaces", () => {
     expect(
       readdirSync(`${repositoryRoot}/packages/policy`, { recursive: true })
         .map(String)
@@ -120,6 +120,7 @@ describe("Phase 5 architecture and security boundaries", () => {
         .sort(),
     ).toEqual([
       "circuit-breaker.ts",
+      "durable.ts",
       "errors.ts",
       "events.ts",
       "executor.ts",
@@ -133,7 +134,10 @@ describe("Phase 5 architecture and security boundaries", () => {
     const persistenceFiles = readdirSync(`${repositoryRoot}/packages/persistence`, {
       recursive: true,
     }).map(String);
-    expect(persistenceFiles.filter((name) => name.endsWith(".ts"))).toEqual([]);
+    expect(persistenceFiles.filter((name) => name.endsWith(".ts")).length).toBeGreaterThan(0);
+    for (const name of productionModules) {
+      expect(source(name), name).not.toMatch(/from ["'](?:pg|redis|drizzle-orm)/u);
+    }
   });
 
   it("keeps event metadata free of prompt, message, arguments, result, and reasoning fields", () => {

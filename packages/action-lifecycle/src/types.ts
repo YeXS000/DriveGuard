@@ -83,6 +83,8 @@ export interface ConsumeExecutionAuthorizationCommand {
   readonly actionFingerprint: string;
   readonly toolName: FormalToolName;
   readonly sessionId: string;
+  readonly userId: string;
+  readonly vehicleId: string;
   readonly contextSnapshotId: string;
   readonly contextVersion: number;
   readonly validatedArguments: unknown;

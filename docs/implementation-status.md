@@ -1015,3 +1015,91 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - All findings were remediated with direct regression tests. Final independent review outcome is
   Critical 0, High 0, and relevant Medium 0 across Executor correctness, exactly-once/idempotency,
   and safety/architecture reviews.
+
+## Phase 9 — Persistence & Memory
+
+- Status: COMPLETE.
+- Scope: PostgreSQL/Drizzle durable state, Redis TTL cache/coordination with PostgreSQL fallback,
+  repository dependency injection, restart recovery, and append-only audit only.
+- Gate result: **PASS**.
+- Verification date: 2026-08-31 (Asia/Shanghai).
+
+### Implemented modules
+
+- `packages/persistence`: eight-table Drizzle schema, repeatable migration and operator rollback,
+  PostgreSQL repositories, atomic PendingAction/authorization lifecycle, durable execution and
+  idempotency coordination, and append-only audit repository.
+- `packages/memory`: session/conversation interfaces, in-memory repositories, PostgreSQL-authoritative
+  ConversationMemory, TTL-bound Redis cache, session coordination with PostgreSQL fallback, and
+  TTL-bound Redis idempotency coordination.
+- `packages/action-lifecycle`, `packages/executor`, and `packages/agent-runtime`: asynchronous
+  repository and durable-coordinator dependency injection, transcript restoration, per-turn durable
+  append, mandatory identity-bound durable memory in the Phase 9 composition, and distributed
+  session lease fencing.
+- `infra/db`: repeatable forward migration, Drizzle journal, and reverse-order rollback for all eight
+  Phase 9 tables.
+- `docker-compose.yml`: PostgreSQL, Redis, one-shot migration, DriveGuard API, NATS infrastructure,
+  and Vehicle Simulator health/dependency wiring. NATS business orchestration remains unused.
+- `docs/adr/0010-phase-9-persistence-and-memory.md`: source-of-truth, transaction, recovery, memory,
+  audit, Redis, and Phase 9/10 boundary decisions.
+
+### Current measured verification
+
+| Check                               | Current result                                                                                                                                                                                                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 9 focused tests               | 148 scenarios PASS across 3 Vitest files by combined evidence (147 on the final code coverage run plus the separately measured unchanged 10,000-case matrix); package export contract PASS                                               |
+| Real persistence/concurrency matrix | 10,000 cases: 5,000 execution/idempotency cases plus 5,000 authorization-consumption cases                                                                                                                                               |
+| Duplicate side effect               | 0                                                                                                                                                                                                                                        |
+| Authorization replay success        | 0                                                                                                                                                                                                                                        |
+| Idempotency conflict bypass         | 0                                                                                                                                                                                                                                        |
+| Lost final execution record         | 0                                                                                                                                                                                                                                        |
+| Audit missing                       | 0                                                                                                                                                                                                                                        |
+| Defined Action audit completeness   | 9 / 9 required events = 100%                                                                                                                                                                                                             |
+| PostgreSQL migration                | Two consecutive migration calls PASS; exactly 8 Phase 9 business tables present                                                                                                                                                          |
+| Restart recovery                    | Session, conversation, PendingAction confirmation, authorization replay, idempotency outcome, and `OUTCOME_UNKNOWN` PASS                                                                                                                 |
+| World-state freshness               | Runtime restart restores conversation while Simulator SOC changes 70 -> 20; Turn 2 observes 20 and not 70                                                                                                                                |
+| Redis                               | Real TTL/owner release PASS; Redis failure falls back to PostgreSQL session lease without weakening durable safety state                                                                                                                 |
+| Coverage                            | all selected: lines 96.22%, branches 91.60%; persistence: lines 95.40%, branches 91.22%; memory: lines 99.29%, branches 92.72%                                                                                                           |
+| Critical paths                      | authorization consume/replay/subject spoofing, strict DB request binding, durable idempotency reuse/conflict, COMMIT-ack ambiguity, crash ambiguity, transaction rollback, session fencing, and post-commit lease loss directly executed |
+| Phase 9 Docker clean deployment     | 5 / 5 clean deployments PASS; final role-separated rebuild also has migration exit 0 and all required services healthy                                                                                                                   |
+| Full Phase 0–9 regression           | 1,813 / 1,813 PASS across 47 files by combined final evidence (148 Phase 9 scenarios plus 1,665 Phase 0–8 tests)                                                                                                                         |
+| Engineering/security gate           | format, lint, typecheck, build, diff check, npm audit, secret/phase-boundary checks PASS                                                                                                                                                 |
+
+### Safety and architecture boundary
+
+- PostgreSQL is authoritative for PendingAction, ExecutionAuthorization, ExecutionRecord,
+  idempotency outcome, and AuditEvent. PostgreSQL unavailability fails closed before Tool owner side
+  effects.
+- Redis is only TTL-bound cache/coordination. Redis failure may take the slower PostgreSQL path but
+  cannot permit duplicate authorization consumption, duplicate side effects, or lost audit state.
+- Authorization consumption is a conditional update under a row-locked transaction; 100 concurrent
+  consumers produce exactly one success, including after repository recreation.
+- Session transcripts are durably bound to one user/vehicle pair before model use. R0/R1 execution
+  fingerprints bind that subject directly; R2 authorization consumption compares the request
+  subject with the stored action while preserving the separately revalidated authorization Context.
+- Execution ownership is committed before invoking the Tool owner. Restart duplicates reuse a final
+  result or return/persist `OUTCOME_UNKNOWN`; they are never automatically retried blindly.
+- PostgreSQL server time is authoritative for confirmation/authorization expiry and lease
+  acquisition. A session renewal or release failure after a committed durable success cannot rewrite
+  that success as `SESSION_BUSY`.
+- Conversation storage contains no VehicleState or TripState. Every runtime turn reloads the current
+  ContextProvider/Simulator state.
+- Audit rows require user/vehicle subjects and reject `UPDATE`, `DELETE`, and `TRUNCATE` through both
+  database triggers and a distinct runtime role with only `SELECT/INSERT` audit grants. Role setup
+  rejects elevated/member/owner roles, forces `NOINHERIT`, resets stale grants, and limits DELETE to
+  transactional execution conflict cleanup. Safe audit and conversation validation rejects
+  credentials, tokens, cookies, authorization headers, reasoning, and chain-of-thought.
+- RX capability registration, Phase 10 HMI/API, NATS business workflow, full observability, and urgent
+  event handling added: 0.
+- `api_key.md` was not read, copied, logged, or used. `.env`, database/Redis data, dumps, credentials,
+  logs, coverage, and temporary artifacts are excluded from the change set.
+
+### Review and known limitations
+
+- Final independent database, reliability, and architecture/security re-reviews each report
+  Critical 0 / High 0 / Medium 0 after the hardening changes.
+- The focused assertions are intentionally scenario-dense rather than padded to 200; the
+  reliability test executes and measures 10,000 real PostgreSQL concurrency cases.
+- Expired ambiguous executions remain `OUTCOME_UNKNOWN`; operator reconciliation, retention,
+  archival, outbox processing, multi-region failover, HMI, and Phase 10 API work remain out of scope.
+- The final Stage Gate passed. Phase 10 was not started and `main` was not merged.

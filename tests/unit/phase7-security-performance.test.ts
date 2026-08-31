@@ -193,7 +193,7 @@ describe("Phase 7 10,000-case adversarial lifecycle security matrix", () => {
         } catch (error) {
           expect(error).toBeInstanceOf(ActionLifecycleError);
         }
-        const final = harness.service.get(created.action.actionId);
+        const final = await harness.service.get(created.action.actionId);
         if (final?.state === "READY_FOR_EXECUTION" && !legitimatelyConfirmed) {
           unauthorizedReady += 1;
         }

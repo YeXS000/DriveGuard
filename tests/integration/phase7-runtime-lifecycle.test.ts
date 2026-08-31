@@ -255,7 +255,7 @@ describe("Phase 7 Runtime confirmation lifecycle integration", () => {
     expect(result.confirmationRequired).toHaveLength(0);
     expect(publishedActionId).toBeDefined();
     expect(discardedActionId).toBe(publishedActionId);
-    expect(instance.confirmationService?.get(publishedActionId ?? "missing")?.state).toBe(
+    expect((await instance.confirmationService?.get(publishedActionId ?? "missing"))?.state).toBe(
       "CANCELLED",
     );
   });

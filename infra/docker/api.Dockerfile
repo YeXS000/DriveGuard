@@ -18,6 +18,7 @@ WORKDIR /app
 COPY --from=build /workspace/node_modules ./node_modules
 COPY --from=build /workspace/dist ./dist
 COPY --from=build /workspace/package.json ./package.json
+COPY --from=build /workspace/infra/db/migrations ./infra/db/migrations
 
 EXPOSE 3000
 

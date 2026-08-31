@@ -127,11 +127,11 @@ describe("Phase 7 serialization, summary, error, and repository boundaries", () 
       confirmationId: null,
       authorization: null,
     };
-    repository.create(record);
-    expect(() => repository.create(record)).toThrowError(/Duplicate actionId/u);
-    expect(() =>
+    await repository.create(record);
+    await expect(repository.create(record)).rejects.toThrowError(/Duplicate actionId/u);
+    await expect(
       repository.transition("action:missing", "CANCELLED", created.action.createdAt),
-    ).toThrowError(/not found/u);
+    ).rejects.toThrowError(/not found/u);
     const outcome = await harness.service.confirm({
       actionId: created.action.actionId,
       confirmationToken: created.trustedChallenge.confirmationToken,
@@ -139,16 +139,23 @@ describe("Phase 7 serialization, summary, error, and repository boundaries", () 
       userId: created.action.userId,
     });
     expect(outcome.authorization).not.toBeNull();
-    repository.transition(created.action.actionId, "CONFIRMED", created.action.createdAt);
-    repository.acceptConfirmation(created.action.actionId, "confirmation:test");
-    repository.authorize(created.action.actionId, outcome.authorization!, outcome.action.updatedAt);
-    expect(() =>
+    await repository.acceptConfirmation(
+      created.action.actionId,
+      "confirmation:test",
+      created.action.createdAt,
+    );
+    await repository.authorize(
+      created.action.actionId,
+      outcome.authorization!,
+      outcome.action.updatedAt,
+    );
+    await expect(
       repository.authorize(
         created.action.actionId,
         outcome.authorization!,
         outcome.action.updatedAt,
       ),
-    ).toThrowError(/already has/u);
+    ).rejects.toThrowError(/already has/u);
   });
 
   it.each([
@@ -362,7 +369,7 @@ describe("Phase 7 fail-closed service and revalidation boundaries", () => {
         userId: created.action.userId,
       }),
     ).rejects.toMatchObject({ code: "INTERNAL_ERROR" });
-    expect(service.get(created.action.actionId)?.state).toBe("AWAITING_CONFIRMATION");
+    expect((await service.get(created.action.actionId))?.state).toBe("AWAITING_CONFIRMATION");
   });
 
   it("authorization ID failure terminally replans without authorization", async () => {
@@ -383,7 +390,7 @@ describe("Phase 7 fail-closed service and revalidation boundaries", () => {
         userId: created.action.userId,
       }),
     ).rejects.toMatchObject({ code: "INTERNAL_ERROR" });
-    expect(service.get(created.action.actionId)?.state).toBe("REPLAN_REQUIRED");
+    expect((await service.get(created.action.actionId))?.state).toBe("REPLAN_REQUIRED");
   });
 
   it("event ID generation failure is secret-safe", async () => {
@@ -399,7 +406,7 @@ describe("Phase 7 fail-closed service and revalidation boundaries", () => {
     await expect(service.create(harness.command())).rejects.toMatchObject({
       code: "INTERNAL_ERROR",
     });
-    expect(service.get("action:event-id-failure")?.state).toBe("CANCELLED");
+    expect((await service.get("action:event-id-failure"))?.state).toBe("CANCELLED");
   });
 
   it("fails closed when lifecycle event delivery fails", async () => {
@@ -414,7 +421,7 @@ describe("Phase 7 fail-closed service and revalidation boundaries", () => {
     await expect(service.create(harness.command())).rejects.toMatchObject({
       code: "INTERNAL_ERROR",
     });
-    expect(service.get("action:event-delivery-failure")?.state).toBe("CANCELLED");
+    expect((await service.get("action:event-delivery-failure"))?.state).toBe("CANCELLED");
   });
 
   it("replans after confirmation event delivery fails", async () => {
@@ -439,7 +446,7 @@ describe("Phase 7 fail-closed service and revalidation boundaries", () => {
         userId: created.action.userId,
       }),
     ).rejects.toMatchObject({ code: "INTERNAL_ERROR" });
-    expect(service.get(created.action.actionId)?.state).toBe("REPLAN_REQUIRED");
+    expect((await service.get(created.action.actionId))?.state).toBe("REPLAN_REQUIRED");
   });
 
   it("keeps an authorized READY action terminal when ready event delivery fails", async () => {
@@ -466,7 +473,7 @@ describe("Phase 7 fail-closed service and revalidation boundaries", () => {
         userId: created.action.userId,
       }),
     ).rejects.toMatchObject({ code: "INTERNAL_ERROR" });
-    expect(service.get(created.action.actionId)?.state).toBe("READY_FOR_EXECUTION");
+    expect((await service.get(created.action.actionId))?.state).toBe("READY_FOR_EXECUTION");
     await expect(
       service.confirm({
         actionId: created.action.actionId,

@@ -132,7 +132,6 @@ function request(
   index: number,
   overrides: Partial<ExecutionRequest> = {},
 ): ExecutionRequest {
-  const actionFingerprint = overrides.actionFingerprint ?? fingerprint(index + 1);
   const validatedArguments = overrides.validatedArguments ?? { value: index };
   const runId = overrides.runId ?? `run:${index}`;
   const sessionId = overrides.sessionId ?? "session:test";
@@ -143,6 +142,19 @@ function request(
   });
   const contextSnapshotId = overrides.contextSnapshotId ?? input.contextSnapshot.snapshotId;
   const contextVersion = overrides.contextVersion ?? input.contextSnapshot.contextVersion;
+  const userId = overrides.userId ?? input.contextSnapshot.user.userId;
+  const vehicleId = overrides.vehicleId ?? input.contextSnapshot.vehicle.vehicleId;
+  const actionFingerprint =
+    overrides.actionFingerprint ??
+    createActionFingerprint({
+      toolName: tool.name,
+      validatedArguments,
+      sessionId,
+      userId,
+      vehicleId,
+      contextSnapshotId,
+      contextVersion,
+    });
   return {
     executionId: `execution:${index}`,
     toolName: tool.name,
@@ -150,6 +162,8 @@ function request(
     actionFingerprint,
     runId,
     sessionId,
+    userId,
+    vehicleId,
     traceId,
     riskLevel: tool.riskLevel,
     policyDecision:
@@ -254,9 +268,8 @@ describe("Phase 8 ReliableToolExecutor parameterized behavior", () => {
       const first = request(tool, index);
       await executor.execute(first);
       const conflict = await executor.execute(
-        request(tool, index, {
+        request(tool, index + 10_000, {
           executionId: `execution:${index}:conflict`,
-          actionFingerprint: fingerprint(index + 10_000),
           idempotencyKey: first.idempotencyKey,
         }),
       );
@@ -288,6 +301,60 @@ describe("Phase 8 ReliableToolExecutor parameterized behavior", () => {
 });
 
 describe("Phase 8 authorization and side-effect safety", () => {
+  it.each(["R0", "R1"] as const)(
+    "rejects a spoofed execution subject for %s before dispatch",
+    async (riskLevel) => {
+      let sideEffects = 0;
+      let consumed = 0;
+      const tool = definition(riskLevel, (input) => {
+        sideEffects += 1;
+        return Promise.resolve({ ok: true, value: inputValue(input) });
+      });
+      const consumer: ExecutionAuthorizationConsumer = {
+        consumeExecutionAuthorization: async (command) => {
+          consumed += 1;
+          return allowAll.consumeExecutionAuthorization(command);
+        },
+      };
+      const { executor } = harness(tool, { authorizationConsumer: consumer });
+      const trusted = request(tool, 900 + sideEffects);
+      const result = await executor.execute({ ...trusted, userId: "user:spoofed" });
+      expect(result).toMatchObject({
+        status: "REJECTED",
+        error: { code: "EXECUTION_NOT_AUTHORIZED" },
+      });
+      expect(sideEffects).toBe(0);
+      expect(consumed).toBe(0);
+    },
+  );
+
+  it("passes the R2 subject to trusted authorization consumption and rejects a spoof", async () => {
+    let sideEffects = 0;
+    let consumed = 0;
+    const tool = definition("R2", (input) => {
+      sideEffects += 1;
+      return Promise.resolve({ ok: true, value: inputValue(input) });
+    });
+    const trusted = request(tool, 902);
+    const consumer: ExecutionAuthorizationConsumer = {
+      consumeExecutionAuthorization: (command) => {
+        consumed += 1;
+        if (command.userId !== trusted.userId || command.vehicleId !== trusted.vehicleId) {
+          return Promise.reject(new ActionLifecycleError("AUTHORIZATION_MISMATCH", "spoofed"));
+        }
+        return allowAll.consumeExecutionAuthorization(command);
+      },
+    };
+    const { executor } = harness(tool, { authorizationConsumer: consumer });
+    const result = await executor.execute({ ...trusted, userId: "user:spoofed" });
+    expect(result).toMatchObject({
+      status: "REJECTED",
+      error: { code: "AUTHORIZATION_MISMATCH" },
+    });
+    expect(consumed).toBe(1);
+    expect(sideEffects).toBe(0);
+  });
+
   it("consumes one R2 authorization and executes once", async () => {
     let consumed = 0;
     let sideEffects = 0;
@@ -964,12 +1031,12 @@ describe("Phase 8 defensive and utility boundaries", () => {
     const { executor: sideEffectExecutor } = harness(sideEffect);
     const authorized = request(sideEffect, 951);
     expect((await sideEffectExecutor.execute(authorized)).status).toBe("SUCCEEDED");
-    const altered = await sideEffectExecutor.execute({
-      ...authorized,
-      executionId: "execution:951:altered",
-      validatedArguments: { value: 952 },
-      authorizationId: "authorization:951:forged",
-    });
+    const altered = await sideEffectExecutor.execute(
+      request(sideEffect, 952, {
+        executionId: "execution:951:altered",
+        idempotencyKey: authorized.idempotencyKey,
+      }),
+    );
     expect(altered.status).toBe("REJECTED");
     expect(altered.error?.code).toBe("IDEMPOTENCY_CONFLICT");
   });
@@ -1033,11 +1100,12 @@ describe("Phase 8 defensive and utility boundaries", () => {
     const ownerRequest = request(tool, 9_550);
     const owner = executor.execute(ownerRequest);
     await authorizationStarted;
-    const conflict = await executor.execute({
-      ...ownerRequest,
-      validatedArguments: { value: 9_551 },
-      authorizationId: "authorization:9550:conflict",
-    });
+    const conflict = await executor.execute(
+      request(tool, 9_551, {
+        executionId: ownerRequest.executionId,
+        idempotencyKey: ownerRequest.idempotencyKey,
+      }),
+    );
     expect(conflict.error?.code).toBe("IDEMPOTENCY_CONFLICT");
     expect(executor.record(ownerRequest.executionId)?.state).toBe("CREATED");
     releaseAuthorization();
