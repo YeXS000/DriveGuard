@@ -18,6 +18,7 @@
     "@driveguard/domain": "0.0.0",
     "@driveguard/executor": "0.0.0",
     "@driveguard/memory": "0.0.0",
+    "@driveguard/urgent-events": "0.0.0",
     "drizzle-orm": "0.45.2",
     "pg": "8.23.0"
   }

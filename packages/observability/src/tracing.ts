@@ -27,6 +27,7 @@ import {
 import type { ActionLifecycleEvent } from "@driveguard/action-lifecycle";
 import type { RuntimeEvent } from "@driveguard/agent-runtime";
 import type { ExecutionEvent } from "@driveguard/executor";
+import type { UrgentEventObservation } from "@driveguard/urgent-events";
 
 import type { ModelUsageObservation } from "./metrics.js";
 
@@ -134,6 +135,10 @@ export class DriveGuardTracing {
   readonly #confirmationRevalidations = new Map<string, ActiveSpan>();
   readonly #executions = new Map<string, ActiveSpan>();
   readonly #attempts = new Map<string, AttemptSpans>();
+  readonly #urgentConsumes = new Map<string, ActiveSpan>();
+  readonly #urgentProcesses = new Map<string, ActiveSpan>();
+  readonly #urgentContexts = new Map<string, ActiveSpan>();
+  readonly #urgentPolicies = new Map<string, ActiveSpan>();
 
   constructor(options: DriveGuardTracingOptions) {
     const inMemoryExporter =
@@ -388,6 +393,69 @@ export class DriveGuardTracing {
       this.#executions
         .get(event.executionId)
         ?.span.addEvent(event.eventType, { "driveguard.execution.attempt": event.attempt }, at);
+    }
+  }
+
+  observeUrgent(event: UrgentEventObservation): void {
+    const at = Date.parse(event.timestamp);
+    const attributes: Attributes = {
+      "driveguard.trace_id": event.traceId,
+      "driveguard.run_id": event.runId,
+      "driveguard.event_id": event.eventId,
+      "driveguard.urgent.event_type": event.eventType,
+      "driveguard.urgent.severity": event.severity,
+      "driveguard.urgent.status": event.status,
+      ...(event.toolName === undefined ? {} : { "driveguard.tool_name": event.toolName }),
+      ...(event.actionId === undefined ? {} : { "driveguard.action_id": event.actionId }),
+      ...(event.executionId === undefined ? {} : { "driveguard.execution_id": event.executionId }),
+    };
+    if (event.observationType === "urgent.event.received") {
+      const consume = this.#start("nats.consume", attributes, this.#parentFor(event.traceId), at);
+      const process = this.#start("urgent.process", attributes, consume.context, at);
+      this.#urgentConsumes.set(event.eventId, consume);
+      this.#urgentProcesses.set(event.eventId, process);
+      this.#rememberTraceParent(event.traceId, process.context);
+      return;
+    }
+    const process = this.#urgentProcesses.get(event.eventId);
+    const parent = process?.context ?? this.#parentFor(event.traceId);
+    if (event.observationType === "urgent.context.load.started") {
+      this.#urgentContexts.set(event.eventId, this.#start("context.load", attributes, parent, at));
+    } else if (event.observationType === "urgent.context.load.completed") {
+      endSpan(this.#urgentContexts.get(event.eventId), undefined, at);
+      this.#urgentContexts.delete(event.eventId);
+    } else if (event.observationType === "urgent.policy.evaluate.started") {
+      this.#urgentPolicies.set(
+        event.eventId,
+        this.#start("policy.evaluate", attributes, parent, at),
+      );
+    } else if (event.observationType === "urgent.policy.evaluate.completed") {
+      const policy = this.#urgentPolicies.get(event.eventId);
+      if (event.policyDecision !== undefined) {
+        policy?.span.setAttribute("driveguard.policy.decision", event.policyDecision);
+      }
+      endSpan(policy, undefined, at);
+      this.#urgentPolicies.delete(event.eventId);
+    } else if (event.observationType === "urgent.event.duplicate") {
+      this.#instant("nats.consume", attributes, parent, at, {
+        "driveguard.urgent.duplicate": true,
+      });
+      this.#instant("urgent.process", attributes, parent, at, {
+        "driveguard.urgent.duplicate": true,
+      });
+    } else if (
+      event.observationType === "urgent.event.processed" ||
+      event.observationType === "urgent.event.rejected" ||
+      event.observationType === "urgent.event.failed"
+    ) {
+      endSpan(this.#urgentContexts.get(event.eventId), event.errorCode, at);
+      endSpan(this.#urgentPolicies.get(event.eventId), event.errorCode, at);
+      endSpan(process, event.errorCode, at);
+      endSpan(this.#urgentConsumes.get(event.eventId), event.errorCode, at);
+      this.#urgentContexts.delete(event.eventId);
+      this.#urgentPolicies.delete(event.eventId);
+      this.#urgentProcesses.delete(event.eventId);
+      this.#urgentConsumes.delete(event.eventId);
     }
   }
 

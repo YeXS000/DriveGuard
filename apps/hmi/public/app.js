@@ -116,7 +116,31 @@ function applyEvent(event, assistant) {
         setExecution("Failed", "failure", data);
       }
       break;
+    case "urgent.received":
+    case "urgent.action_required":
+    case "urgent.confirmation_required":
+    case "urgent.resolved":
+    case "urgent.failed":
+      applyUrgentEvent(event);
+      break;
   }
+}
+
+function addUrgentItem(label) {
+  if ($("urgent-events").querySelector(".muted")) $("urgent-events").replaceChildren();
+  const item = document.createElement("li");
+  item.textContent = label;
+  $("urgent-events").prepend(item);
+}
+
+function applyUrgentEvent(event) {
+  const data = event.data || {};
+  addUrgentItem(
+    `${data.severity || "UNKNOWN"} · ${data.event_type || "UNKNOWN"} · ${data.status || "UNKNOWN"} — ${data.summary || "No summary"}`,
+  );
+  addTimeline(`Urgent event: ${data.event_type || "UNKNOWN"} (${data.status || "UNKNOWN"})`);
+  if (event.event_type === "urgent.confirmation_required") showAction(data);
+  if (event.event_type === "urgent.failed") setExecution("Urgent event blocked", "failure", data);
 }
 
 async function readSse(response, assistant) {
@@ -187,7 +211,9 @@ async function sendMessage(event) {
 }
 
 async function decide(operation) {
-  if (!pendingAction || !sessionId) return;
+  if (!pendingAction) return;
+  const actionSessionId = pendingAction.session_id || sessionId;
+  if (!actionSessionId) return;
   $("confirm-action").disabled = true;
   $("reject-action").disabled = true;
   try {
@@ -199,7 +225,7 @@ async function decide(operation) {
         {
           method: "POST",
           body: JSON.stringify({
-            sessionId,
+            sessionId: actionSessionId,
             confirmationCredential: pendingAction.confirmation_credential,
           }),
         },
@@ -217,7 +243,7 @@ async function decide(operation) {
         `/v1/actions/${encodeURIComponent(pendingAction.action_id)}/reject`,
         {
           method: "POST",
-          body: JSON.stringify({ sessionId }),
+          body: JSON.stringify({ sessionId: actionSessionId }),
         },
       );
       setExecution("Rejected", "failure", data);
@@ -239,6 +265,41 @@ async function decide(operation) {
   }
 }
 
+async function loadUrgentHistory() {
+  const events = await request("/v1/urgent-events");
+  for (const event of [...events].reverse()) {
+    addUrgentItem(
+      `${event.severity} · ${event.eventType} · ${event.status} — ${event.safeSummary}`,
+    );
+  }
+}
+
+async function runUrgentStream() {
+  while (true) {
+    try {
+      const response = await fetch(`${apiBase}/v1/urgent-events/stream`, { headers: headers() });
+      if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() || "";
+        for (const frame of frames) {
+          const dataLine = frame.split("\n").find((line) => line.startsWith("data: "));
+          if (dataLine) applyUrgentEvent(JSON.parse(dataLine.slice(6)));
+        }
+      }
+    } catch {
+      addUrgentItem("Urgent event stream disconnected; reconnecting safely.");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+  }
+}
+
 $("create-session").addEventListener("click", () =>
   createSession().catch((error) => setExecution("Failed", "failure", { message: error.message })),
 );
@@ -249,3 +310,5 @@ $("message-form").addEventListener("submit", sendMessage);
 $("confirm-action").addEventListener("click", () => decide("confirm"));
 $("reject-action").addEventListener("click", () => decide("reject"));
 if (sessionId) $("session-id").textContent = sessionId;
+void loadUrgentHistory().catch(() => undefined);
+void runUrgentStream();

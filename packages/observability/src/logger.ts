@@ -60,6 +60,7 @@ export interface CorrelationFields {
   readonly actionId?: string | null;
   readonly executionId?: string | null;
   readonly toolName?: string | null;
+  readonly eventId?: string | null;
 }
 
 export interface ObservableLogDetails {
@@ -147,6 +148,7 @@ export class DriveGuardLogger {
       ...(correlation.actionId === undefined ? {} : { actionId: correlation.actionId }),
       ...(correlation.executionId === undefined ? {} : { executionId: correlation.executionId }),
       ...(correlation.toolName === undefined ? {} : { toolName: correlation.toolName }),
+      ...(correlation.eventId === undefined ? {} : { eventId: correlation.eventId }),
       ...(sanitizeDetails(details, this.#sensitiveValues) ?? {}),
     };
     this.#logger[level](fields);

@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import type { ActionLifecycleEventSink } from "@driveguard/action-lifecycle";
 import type { RuntimeEvent, RuntimeEventSink } from "@driveguard/agent-runtime";
 import type { ExecutionEvent, ExecutionEventSink } from "@driveguard/executor";
+import type { UrgentEventObservation, UrgentEventObserver } from "@driveguard/urgent-events";
 import type { DestinationStream } from "pino";
 
 import { DriveGuardLogger } from "./logger.js";
@@ -53,6 +54,17 @@ function executionLevel(event: ExecutionEvent): "info" | "warn" | "error" {
   return "info";
 }
 
+function urgentLevel(event: UrgentEventObservation): "info" | "warn" | "error" {
+  if (event.observationType === "urgent.event.failed") return "error";
+  if (
+    event.observationType === "urgent.event.rejected" ||
+    event.observationType === "urgent.event.duplicate"
+  ) {
+    return "warn";
+  }
+  return "info";
+}
+
 export class DriveGuardObservability {
   readonly logger: DriveGuardLogger;
   readonly metrics: DriveGuardMetrics;
@@ -60,6 +72,7 @@ export class DriveGuardObservability {
   readonly runtimeEventSink: RuntimeEventSink;
   readonly actionLifecycleEventSink: ActionLifecycleEventSink;
   readonly executionEventSink: ExecutionEventSink;
+  readonly urgentEventObserver: UrgentEventObserver;
 
   constructor(options: DriveGuardObservabilityOptions) {
     this.logger = new DriveGuardLogger({
@@ -155,6 +168,34 @@ export class DriveGuardObservability {
             },
             {
               attempt: event.attempt,
+              ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
+            },
+          ),
+        );
+      },
+    };
+    this.urgentEventObserver = {
+      observe: (event) => {
+        this.#bestEffort(() => this.metrics.observeUrgent(event));
+        this.#bestEffort(() => this.tracing.observeUrgent(event));
+        this.#bestEffort(() =>
+          this.logger.write(
+            urgentLevel(event),
+            event.observationType,
+            {
+              traceId: event.traceId,
+              runId: event.runId,
+              sessionId: null,
+              eventId: event.eventId,
+              ...(event.actionId === undefined ? {} : { actionId: event.actionId }),
+              ...(event.executionId === undefined ? {} : { executionId: event.executionId }),
+              ...(event.toolName === undefined ? {} : { toolName: event.toolName }),
+            },
+            {
+              status: event.status,
+              ...(event.policyDecision === undefined
+                ? {}
+                : { policyDecision: event.policyDecision }),
               ...(event.errorCode === undefined ? {} : { errorCode: event.errorCode }),
             },
           ),

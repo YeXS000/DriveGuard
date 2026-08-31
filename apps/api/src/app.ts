@@ -5,6 +5,7 @@ import { assessReadiness, type DependencyProbe } from "./health.js";
 import { ApiError } from "./errors.js";
 import { registerPhase10Routes } from "./routes.js";
 import type { DriveGuardApiService } from "./service.js";
+import { registerUrgentRoutes, type UrgentApiService } from "./urgent.js";
 import {
   finishRequestObservation,
   setRequestErrorCode,
@@ -17,6 +18,7 @@ export interface BuildApiOptions {
   readonly logger?: boolean;
   readonly service?: DriveGuardApiService;
   readonly observability?: DriveGuardObservability;
+  readonly urgentService?: UrgentApiService;
   readonly onClose?: () => void | Promise<void>;
 }
 
@@ -141,6 +143,7 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
   });
 
   if (options.service !== undefined) registerPhase10Routes(app, options.service);
+  if (options.urgentService !== undefined) registerUrgentRoutes(app, options.urgentService);
 
   app.setNotFoundHandler((_request, reply) =>
     reply.code(404).send({ error: { code: "VALIDATION_ERROR", message: "Route was not found" } }),

@@ -23,6 +23,7 @@ import {
   PostgresSessionCoordinator,
   PostgresSessionRepository,
 } from "./session.js";
+import { PostgresUrgentEventRepository } from "./urgent-event.js";
 
 export interface Phase9RuntimeBindings {
   readonly database: PostgresDatabaseHandle;
@@ -36,6 +37,7 @@ export interface Phase9RuntimeBindings {
   readonly conversationMemory: RepositoryConversationMemory;
   readonly sessionCoordinator: FallbackSessionCoordinator;
   readonly sessionRepository: PostgresSessionRepository;
+  readonly urgentEventRepository: PostgresUrgentEventRepository;
   close(): Promise<void>;
 }
 
@@ -84,6 +86,7 @@ export function createPhase9RuntimeBindings(options: {
     }),
     sessionCoordinator: new FallbackSessionCoordinator(redisSession, durableSession),
     sessionRepository,
+    urgentEventRepository: new PostgresUrgentEventRepository(database.pool),
     close: () => database.close(),
   };
   return Object.freeze(bindings);

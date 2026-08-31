@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: driveguard-api:phase11
+    image: driveguard-api:phase12
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
@@ -71,6 +71,8 @@ services:
       PHASE_5_DEVELOPMENT_OPT_IN: ${PHASE_5_DEVELOPMENT_OPT_IN:-NON_PRODUCTION}
       DRIVEGUARD_DEVELOPMENT_SIMULATOR_ORIGINS: http://vehicle-simulator:3001
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      URGENT_EVENT_USER_ID: ${URGENT_EVENT_USER_ID:-phase5-driver}
+      URGENT_CONFIRMATION_SECRET: ${URGENT_CONFIRMATION_SECRET:?URGENT_CONFIRMATION_SECRET must be set}
     ports:
       - "127.0.0.1:${DRIVEGUARD_API_PORT:-3000}:3000"
     depends_on:
@@ -99,7 +101,7 @@ services:
     restart: unless-stopped
 
   persistence-migrate:
-    image: driveguard-api:phase11
+    image: driveguard-api:phase12
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile

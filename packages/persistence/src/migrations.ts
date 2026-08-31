@@ -79,6 +79,7 @@ export async function configureRuntimeDatabaseRole(
                   'agent_sessions','conversation_messages','pending_actions',
                   'execution_authorizations','execution_records','execution_attempts',
                   'idempotency_records','audit_events'
+                  ,'urgent_events'
                 )
             ) as "ownsPhase9Relation",
             exists (
@@ -126,12 +127,14 @@ export async function configureRuntimeDatabaseRole(
     `revoke all privileges on
        agent_sessions,conversation_messages,pending_actions,execution_authorizations,
        execution_records,execution_attempts,idempotency_records
+       ,urgent_events
      from ${identifier}`,
   );
   await pool.query(
     `grant select,insert,update on
        agent_sessions,conversation_messages,pending_actions,execution_authorizations,
        execution_records,execution_attempts,idempotency_records
+       ,urgent_events
      to ${identifier}`,
   );
   await pool.query(`grant delete on execution_records to ${identifier}`);
