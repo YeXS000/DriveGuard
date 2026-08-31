@@ -82,4 +82,27 @@ describe("health endpoints", () => {
       dependencies: [{ name: "redis", status: "down" }],
     });
   });
+
+  it("closes dependency resources and the application callback", async () => {
+    let dependencyClosed = false;
+    let applicationClosed = false;
+    const application = buildApi({
+      dependencies: [
+        {
+          name: "postgres",
+          check: () => Promise.resolve(),
+          close: () => {
+            dependencyClosed = true;
+            return Promise.resolve();
+          },
+        },
+      ],
+      onClose: () => {
+        applicationClosed = true;
+      },
+    });
+    await application.close();
+    expect(dependencyClosed).toBe(true);
+    expect(applicationClosed).toBe(true);
+  });
 });

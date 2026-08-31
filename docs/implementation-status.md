@@ -1103,3 +1103,90 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - Expired ambiguous executions remain `OUTCOME_UNKNOWN`; operator reconciliation, retention,
   archival, outbox processing, multi-region failover, HMI, and Phase 10 API work remain out of scope.
 - The final Stage Gate passed. Phase 10 was not started and `main` was not merged.
+
+## Phase 10 — API, Streaming & HMI
+
+- Status: COMPLETE.
+- Scope: HTTP API, curated SSE streaming, confirmation/action/session/execution application APIs,
+  durable Phase 9 integration, minimal HMI, and Compose deployment only.
+- Gate result: **PASS**.
+- Verification date: 2026-08-31 (Asia/Shanghai).
+
+### Implemented modules
+
+- `apps/api/src/{app,errors,events,production,routes,service,server}.ts`: strict TypeBox/Fastify
+  boundary, stable response/error contracts, curated SSE mapping, development identity binding,
+  Runtime-backed application service, production provider selection, and durable startup wiring.
+- `packages/agent-runtime`: sanitized assistant-delta callback and exact development-only trusted
+  Simulator origin extension without changing the accepted internal Runtime event contract.
+- `packages/persistence`: identity-bound Execution envelope reads and exposed durable Session
+  repository binding; execution request, record, attempts, and result are read consistently.
+- `apps/hmi/public`: minimal Conversation, confirmation, Tool/Policy progress, timeline, and
+  execution-result UI with explicit waiting/executing/success/failure/replan/expired states.
+- `infra/docker` and `docker-compose.yml`: Phase 10 API image, Node 22 static HMI/API proxy, and the
+  PostgreSQL/Redis/NATS/Simulator/API/HMI health/dependency graph.
+- `tests`: 150 dedicated Phase 10 contract, branch, architecture, HMI, Runtime integration,
+  streaming/disconnect, security, performance, and Docker restart-smoke scenarios.
+- `docs/adr/0011-phase-10-api-streaming-hmi.md`: API, SSE, identity, confirmation, HMI, deployment,
+  and Phase 10/11 boundary decisions.
+
+### Current measured verification
+
+| Check                                      | Current result                                                                                        |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
+| Dedicated Phase 10 tests                   | 150 / 150 PASS across 6 files; coverage command also executes 5 health tests                          |
+| API contract and malformed input           | PASS; strict headers/params/body, no coercion, stable data/error envelopes                            |
+| SSE lifecycle                              | PASS; normal/tool/policy/confirmation/completion/failure and real client-disconnect cancellation      |
+| R0 Runtime flow                            | PASS; Session -> streamed Tool -> Policy ALLOW -> Executor -> assistant completion                    |
+| R2/R3 confirmation flow                    | PASS; both risks require confirmation before Executor; R2 also passes restart/durable recovery        |
+| Confirmation/Executor bypass               | 0 / 0                                                                                                 |
+| Unconfirmed / duplicate side effects       | 0 / 0                                                                                                 |
+| Cross-user action access                   | 0 accepted; mismatches hidden as ACTION_NOT_FOUND                                                     |
+| API restart recovery                       | PASS for Session and PendingAction; confirmed post-restart side effect exactly once                   |
+| Non-LLM API latency                        | 300 valid local requests; P95 0.103 ms; P99 0.246 ms; error rate 0                                    |
+| Backend coverage                           | lines 99.50%; branches 96.07%; statements 99.04%; functions 100%                                      |
+| Critical Application Service coverage      | lines 100%; branches 95.65%; functions 100%                                                           |
+| Real Phase 9 PostgreSQL/Redis regression   | 147 PASS; the separately accepted 10,000-case Phase 9 matrix intentionally skipped per Phase 10 scope |
+| Full local regression without DB variables | 1,921 PASS on final code; 43 Phase 9 DB cases skipped by their environment gate                       |
+| Docker clean deployment                    | PASS after one verified `down -v`; all six long-running services healthy, migration exited 0          |
+| Docker end-to-end smoke                    | PASS: health, HMI, R0 SSE, R2 confirmation, restart recovery, persistence, exactly-once side effect   |
+| Dependency/security checks                 | npm audit 0 vulnerabilities; structured secret-safe responses; `api_key.md` never read                |
+
+### Safety and architecture boundary
+
+- HTTP route direct database mutation = 0; route direct Simulator calls = 0; HMI Simulator calls = 0.
+- Action state is never assigned by API/HMI code. Confirm/reject/cancel go through the production
+  Runtime and `ConfirmationService`; authorized execution goes through the Reliable Executor.
+- Confirmation publication validates action session/user/vehicle and challenge session/user. Cross-
+  session, cross-user, cross-vehicle, wrong-token, expired, malformed, replay, and missing-boundary
+  cases fail closed in tests.
+- SSE exports only eight stable public event types. Context/model internals, raw arguments outside
+  the deterministic confirmation view, reasoning, stacks, SQL, filesystem paths, and secrets are
+  not exposed.
+- World state remains per-turn Runtime input. Conversation and action recovery do not reuse a stale
+  VehicleState or TripState.
+- NATS business publishers/consumers, RX tools, Phase 11 observability, Phase 12 urgent events,
+  benchmark/load infrastructure, and direct vehicle actuation added: 0.
+- Compose's faux provider and development identity headers are explicitly non-production. The
+  standalone API defaults to environment-configured DeepSeek; no credential is hard-coded.
+
+### Review closure and known limitations
+
+- Three focused read-only self-review passes covered API/SSE, confirmation/security, and
+  architecture/HMI. Initial result: Critical 0, High 0, Medium 4.
+- All four Medium findings were fixed: complete action/challenge subject binding before credential
+  publication, distinct HMI replan/expired states, a consistent single-statement Execution envelope
+  read, and browser disconnect propagation through the HMI proxy to the API SSE request. Final
+  result: Critical 0, High 0, relevant Medium 0.
+- The first HMI container build was blocked by Docker Desktop's unavailable registry proxy. The HMI
+  now reuses the verified Node 22 base image and a static `/api` proxy with no business logic; the
+  clean deployment and end-to-end restart smoke pass on that image.
+- The Phase 9 real 10,000-case regression was attempted but exceeded its existing 180-second test
+  timeout before completion; its partial counters were discarded. The repository's explicit
+  `PHASE9_SKIP_RELIABILITY_MATRIX=1` switch was then used as permitted by the Phase 10 instruction
+  not to rerun a 10,000-case matrix; all other 147 Phase 9 tests passed against real PostgreSQL and
+  Redis.
+- OAuth, production HMI authorization/storage hardening, reconnection replay cursors, formal load
+  testing, live DeepSeek smoke, observability, urgent events, and NATS business workflows remain out
+  of scope and are not claimed.
+- Phase 11 was not started and `main` was not merged.

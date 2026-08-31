@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: driveguard-api:phase9
+    image: driveguard-api:phase10
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
@@ -65,6 +65,12 @@ services:
       PGDATABASE: ${POSTGRES_DB:-driveguard}
       REDIS_URL: redis://redis:6379
       NATS_URL: nats://nats:4222
+      SIMULATOR_BASE_URL: http://vehicle-simulator:3001
+      DRIVEGUARD_LLM_PROVIDER: ${DRIVEGUARD_LLM_PROVIDER:-faux}
+      PHASE_5_RUNTIME_MODE: ${PHASE_5_RUNTIME_MODE:-development}
+      PHASE_5_DEVELOPMENT_OPT_IN: ${PHASE_5_DEVELOPMENT_OPT_IN:-NON_PRODUCTION}
+      DRIVEGUARD_DEVELOPMENT_SIMULATOR_ORIGINS: http://vehicle-simulator:3001
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
     ports:
       - "127.0.0.1:${DRIVEGUARD_API_PORT:-3000}:3000"
     depends_on:
@@ -76,6 +82,8 @@ services:
         condition: service_healthy
       persistence-migrate:
         condition: service_completed_successfully
+      vehicle-simulator:
+        condition: service_healthy
     healthcheck:
       test:
         [
@@ -91,7 +99,7 @@ services:
     restart: unless-stopped
 
   persistence-migrate:
-    image: driveguard-api:phase9
+    image: driveguard-api:phase10
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
@@ -125,6 +133,32 @@ services:
           "node",
           "-e",
           "fetch('http://127.0.0.1:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 3s
+    restart: unless-stopped
+
+  hmi:
+    image: driveguard-hmi:phase10
+    build:
+      context: .
+      dockerfile: infra/docker/hmi.Dockerfile
+    environment:
+      DRIVEGUARD_API_ORIGIN: http://api:3000
+    ports:
+      - "127.0.0.1:${DRIVEGUARD_HMI_PORT:-3002}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:8080/').then(async r=>{if(!r.ok||!(await r.text()).includes('DriveGuard HMI'))process.exit(1)}).catch(()=>process.exit(1))",
         ]
       interval: 2s
       timeout: 2s

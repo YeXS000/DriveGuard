@@ -10,6 +10,7 @@ export interface PiEventAdapterOptions {
   readonly eventFactory: Pick<RuntimeEventFactory, "create">;
   readonly emit: (event: RuntimeEvent) => void | Promise<void>;
   readonly boundary?: "PRE_POLICY" | "POLICY_GUARDED";
+  readonly assistantTextDelta?: (delta: string) => void | Promise<void>;
 }
 
 export class PiEventAdapter {
@@ -18,6 +19,7 @@ export class PiEventAdapter {
   readonly #eventFactory: Pick<RuntimeEventFactory, "create">;
   readonly #emit: (event: RuntimeEvent) => void | Promise<void>;
   readonly #boundary: "PRE_POLICY" | "POLICY_GUARDED";
+  readonly #assistantTextDelta: ((delta: string) => void | Promise<void>) | undefined;
   readonly #toolCallIds = new Map<string, string>();
   readonly #activeToolCalls = new Map<string, string>();
   readonly #completedToolCalls = new Set<string>();
@@ -30,6 +32,7 @@ export class PiEventAdapter {
     this.#eventFactory = options.eventFactory;
     this.#emit = options.emit;
     this.#boundary = options.boundary ?? "PRE_POLICY";
+    this.#assistantTextDelta = options.assistantTextDelta;
   }
 
   get toolErrorCount(): number {
@@ -67,6 +70,14 @@ export class PiEventAdapter {
 
   readonly observe = async (event: AgentEvent): Promise<void> => {
     switch (event.type) {
+      case "message_update":
+        if (
+          this.#assistantTextDelta !== undefined &&
+          event.assistantMessageEvent?.type === "text_delta"
+        ) {
+          await this.#assistantTextDelta(event.assistantMessageEvent.delta);
+        }
+        return;
       case "turn_start":
         if (this.#run.status === "MODEL_RESUMED") {
           this.#run.transition("MODEL_RUNNING");

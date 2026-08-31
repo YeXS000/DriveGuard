@@ -1,5 +1,10 @@
 import { buildApi } from "./app.js";
 import { createInfrastructureProbes, readInfrastructureConfig } from "./dependencies.js";
+import { createClient } from "redis";
+import { createPhase9RuntimeBindings } from "@driveguard/persistence";
+
+import { ProductionPhase10RuntimeFactory } from "./production.js";
+import { DriveGuardApiService } from "./service.js";
 
 function readApiPort(environment: NodeJS.ProcessEnv = process.env): number {
   const port = Number(environment.PORT ?? "3000");
@@ -12,8 +17,37 @@ function readApiPort(environment: NodeJS.ProcessEnv = process.env): number {
 }
 
 async function main(): Promise<void> {
-  const dependencies = createInfrastructureProbes(readInfrastructureConfig());
-  const app = buildApi({ dependencies, logger: true });
+  const config = readInfrastructureConfig();
+  const redis = createClient({ url: config.redisUrl });
+  redis.on("error", () => undefined);
+  await redis.connect();
+  const bindings = createPhase9RuntimeBindings({ postgres: config.postgres, redis });
+  const simulatorBaseUrl = process.env.SIMULATOR_BASE_URL ?? "http://127.0.0.1:3001";
+  const runtimeFactory = new ProductionPhase10RuntimeFactory({
+    bindings,
+    simulatorBaseUrl,
+    provider: process.env.DRIVEGUARD_LLM_PROVIDER ?? "deepseek",
+    trustedSimulatorOrigins: (process.env.DRIVEGUARD_DEVELOPMENT_SIMULATOR_ORIGINS ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => value.length > 0),
+  });
+  const service = new DriveGuardApiService({
+    sessions: bindings.sessionRepository,
+    conversation: bindings.conversationMemory,
+    executions: bindings.executionRepository,
+    runtimeFactory,
+  });
+  const dependencies = createInfrastructureProbes(config);
+  const app = buildApi({
+    dependencies,
+    service,
+    logger: true,
+    onClose: async () => {
+      await bindings.close();
+      if (redis.isOpen) await redis.quit();
+    },
+  });
   let closing = false;
 
   const shutdown = async (): Promise<void> => {
