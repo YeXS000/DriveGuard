@@ -25,6 +25,9 @@ export default defineConfig({
       "@driveguard/memory": fileURLToPath(
         new URL("./packages/memory/src/index.ts", import.meta.url),
       ),
+      "@driveguard/observability": fileURLToPath(
+        new URL("./packages/observability/src/index.ts", import.meta.url),
+      ),
       "@driveguard/persistence": fileURLToPath(
         new URL("./packages/persistence/src/index.ts", import.meta.url),
       ),

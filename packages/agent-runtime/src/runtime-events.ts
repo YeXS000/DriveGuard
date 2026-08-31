@@ -30,6 +30,7 @@ export interface RuntimeEventMetadata {
   readonly boundary?: "PRE_POLICY" | "POLICY_GUARDED";
   readonly decision?: "ALLOW" | "DENY" | "REQUIRE_CONFIRMATION" | "REPLAN";
   readonly ruleId?: string;
+  readonly reasonCode?: string;
 }
 
 export interface RuntimeEvent {

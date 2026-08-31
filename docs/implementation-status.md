@@ -1190,3 +1190,81 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
   testing, live DeepSeek smoke, observability, urgent events, and NATS business workflows remain out
   of scope and are not claimed.
 - Phase 11 was not started and `main` was not merged.
+
+## Phase 11 — Observability
+
+- Status: COMPLETE.
+- Scope: structured logging, Prometheus metrics, OpenTelemetry traces, API observability wiring,
+  Prometheus/Grafana deployment, and dashboard provisioning only.
+- Gate result: **PASS**.
+- Verification date: 2026-08-31 (Asia/Shanghai).
+
+### Implemented modules
+
+- `packages/observability`: typed Pino business logs with centralized redaction, bounded-cardinality
+  Prometheus counters/gauges/histograms, OpenTelemetry span correlation, and independently isolated
+  best-effort observers.
+- `apps/api`: request trace lifecycle, safe HTTP outcome logging/metrics, `GET /metrics`, dependency
+  readiness gauges, model-usage observation, and production startup/shutdown composition.
+- `packages/agent-runtime` and `packages/executor`: additive safe model-usage, Policy reason-code, and
+  Action/Execution correlation fields on existing accepted event streams; no new business event type
+  or decision path.
+- `infra/observability` and `docker-compose.yml`: pinned Prometheus/Grafana services, scrape config,
+  provisioned datasource, and a dashboard with Agent, Safety, Reliability, and Infrastructure rows.
+- `tests`: 80 focused logging, metrics, tracing, architecture, R0/R2/R3 integration, and real
+  Simulator dependency-failure scenarios plus the Phase 11 Docker smoke.
+- `docs/adr/0012-phase-11-observability.md`: logging/redaction, tracing, metric-cardinality,
+  isolation, deployment, and phase-boundary decisions.
+
+### Current measured verification
+
+| Check                                      | Current result                                                                                                                                                   |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Dedicated Phase 11 tests                   | 80 / 80 PASS across 4 files                                                                                                                                      |
+| Observability package coverage             | lines 95.53%; branches 73.28%; statements 93.11%; functions 94.52%; required lines >= 90% and branches >= 70% PASS                                               |
+| Required trace nodes                       | 15 / 15 defined spans directly asserted; one OpenTelemetry trace ID from HTTP through Runtime, Policy, Confirmation, Executor, Tool, dependency, and persistence |
+| R0/R2/R3 observability flow                | PASS; R2 and R3 include confirmation wait, revalidation, Action ID, Execution ID, Tool, Simulator, and persistence correlation                                   |
+| Action/Execution association               | 100% for the defined successful R2/R3 flows                                                                                                                      |
+| Dependency failure visibility              | Real Simulator HTTP 503, retry, safe error code, failed attempt span, and recovery PASS                                                                          |
+| Real Phase 9 PostgreSQL/Redis regression   | 147 PASS; 9 / 9 required Action audit events present; the previously accepted 10,000-case matrix intentionally not rerun                                         |
+| Full local regression without DB variables | 2,001 PASS on the final Phase 11 tree; 43 Phase 9 DB cases skipped by their environment gate                                                                     |
+| Docker deployment                          | PASS; migration exit 0 and all 8 long-running services healthy in the isolated Phase 11 Compose project                                                          |
+| Docker observability smoke                 | PASS: 41 business HTTP requests, 20 Agent runs, 20 executions, Prometheus target up, Grafana datasource OK, 326 structured business logs                         |
+| Dashboard validation                       | 4 required rows provisioned; 16 / 16 PromQL panel queries accepted by live Prometheus                                                                            |
+| Secret/cardinality scan                    | 0 injected-secret occurrences in logs; 0 forbidden high-cardinality metric labels                                                                                |
+| Engineering/security gate                  | format, lint, typecheck, build, diff check PASS; npm audit 0 vulnerabilities                                                                                     |
+
+### Safety and architecture boundary
+
+- Observability is downstream of the primary durable event/audit sinks. Log, metric, and trace
+  failures are isolated independently and cannot change Policy decisions, confirmation state,
+  execution authorization, retry/idempotency/circuit behavior, or Tool outcomes.
+- The side-effect path remains LLM -> Tool Contract -> Policy -> Confirmation/Action state machine ->
+  Reliable Executor -> Tool/dependency -> persistence/audit. Direct HTTP/HMI Simulator calls,
+  Runtime Executor bypass, RX Tool registration, and direct vehicle actuation added: 0.
+- Metrics never label by user, session, run, trace, Action, Execution, prompt, or payload. Logs and
+  spans preserve correlation without raw prompts, model reasoning, chain-of-thought, credentials,
+  authorization/cookie values, or confirmation/execution secrets.
+- Existing Runtime and lifecycle events remain authoritative. The only event-shape changes are
+  additive optional safe fields carrying already-existing Policy reason and Action correlation.
+- Prometheus, Grafana, and OTLP are not health dependencies. Their failure cannot make the API's
+  business health path fail or change a business result.
+- `api_key.md` was not read, copied, logged, or used. Provider credentials remain environment-only.
+
+### Review closure and known limitations
+
+- Three focused self-review passes covered trace lifetime/correlation, metric completeness and
+  cardinality, and architecture/security boundaries. They found two High trace-lifetime retention
+  issues plus relevant Medium Context-conflict attribution and restart-safe pending-gauge gaps.
+- All findings were fixed with regression tests: only bounded active Agent parents can cross event
+  boundaries, aborted HTTP requests close their spans, the already-existing Policy reason code feeds
+  Context conflict metrics/logs/spans, and process-local pending state cannot underflow after restart.
+  Final review result: Critical 0, High 0, relevant Medium 0.
+- The first registry pull was blocked by Docker Desktop's unavailable local proxy. Official pinned
+  images were imported with a SHA256-verified release of `regctl`; Docker Desktop configuration and
+  the existing Phase 10 project were not modified.
+- Without `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, production creates/ends spans but does not retain or
+  export them. Trace hierarchy is validated with the opt-in in-memory test exporter; external trace
+  storage and collector deployment remain operator configuration, not a claimed Phase 11 service.
+- No new large performance/safety matrix, urgent-event handling, NATS business workflow, evaluation
+  harness, or Phase 12 implementation was added. The Stage Gate passed; `main` was not merged.

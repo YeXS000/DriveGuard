@@ -72,7 +72,12 @@ export interface CreateProductionRuntimeOptions {
   readonly latestContextVersionProvider?: (snapshotVersion: number) => unknown;
   readonly runtimeOverrides?: Pick<
     DriveGuardRuntimeOptions,
-    "runIdFactory" | "traceIdFactory" | "eventIdFactory" | "eventSink" | "assistantTextDeltaSink"
+    | "runIdFactory"
+    | "traceIdFactory"
+    | "eventIdFactory"
+    | "eventSink"
+    | "assistantTextDeltaSink"
+    | "modelUsageSink"
   >;
   readonly actionLifecycleEventSink?: ActionLifecycleEventSink;
   readonly executionEventSink?: ExecutionEventSink;

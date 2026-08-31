@@ -1,15 +1,22 @@
 import Fastify, { type FastifyInstance } from "fastify";
+import type { DriveGuardObservability } from "@driveguard/observability";
 
 import { assessReadiness, type DependencyProbe } from "./health.js";
 import { ApiError } from "./errors.js";
 import { registerPhase10Routes } from "./routes.js";
 import type { DriveGuardApiService } from "./service.js";
+import {
+  finishRequestObservation,
+  setRequestErrorCode,
+  setRequestObservation,
+} from "./request-observability.js";
 
 export interface BuildApiOptions {
   readonly dependencies?: readonly DependencyProbe[];
   readonly dependencyTimeoutMs?: number;
   readonly logger?: boolean;
   readonly service?: DriveGuardApiService;
+  readonly observability?: DriveGuardObservability;
   readonly onClose?: () => void | Promise<void>;
 }
 
@@ -56,6 +63,35 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
     },
   });
 
+  app.addHook("onRequest", (request, reply, done) => {
+    if (options.observability !== undefined && request.url !== "/metrics") {
+      setRequestObservation(
+        request,
+        options.observability.startHttpRequest({
+          method: request.method,
+          route: request.routeOptions.url ?? "unmatched",
+        }),
+      );
+      reply.raw.once("close", () => {
+        if (reply.raw.writableEnded) return;
+        setRequestErrorCode(request, "REQUEST_ABORTED");
+        finishRequestObservation(request, 499);
+      });
+    }
+    done();
+  });
+
+  app.addHook("onResponse", (request, reply, done) => {
+    finishRequestObservation(request, reply.statusCode);
+    done();
+  });
+
+  app.addHook("onRequestAbort", (request, done) => {
+    setRequestErrorCode(request, "REQUEST_ABORTED");
+    finishRequestObservation(request, 499);
+    done();
+  });
+
   app.get(
     "/health/live",
     {
@@ -65,6 +101,13 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
     },
     () => ({ status: "ok" as const }),
   );
+
+  if (options.observability !== undefined) {
+    app.get("/metrics", async (_request, reply) => {
+      const metrics = await options.observability?.metricsText();
+      return reply.type(options.observability?.metrics.contentType ?? "text/plain").send(metrics);
+    });
+  }
 
   app.get(
     "/health/ready",
@@ -78,6 +121,7 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
     },
     async (_request, reply) => {
       const assessment = await assessReadiness(dependencies, dependencyTimeoutMs);
+      options.observability?.observeDependencies(assessment.dependencies);
       const status = assessment.ready ? "ready" : "not_ready";
 
       return reply.code(assessment.ready ? 200 : 503).send({
@@ -102,8 +146,9 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
     reply.code(404).send({ error: { code: "VALIDATION_ERROR", message: "Route was not found" } }),
   );
 
-  app.setErrorHandler((error, _request, reply) => {
+  app.setErrorHandler((error, request, reply) => {
     if (error instanceof ApiError) {
+      setRequestErrorCode(request, error.code);
       return reply.code(error.statusCode).send({
         error: { code: error.code, message: error.message },
       });
@@ -114,10 +159,12 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
       "validation" in error &&
       error.validation !== undefined
     ) {
+      setRequestErrorCode(request, "VALIDATION_ERROR");
       return reply.code(400).send({
         error: { code: "VALIDATION_ERROR", message: "Request validation failed" },
       });
     }
+    setRequestErrorCode(request, "INTERNAL_ERROR");
     return reply.code(500).send({
       error: { code: "INTERNAL_ERROR", message: "The request failed safely" },
     });

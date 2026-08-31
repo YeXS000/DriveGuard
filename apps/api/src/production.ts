@@ -16,6 +16,9 @@ import {
 import type { ExecutionEventSink } from "@driveguard/executor";
 import type { UserId } from "@driveguard/domain";
 import type { Phase9RuntimeBindings } from "@driveguard/persistence";
+import type { DriveGuardObservability } from "@driveguard/observability";
+import type { ActionLifecycleEventSink } from "@driveguard/action-lifecycle";
+import type { RuntimeEventSink } from "@driveguard/agent-runtime";
 
 import { ApiError } from "./errors.js";
 import type { Phase10RuntimeFactory, Phase10RuntimeFactoryInput } from "./service.js";
@@ -84,15 +87,51 @@ function selection(provider: string, prompt: string | undefined): RuntimeSelecti
 function combinedExecutionSink(
   durable: ExecutionEventSink,
   additional: ExecutionEventSink | undefined,
+  observability: ExecutionEventSink | undefined,
 ): ExecutionEventSink {
-  if (additional === undefined) return durable;
   return {
     async emit(event): Promise<void> {
       await durable.emit(event);
+      for (const observer of [additional, observability]) {
+        try {
+          await observer?.emit(event);
+        } catch {
+          // UI and observability delivery are best effort after durable safety audit commits.
+        }
+      }
+    },
+  };
+}
+
+function combinedRuntimeSink(
+  primary: RuntimeEventSink | undefined,
+  observability: RuntimeEventSink | undefined,
+): RuntimeEventSink | undefined {
+  if (primary === undefined && observability === undefined) return undefined;
+  return {
+    async emit(event): Promise<void> {
+      await primary?.emit(event);
       try {
-        await additional.emit(event);
+        await observability?.emit(event);
       } catch {
-        // Streaming/UI delivery is best effort after the durable safety event commits.
+        // Observability must not change Runtime settlement.
+      }
+    },
+  };
+}
+
+function combinedActionSink(
+  primary: ActionLifecycleEventSink | undefined,
+  observability: ActionLifecycleEventSink | undefined,
+): ActionLifecycleEventSink | undefined {
+  if (primary === undefined && observability === undefined) return undefined;
+  return {
+    async emit(event): Promise<void> {
+      await primary?.emit(event);
+      try {
+        await observability?.emit(event);
+      } catch {
+        // Observability must not change confirmation state transitions.
       }
     },
   };
@@ -103,17 +142,20 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
   readonly #simulatorBaseUrl: string;
   readonly #provider: string;
   readonly #trustedSimulatorOrigins: readonly string[];
+  readonly #observability: DriveGuardObservability | undefined;
 
   constructor(options: {
     readonly bindings: Phase9RuntimeBindings;
     readonly simulatorBaseUrl: string;
     readonly provider: string;
     readonly trustedSimulatorOrigins?: readonly string[];
+    readonly observability?: DriveGuardObservability;
   }) {
     this.#bindings = options.bindings;
     this.#simulatorBaseUrl = options.simulatorBaseUrl;
     this.#provider = options.provider;
     this.#trustedSimulatorOrigins = Object.freeze([...(options.trustedSimulatorOrigins ?? [])]);
+    this.#observability = options.observability;
   }
 
   create(input: Phase10RuntimeFactoryInput) {
@@ -121,6 +163,15 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
     const executionEventSink = combinedExecutionSink(
       this.#bindings.executionEventSink,
       input.executionEventSink,
+      this.#observability?.executionEventSink,
+    );
+    const runtimeEventSink = combinedRuntimeSink(
+      input.runtimeEventSink,
+      this.#observability?.runtimeEventSink,
+    );
+    const actionLifecycleEventSink = combinedActionSink(
+      input.actionLifecycleEventSink,
+      this.#observability?.actionLifecycleEventSink,
     );
     const mode = parsePhase5RuntimeMode(process.env.PHASE_5_RUNTIME_MODE);
     return createPhase9ProductionDriveGuardRuntime(
@@ -136,19 +187,24 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
           mode === "development" && process.env.PHASE_5_DEVELOPMENT_OPT_IN === "NON_PRODUCTION",
         developmentTrustedSimulatorOrigins: this.#trustedSimulatorOrigins,
         sensitiveValues: selected.sensitiveValues,
-        ...(input.actionLifecycleEventSink === undefined
-          ? {}
-          : { actionLifecycleEventSink: input.actionLifecycleEventSink }),
+        ...(actionLifecycleEventSink === undefined ? {} : { actionLifecycleEventSink }),
         runtimeOverrides:
-          input.runtimeEventSink === undefined && input.assistantTextDeltaSink === undefined
+          runtimeEventSink === undefined &&
+          input.assistantTextDeltaSink === undefined &&
+          this.#observability === undefined
             ? {}
             : {
-                ...(input.runtimeEventSink === undefined
-                  ? {}
-                  : { eventSink: input.runtimeEventSink }),
+                ...(runtimeEventSink === undefined ? {} : { eventSink: runtimeEventSink }),
                 ...(input.assistantTextDeltaSink === undefined
                   ? {}
                   : { assistantTextDeltaSink: input.assistantTextDeltaSink }),
+                ...(this.#observability === undefined
+                  ? {}
+                  : {
+                      modelUsageSink: (
+                        usage: Parameters<DriveGuardObservability["observeModelUsage"]>[0],
+                      ) => this.#observability?.observeModelUsage(usage),
+                    }),
               },
       },
       { ...this.#bindings, executionEventSink },

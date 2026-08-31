@@ -1,0 +1,241 @@
+{
+  "annotations": { "list": [] },
+  "editable": false,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "type": "row",
+      "title": "Agent",
+      "id": 1,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "API request rate",
+      "id": 2,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(driveguard_http_requests_total[$__rate_interval]))",
+          "legendFormat": "requests/s",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "API latency P95",
+      "id": 3,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(driveguard_http_request_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "P95",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Agent success / failure",
+      "id": 4,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(driveguard_agent_runs_total[$__rate_interval]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Agent latency P50 / P95 / P99",
+      "id": 5,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(driveguard_agent_run_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(driveguard_agent_run_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(driveguard_agent_run_duration_seconds_bucket[$__rate_interval])))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Tool calls / errors",
+      "id": 6,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (tool_name, status) (rate(driveguard_tool_calls_total[$__rate_interval]))",
+          "legendFormat": "{{tool_name}} {{status}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "LLM token usage",
+      "id": 7,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (direction) (rate(driveguard_llm_tokens_total[$__rate_interval]))",
+          "legendFormat": "{{direction}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 8 }
+    },
+    {
+      "type": "row",
+      "title": "Safety",
+      "id": 8,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Policy decision distribution",
+      "id": 9,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (decision) (rate(driveguard_policy_decisions_total[$__rate_interval]))",
+          "legendFormat": "{{decision}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Confirmation count",
+      "id": 10,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (event) (increase(driveguard_confirmations_total[1h]))",
+          "legendFormat": "{{event}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 }
+    },
+    {
+      "type": "row",
+      "title": "Reliability",
+      "id": 11,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Execution success / failure",
+      "id": 12,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(driveguard_executions_total[$__rate_interval]))",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 24 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Retry count",
+      "id": 13,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "sum by (tool_name, error_code) (rate(driveguard_retries_total[$__rate_interval]))",
+          "legendFormat": "{{tool_name}} {{error_code}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 24 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Circuit breaker state",
+      "id": 14,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        { "expr": "driveguard_circuit_state", "legendFormat": "{{tool_name}}", "refId": "A" }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 24 }
+    },
+    {
+      "type": "row",
+      "title": "Infrastructure",
+      "id": 15,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 31 }
+    },
+    {
+      "type": "timeseries",
+      "title": "API CPU",
+      "id": 16,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "rate(driveguard_process_process_cpu_user_seconds_total[$__rate_interval]) + rate(driveguard_process_process_cpu_system_seconds_total[$__rate_interval])",
+          "legendFormat": "CPU",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 32 }
+    },
+    {
+      "type": "timeseries",
+      "title": "API resident memory",
+      "id": 17,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        {
+          "expr": "driveguard_process_process_resident_memory_bytes",
+          "legendFormat": "RSS",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 32 }
+    },
+    {
+      "type": "timeseries",
+      "title": "PostgreSQL / Redis / NATS readiness",
+      "id": 18,
+      "datasource": { "type": "prometheus", "uid": "driveguard-prometheus" },
+      "targets": [
+        { "expr": "driveguard_dependency_up", "legendFormat": "{{dependency}}", "refId": "A" }
+      ],
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 32 }
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 41,
+  "tags": ["driveguard", "phase11", "observability"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30m", "to": "now" },
+  "timezone": "browser",
+  "title": "DriveGuard Observability",
+  "uid": "driveguard-observability",
+  "version": 1
+}
