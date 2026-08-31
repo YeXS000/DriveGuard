@@ -34,6 +34,13 @@ async function coordinationWithin<T>(
 export interface ExecutionRepository {
   get(executionId: string): Promise<ExecutionRecord | undefined>;
   getResult(executionId: string): Promise<ExecutionResult | undefined>;
+  getEnvelope(executionId: string): Promise<ExecutionEnvelope | undefined>;
+}
+
+export interface ExecutionEnvelope {
+  readonly request: ExecutionRequest;
+  readonly record: ExecutionRecord;
+  readonly result: ExecutionResult | null;
 }
 
 export interface IdempotencyRecord {
@@ -53,22 +60,28 @@ export interface IdempotencyRepository {
 export class InMemoryExecutionRepository implements ExecutionRepository {
   readonly #records = new Map<
     string,
-    { readonly record: ExecutionRecord; readonly result?: ExecutionResult }
+    {
+      readonly record: ExecutionRecord;
+      readonly result?: ExecutionResult;
+      readonly request?: ExecutionRequest;
+    }
   >();
 
   constructor(
     values: readonly {
       readonly record: ExecutionRecord;
       readonly result?: ExecutionResult;
+      readonly request?: ExecutionRequest;
     }[] = [],
   ) {
-    for (const value of values) this.set(value.record, value.result);
+    for (const value of values) this.set(value.record, value.result, value.request);
   }
 
-  set(record: ExecutionRecord, result?: ExecutionResult): void {
+  set(record: ExecutionRecord, result?: ExecutionResult, request?: ExecutionRequest): void {
     this.#records.set(record.executionId, {
       record: structuredClone(record),
       ...(result === undefined ? {} : { result: structuredClone(result) }),
+      ...(request === undefined ? {} : { request: structuredClone(request) }),
     });
   }
 
@@ -82,6 +95,17 @@ export class InMemoryExecutionRepository implements ExecutionRepository {
     await Promise.resolve();
     const result = this.#records.get(executionId)?.result;
     return result === undefined ? undefined : Object.freeze(structuredClone(result));
+  }
+
+  async getEnvelope(executionId: string): Promise<ExecutionEnvelope | undefined> {
+    await Promise.resolve();
+    const value = this.#records.get(executionId);
+    if (value?.request === undefined) return undefined;
+    return Object.freeze({
+      request: Object.freeze(structuredClone(value.request)),
+      record: Object.freeze(structuredClone(value.record)),
+      result: value.result === undefined ? null : Object.freeze(structuredClone(value.result)),
+    });
   }
 }
 
@@ -116,6 +140,11 @@ interface IdempotencyRow extends QueryResultRow {
 interface ExecutionRow extends QueryResultRow {
   record: ExecutionRecord;
   result: ExecutionResult | null;
+}
+
+interface ExecutionEnvelopeRow extends ExecutionRow {
+  request: ExecutionRequest;
+  attempts: ExecutionRecord["attempts"];
 }
 
 interface AttemptRow extends QueryResultRow {
@@ -258,6 +287,34 @@ export class PostgresExecutionRepository implements ExecutionRepository {
     );
     const value = result.rows[0]?.result;
     return value == null ? undefined : Object.freeze(structuredClone(value));
+  }
+
+  async getEnvelope(executionId: string): Promise<ExecutionEnvelope | undefined> {
+    const result = await this.#pool.query<ExecutionEnvelopeRow>(
+      `select e.request,e.record,e.result,
+              coalesce(
+                jsonb_agg(a.attempt_record order by a.attempt)
+                  filter (where a.completed_at is not null),
+                '[]'::jsonb
+              ) as attempts
+       from execution_records e
+       left join execution_attempts a on a.execution_id=e.execution_id
+       where e.execution_id=$1
+       group by e.execution_id`,
+      [executionId],
+    );
+    const row = result.rows[0];
+    if (row === undefined) return undefined;
+    return Object.freeze({
+      request: Object.freeze(structuredClone(row.request)),
+      record: Object.freeze({
+        ...structuredClone(row.record),
+        attempts: Object.freeze(
+          row.attempts.map((attempt) => Object.freeze(structuredClone(attempt))),
+        ),
+      }),
+      result: row.result == null ? null : Object.freeze(structuredClone(row.result)),
+    });
   }
 }
 

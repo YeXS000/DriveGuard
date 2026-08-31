@@ -35,6 +35,7 @@ export interface Phase9RuntimeBindings {
   readonly executionEventSink: PostgresExecutionAttemptEventSink;
   readonly conversationMemory: RepositoryConversationMemory;
   readonly sessionCoordinator: FallbackSessionCoordinator;
+  readonly sessionRepository: PostgresSessionRepository;
   close(): Promise<void>;
 }
 
@@ -57,6 +58,7 @@ export function createPhase9RuntimeBindings(options: {
   const durableSession = new PostgresSessionCoordinator(database.db, sessionLeaseMs);
   const redisSession = new RedisSessionCoordinator(options.redis, sessionLeaseMs);
   const redisIdempotency = new RedisIdempotencyCoordinator(options.redis, executionLeaseMs);
+  const sessionRepository = new PostgresSessionRepository(database.db);
   const bindings: Phase9RuntimeBindings = {
     database,
     pendingActionRepository: new PostgresPendingActionRepository(database.pool),
@@ -81,6 +83,7 @@ export function createPhase9RuntimeBindings(options: {
       cacheOperationTimeoutMs: Math.max(1, Math.min(1_000, Math.floor(conversationCacheTtlMs / 4))),
     }),
     sessionCoordinator: new FallbackSessionCoordinator(redisSession, durableSession),
+    sessionRepository,
     close: () => database.close(),
   };
   return Object.freeze(bindings);

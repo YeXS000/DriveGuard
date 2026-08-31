@@ -86,6 +86,12 @@ export interface DriveGuardRuntimeOptions {
   readonly reliableExecutor: ReliableToolExecutor;
   readonly conversationMemory?: ConversationMemory;
   readonly sessionCoordinator?: SessionCoordinator;
+  readonly assistantTextDeltaSink?: (event: {
+    readonly delta: string;
+    readonly runId: string;
+    readonly sessionId: string;
+    readonly traceId: string;
+  }) => void | Promise<void>;
 }
 
 export interface AgentRunRequest {
@@ -185,6 +191,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   readonly #reliableExecutor: ReliableToolExecutor;
   readonly #conversationMemory: ConversationMemory | undefined;
   readonly #sessionCoordinator: SessionCoordinator | undefined;
+  readonly #assistantTextDeltaSink: DriveGuardRuntimeOptions["assistantTextDeltaSink"];
   readonly confirmationService: ConfirmationService;
   readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   readonly #cancelledRunIds = new Set<string>();
@@ -222,6 +229,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     this.#reliableExecutor = options.reliableExecutor;
     this.#conversationMemory = options.conversationMemory;
     this.#sessionCoordinator = options.sessionCoordinator;
+    this.#assistantTextDeltaSink = options.assistantTextDeltaSink;
     this.confirmationService = options.confirmationService;
     this.trustedConfirmationChallengeChannel = options.trustedConfirmationChallengeChannel;
     this.#sessions = new AgentSessionStore(async (sessionId, identity) => {
@@ -815,6 +823,21 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           await emit(event);
           this.#throwIfSinkFailed(sinkFailed);
         },
+        ...(this.#assistantTextDeltaSink === undefined
+          ? {}
+          : {
+              assistantTextDelta: async (value: string) => {
+                const delta = sanitizeRuntimeText(value, this.#sensitiveValues);
+                if (delta.length > 0) {
+                  await this.#assistantTextDeltaSink?.({
+                    delta,
+                    runId: run.runId,
+                    sessionId: run.sessionId,
+                    traceId: run.traceId,
+                  });
+                }
+              },
+            }),
       });
       const unsubscribe = session.subscribe(piEvents.observe);
       try {

@@ -52,6 +52,9 @@
     "test:phase9": "vitest run tests/unit/phase9-*.test.ts tests/contract/phase9-*.test.ts tests/integration/phase9-*.test.ts",
     "test:phase9:coverage": "npm run test:phase9 -- --coverage --coverage.include=packages/persistence/src/**/*.ts --coverage.include=packages/memory/src/**/*.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html --coverage.thresholds.lines=90 --coverage.thresholds.branches=90",
     "test:phase9:packages": "npm run build --silent && node tests/contract/phase9-package-exports.mjs",
+    "test:phase10": "vitest run tests/unit/health.test.ts tests/unit/phase10-*.test.ts tests/contract/phase10-*.test.ts tests/integration/phase10-*.test.ts",
+    "test:phase10:coverage": "npm run test:phase10 -- --coverage --coverage.include=apps/api/src/app.ts --coverage.include=apps/api/src/errors.ts --coverage.include=apps/api/src/events.ts --coverage.include=apps/api/src/routes.ts --coverage.include=apps/api/src/service.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html --coverage.thresholds.lines=90 --coverage.thresholds.branches=90",
+    "test:phase10:docker": "node tests/smoke/phase10-docker-smoke.mjs",
     "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
   },
   "dependencies": {

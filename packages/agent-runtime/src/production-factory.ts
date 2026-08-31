@@ -72,7 +72,7 @@ export interface CreateProductionRuntimeOptions {
   readonly latestContextVersionProvider?: (snapshotVersion: number) => unknown;
   readonly runtimeOverrides?: Pick<
     DriveGuardRuntimeOptions,
-    "runIdFactory" | "traceIdFactory" | "eventIdFactory" | "eventSink"
+    "runIdFactory" | "traceIdFactory" | "eventIdFactory" | "eventSink" | "assistantTextDeltaSink"
   >;
   readonly actionLifecycleEventSink?: ActionLifecycleEventSink;
   readonly executionEventSink?: ExecutionEventSink;
@@ -81,6 +81,8 @@ export interface CreateProductionRuntimeOptions {
   readonly durableExecutionCoordinator?: DurableExecutionCoordinator;
   readonly conversationMemory?: ConversationMemory;
   readonly sessionCoordinator?: SessionCoordinator;
+  /** Exact non-production Simulator origins permitted in addition to loopback. */
+  readonly developmentTrustedSimulatorOrigins?: readonly string[];
 }
 
 export interface Phase9DurableRuntimeBindings {
@@ -210,7 +212,11 @@ export function createProductionDriveGuardRuntime(
       throw new AgentRuntimeError("CONFIGURATION_ERROR", "Simulator base URL is invalid");
     }
     const loopbackHosts = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
-    if (!loopbackHosts.has(simulatorOrigin.hostname.toLowerCase())) {
+    const trustedOrigins = new Set(options.developmentTrustedSimulatorOrigins ?? []);
+    if (
+      !loopbackHosts.has(simulatorOrigin.hostname.toLowerCase()) &&
+      !trustedOrigins.has(simulatorOrigin.origin)
+    ) {
       throw new AgentRuntimeError(
         "CONFIGURATION_ERROR",
         "Development side-effect execution requires a loopback Simulator origin",
