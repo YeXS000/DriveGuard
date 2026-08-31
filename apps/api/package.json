@@ -9,6 +9,7 @@
     "@driveguard/domain": "0.0.0",
     "@driveguard/executor": "0.0.0",
     "@driveguard/memory": "0.0.0",
+    "@driveguard/observability": "0.0.0",
     "@driveguard/persistence": "0.0.0",
     "@earendil-works/pi-ai": "0.84.3",
     "@nats-io/jetstream": "3.4.0",

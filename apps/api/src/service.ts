@@ -182,6 +182,7 @@ export class DriveGuardApiService {
     readonly prompt: string;
     readonly identity: DevelopmentIdentity;
     readonly emit?: PublicEventEmitter;
+    readonly traceId?: string;
   }): Promise<ApiMessageResult> {
     await this.getSession(input.sessionId, input.identity);
     if (this.#active.has(input.sessionId)) {
@@ -206,7 +207,11 @@ export class DriveGuardApiService {
     });
     this.#active.set(input.sessionId, runtime);
     try {
-      const result = await runtime.run({ sessionId: input.sessionId, prompt: input.prompt });
+      const result = await runtime.run({
+        sessionId: input.sessionId,
+        prompt: input.prompt,
+        ...(input.traceId === undefined ? {} : { traceId: input.traceId }),
+      });
       const actions: ApiConfirmationView[] = [];
       for (const required of result.confirmationRequired) {
         const action = await runtime.confirmationService.get(required.actionId);

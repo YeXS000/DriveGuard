@@ -698,6 +698,7 @@ export class ReliableToolExecutor {
       runId: request.runId,
       sessionId: request.sessionId,
       traceId: request.traceId,
+      ...(request.actionId === undefined ? {} : { actionId: request.actionId }),
       toolName: request.toolName,
       attempt,
       timestamp: toUtcTimestamp(this.#clock.nowMs()),

@@ -11,6 +11,15 @@ export interface PiEventAdapterOptions {
   readonly emit: (event: RuntimeEvent) => void | Promise<void>;
   readonly boundary?: "PRE_POLICY" | "POLICY_GUARDED";
   readonly assistantTextDelta?: (delta: string) => void | Promise<void>;
+  readonly modelUsage?: (usage: ModelUsageEvent) => void | Promise<void>;
+}
+
+export interface ModelUsageEvent {
+  readonly modelName: string;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly cost: number;
+  readonly isError: boolean;
 }
 
 export class PiEventAdapter {
@@ -20,6 +29,7 @@ export class PiEventAdapter {
   readonly #emit: (event: RuntimeEvent) => void | Promise<void>;
   readonly #boundary: "PRE_POLICY" | "POLICY_GUARDED";
   readonly #assistantTextDelta: ((delta: string) => void | Promise<void>) | undefined;
+  readonly #modelUsage: ((usage: ModelUsageEvent) => void | Promise<void>) | undefined;
   readonly #toolCallIds = new Map<string, string>();
   readonly #activeToolCalls = new Map<string, string>();
   readonly #completedToolCalls = new Set<string>();
@@ -33,6 +43,7 @@ export class PiEventAdapter {
     this.#emit = options.emit;
     this.#boundary = options.boundary ?? "PRE_POLICY";
     this.#assistantTextDelta = options.assistantTextDelta;
+    this.#modelUsage = options.modelUsage;
   }
 
   get toolErrorCount(): number {
@@ -139,6 +150,15 @@ export class PiEventAdapter {
         return;
       }
       case "turn_end":
+        if (event.message.role === "assistant") {
+          await this.#modelUsage?.({
+            modelName: event.message.model,
+            inputTokens: event.message.usage.input,
+            outputTokens: event.message.usage.output,
+            cost: event.message.usage.cost.total,
+            isError: event.message.stopReason === "error",
+          });
+        }
         if (event.toolResults.length > 0 && this.#run.status !== "TOOL_PROCESSING") {
           throw new AgentRuntimeError(
             "INTERNAL_ERROR",

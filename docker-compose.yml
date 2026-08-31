@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   api:
-    image: driveguard-api:phase10
+    image: driveguard-api:phase11
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
@@ -99,7 +99,7 @@ services:
     restart: unless-stopped
 
   persistence-migrate:
-    image: driveguard-api:phase10
+    image: driveguard-api:phase11
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
@@ -166,7 +166,53 @@ services:
       start_period: 3s
     restart: unless-stopped
 
+  prometheus:
+    image: prom/prometheus:v3.13.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:9090/-/ready"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 5s
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.2.0
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:-3003}:3000"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health | grep -q 'ok'"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+      start_period: 10s
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:
   nats-data:
+  prometheus-data:
+  grafana-data:

@@ -22,6 +22,7 @@ export interface ExecutionEvent {
   readonly runId: string;
   readonly sessionId: string;
   readonly traceId: string;
+  readonly actionId?: string;
   readonly toolName: string;
   readonly attempt: number;
   readonly timestamp: UtcTimestamp;

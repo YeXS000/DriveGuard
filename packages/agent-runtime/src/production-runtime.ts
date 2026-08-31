@@ -92,6 +92,16 @@ export interface DriveGuardRuntimeOptions {
     readonly sessionId: string;
     readonly traceId: string;
   }) => void | Promise<void>;
+  readonly modelUsageSink?: (event: {
+    readonly runId: string;
+    readonly sessionId: string;
+    readonly traceId: string;
+    readonly modelName: string;
+    readonly inputTokens: number;
+    readonly outputTokens: number;
+    readonly cost: number;
+    readonly isError: boolean;
+  }) => void | Promise<void>;
 }
 
 export interface AgentRunRequest {
@@ -192,6 +202,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   readonly #conversationMemory: ConversationMemory | undefined;
   readonly #sessionCoordinator: SessionCoordinator | undefined;
   readonly #assistantTextDeltaSink: DriveGuardRuntimeOptions["assistantTextDeltaSink"];
+  readonly #modelUsageSink: DriveGuardRuntimeOptions["modelUsageSink"];
   readonly confirmationService: ConfirmationService;
   readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   readonly #cancelledRunIds = new Set<string>();
@@ -230,6 +241,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     this.#conversationMemory = options.conversationMemory;
     this.#sessionCoordinator = options.sessionCoordinator;
     this.#assistantTextDeltaSink = options.assistantTextDeltaSink;
+    this.#modelUsageSink = options.modelUsageSink;
     this.confirmationService = options.confirmationService;
     this.trustedConfirmationChallengeChannel = options.trustedConfirmationChallengeChannel;
     this.#sessions = new AgentSessionStore(async (sessionId, identity) => {
@@ -674,6 +686,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
               toolName: policyDecision.toolName,
               decision: policyDecision.decision,
               ruleId: policyDecision.ruleId,
+              reasonCode: policyDecision.reasonCode,
               ...(policyDecision.contextVersion === null
                 ? {}
                 : { contextVersion: policyDecision.contextVersion }),
@@ -836,6 +849,18 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
                     traceId: run.traceId,
                   });
                 }
+              },
+            }),
+        ...(this.#modelUsageSink === undefined
+          ? {}
+          : {
+              modelUsage: async (usage) => {
+                await this.#modelUsageSink?.({
+                  ...usage,
+                  runId: run.runId,
+                  sessionId: run.sessionId,
+                  traceId: run.traceId,
+                });
               },
             }),
       });

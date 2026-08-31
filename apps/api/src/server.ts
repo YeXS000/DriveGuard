@@ -2,6 +2,7 @@ import { buildApi } from "./app.js";
 import { createInfrastructureProbes, readInfrastructureConfig } from "./dependencies.js";
 import { createClient } from "redis";
 import { createPhase9RuntimeBindings } from "@driveguard/persistence";
+import { DriveGuardObservability } from "@driveguard/observability";
 
 import { ProductionPhase10RuntimeFactory } from "./production.js";
 import { DriveGuardApiService } from "./service.js";
@@ -17,6 +18,16 @@ function readApiPort(environment: NodeJS.ProcessEnv = process.env): number {
 }
 
 async function main(): Promise<void> {
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const observability = new DriveGuardObservability({
+    service: "driveguard-api",
+    logLevel: process.env.LOG_LEVEL ?? "info",
+    sensitiveValues: apiKey === undefined || apiKey.length === 0 ? [] : [apiKey],
+    ...(process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT === undefined
+      ? {}
+      : { otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT }),
+    registerGlobalTracing: true,
+  });
   const config = readInfrastructureConfig();
   const redis = createClient({ url: config.redisUrl });
   redis.on("error", () => undefined);
@@ -31,6 +42,7 @@ async function main(): Promise<void> {
       .split(",")
       .map((value) => value.trim())
       .filter((value) => value.length > 0),
+    observability,
   });
   const service = new DriveGuardApiService({
     sessions: bindings.sessionRepository,
@@ -42,10 +54,12 @@ async function main(): Promise<void> {
   const app = buildApi({
     dependencies,
     service,
-    logger: true,
+    logger: false,
+    observability,
     onClose: async () => {
       await bindings.close();
       if (redis.isOpen) await redis.quit();
+      await observability.shutdown();
     },
   });
   let closing = false;

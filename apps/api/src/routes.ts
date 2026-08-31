@@ -11,6 +11,7 @@ import {
   DriveGuardApiService,
   type DevelopmentIdentity,
 } from "./service.js";
+import { requestTraceId } from "./request-observability.js";
 
 const safeId = Type.String({
   minLength: 1,
@@ -111,10 +112,12 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
       },
     },
     async (request) => {
+      const traceId = requestTraceId(request);
       const result = await service.sendMessage({
         sessionId: request.params.sessionId,
         prompt: request.body.prompt,
         identity: identity(request),
+        ...(traceId === undefined ? {} : { traceId }),
       });
       const failure = service.failureFor(result);
       if (failure !== undefined) throw failure;
@@ -134,6 +137,7 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
     async (request, reply) => {
       const requestIdentity = identity(request);
       const sessionId = request.params.sessionId;
+      const traceId = requestTraceId(request);
       let settled = false;
       let closed = false;
       const onClose = (): void => {
@@ -155,6 +159,7 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
           sessionId,
           prompt: request.body.prompt,
           identity: requestIdentity,
+          ...(traceId === undefined ? {} : { traceId }),
           emit: (event) => {
             if (!closed) writeSse(reply.raw, event);
           },
@@ -167,7 +172,7 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
             publicEvent({
               eventType: "run.failed",
               runId: `run:${randomUUID()}`,
-              traceId: `trace:${randomUUID()}`,
+              traceId: traceId ?? `trace:${randomUUID()}`,
               timestamp: toUtcTimestamp(Date.now()),
               data: { code },
             }),
