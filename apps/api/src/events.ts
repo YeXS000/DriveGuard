@@ -12,6 +12,11 @@ export const PUBLIC_EVENT_TYPES = [
   "tool.completed",
   "assistant.completed",
   "run.failed",
+  "urgent.received",
+  "urgent.action_required",
+  "urgent.confirmation_required",
+  "urgent.resolved",
+  "urgent.failed",
 ] as const;
 
 export type PublicEventType = (typeof PUBLIC_EVENT_TYPES)[number];

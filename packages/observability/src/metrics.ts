@@ -10,6 +10,7 @@ import {
 import type { ActionLifecycleEvent } from "@driveguard/action-lifecycle";
 import type { RuntimeEvent } from "@driveguard/agent-runtime";
 import type { ExecutionEvent } from "@driveguard/executor";
+import type { UrgentEventObservation } from "@driveguard/urgent-events";
 
 const DURATION_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
 const TERMINAL_EXECUTION_EVENTS = new Set([
@@ -78,11 +79,15 @@ export class DriveGuardMetrics {
   readonly #llmCost: Counter<"model">;
   readonly #contextConflicts: Counter<"decision">;
   readonly #dependencyUp: Gauge<"dependency">;
+  readonly #urgentEvents: Counter<"event_type" | "severity" | "status">;
+  readonly #urgentDuration: Histogram<"event_type" | "severity" | "status">;
+  readonly #urgentDuplicates: Counter<"event_type" | "severity">;
   readonly #agentStarted = new Map<string, number>();
   readonly #toolStarted = new Map<string, number>();
   readonly #policyStarted = new Map<string, number>();
   readonly #executionStarted = new Map<string, number>();
   readonly #pendingActions = new Set<string>();
+  readonly #urgentStarted = new Map<string, number>();
 
   constructor(options: { readonly collectProcessMetrics?: boolean } = {}) {
     this.registry = new Registry(prometheusContentType);
@@ -203,6 +208,25 @@ export class DriveGuardMetrics {
       name: "driveguard_dependency_up",
       help: "Latest non-authoritative readiness observation for a bounded dependency.",
       labelNames: ["dependency"] as const,
+      registers,
+    });
+    this.#urgentEvents = new Counter({
+      name: "driveguard_urgent_events_total",
+      help: "Total urgent-event lifecycle outcomes by bounded event type, severity, and status.",
+      labelNames: ["event_type", "severity", "status"] as const,
+      registers,
+    });
+    this.#urgentDuration = new Histogram({
+      name: "driveguard_urgent_event_processing_duration_seconds",
+      help: "Urgent-event processing duration in seconds.",
+      labelNames: ["event_type", "severity", "status"] as const,
+      buckets: DURATION_BUCKETS,
+      registers,
+    });
+    this.#urgentDuplicates = new Counter({
+      name: "driveguard_urgent_event_duplicates_total",
+      help: "Total durable duplicate urgent events.",
+      labelNames: ["event_type", "severity"] as const,
       registers,
     });
     for (const status of ["succeeded", "failed", "cancelled"]) {
@@ -348,6 +372,45 @@ export class DriveGuardMetrics {
         secondsBetween(this.#executionStarted.get(event.executionId) ?? at, at),
       );
       this.#executionStarted.delete(event.executionId);
+    }
+  }
+
+  observeUrgent(event: UrgentEventObservation): void {
+    const at = epochMs(event.timestamp);
+    if (event.observationType === "urgent.event.received") {
+      this.#urgentStarted.set(event.eventId, at);
+      this.#urgentEvents.inc({
+        event_type: event.eventType,
+        severity: event.severity,
+        status: event.status,
+      });
+      return;
+    }
+    if (event.observationType === "urgent.event.duplicate") {
+      this.#urgentDuplicates.inc({ event_type: event.eventType, severity: event.severity });
+      this.#urgentEvents.inc({
+        event_type: event.eventType,
+        severity: event.severity,
+        status: event.status,
+      });
+      return;
+    }
+    if (
+      event.observationType === "urgent.event.processed" ||
+      event.observationType === "urgent.event.rejected" ||
+      event.observationType === "urgent.event.failed"
+    ) {
+      const labels = {
+        event_type: event.eventType,
+        severity: event.severity,
+        status: event.status,
+      };
+      this.#urgentEvents.inc(labels);
+      this.#urgentDuration.observe(
+        labels,
+        secondsBetween(this.#urgentStarted.get(event.eventId) ?? at, at),
+      );
+      this.#urgentStarted.delete(event.eventId);
     }
   }
 

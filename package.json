@@ -14,7 +14,7 @@
     "services/*"
   ],
   "scripts": {
-    "build": "tsc --project tsconfig.build.json && tsc --project packages/shared/tsconfig.json && tsc --project packages/domain/tsconfig.json && tsc --project packages/context/tsconfig.json && tsc --project packages/capabilities/tsconfig.json && tsc --project packages/tools/tsconfig.json && tsc --project packages/policy/tsconfig.json && tsc --project packages/action-lifecycle/tsconfig.json && tsc --project packages/executor/tsconfig.json && tsc --project packages/memory/tsconfig.json && tsc --project packages/persistence/tsconfig.json && tsc --project packages/agent-runtime/tsconfig.json && tsc --project packages/observability/tsconfig.json && tsc --project services/vehicle-simulator/tsconfig.json",
+    "build": "tsc --project tsconfig.build.json && tsc --project packages/shared/tsconfig.json && tsc --project packages/domain/tsconfig.json && tsc --project packages/context/tsconfig.json && tsc --project packages/capabilities/tsconfig.json && tsc --project packages/tools/tsconfig.json && tsc --project packages/policy/tsconfig.json && tsc --project packages/action-lifecycle/tsconfig.json && tsc --project packages/executor/tsconfig.json && tsc --project packages/memory/tsconfig.json && tsc --project packages/agent-runtime/tsconfig.json && tsc --project packages/urgent-events/tsconfig.json && tsc --project packages/persistence/tsconfig.json && tsc --project packages/observability/tsconfig.json && tsc --project services/vehicle-simulator/tsconfig.json",
     "db:migrate": "npm run build --silent && node dist/packages/persistence/src/migrate-cli.js",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
@@ -58,7 +58,9 @@
     "test:phase11": "vitest run tests/unit/phase11-*.test.ts tests/contract/phase11-*.test.ts tests/integration/phase11-*.test.ts",
     "test:phase11:coverage": "npm run test:phase11 -- --coverage --coverage.include=packages/observability/src/**/*.ts --coverage.exclude=packages/observability/src/index.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html --coverage.thresholds.lines=90 --coverage.thresholds.branches=70",
     "test:phase11:docker": "node tests/smoke/phase11-docker-smoke.mjs",
-    "test:phase11:docker": "node tests/smoke/phase11-docker-smoke.mjs",
+    "test:phase12": "vitest run tests/unit/phase12-*.test.ts tests/contract/phase12-*.test.ts tests/integration/phase12-*.test.ts",
+    "test:phase12:coverage": "npm run test:phase12 -- --coverage --coverage.include=packages/urgent-events/src/**/*.ts --coverage.include=packages/persistence/src/urgent-event.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html",
+    "test:phase12:docker": "node tests/smoke/phase12-docker-smoke.mjs",
     "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
   },
   "dependencies": {

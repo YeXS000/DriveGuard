@@ -1268,3 +1268,85 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
   storage and collector deployment remain operator configuration, not a claimed Phase 11 service.
 - No new large performance/safety matrix, urgent-event handling, NATS business workflow, evaluation
   harness, or Phase 12 implementation was added. The Stage Gate passed; `main` was not merged.
+
+## Phase 12 — Urgent Event Handling
+
+- Status: COMPLETE.
+- Scope: validated urgent-event ingestion, NATS JetStream delivery, PostgreSQL deduplication and
+  processing leases, deterministic classification/planning, current Context refresh, existing
+  Policy/Confirmation/Executor integration, safe API/HMI notification, and Phase 11 observability.
+- Gate result: **PASS**.
+- Verification date: 2026-08-31 (Asia/Shanghai).
+
+### Implemented modules
+
+- `packages/urgent-events`: closed immutable event model, deterministic classifier/planner, formal
+  safe dispatcher, durable processor, notification hub, observations, and JetStream publisher/
+  durable consumer with ACK/NAK/redelivery/DLQ semantics.
+- `packages/persistence`: `urgent_events` migration/schema/repository, event fingerprint equality
+  binding, atomic processing ownership, expiry recovery, safe result metadata, and runtime-role
+  grants.
+- `apps/api` and `apps/hmi`: production consumer composition, identity-filtered history/SSE routes,
+  safe urgent projections, existing PendingAction confirmation reuse, and urgent status UI.
+- `packages/observability`: urgent structured events, three bounded Prometheus metric families, and
+  NATS/process/Context/Policy/Executor-or-confirmation trace correlation.
+- `docker-compose.yml` and `tests/smoke/phase12-docker-smoke.mjs`: Phase 12 API wiring and repeatable
+  real NATS/PostgreSQL/Redis/API/Simulator/Prometheus/Grafana/HMI smoke with restart recovery.
+- `docs/adr/0013-phase-12-urgent-event-handling.md`: event, priority, delivery, deduplication,
+  Context, safety, notification, observability, and Phase 12/13 boundary decisions.
+
+### Current measured verification
+
+| Check                             | Current result                                                                                                                     |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Dedicated Phase 12 tests          | 92 / 92 PASS across 6 files                                                                                                        |
+| Event model/classification        | 45 / 45 PASS, including schema, closed payloads, thresholds, immutability, and canonical fingerprint equality                      |
+| NATS ACK/redelivery/DLQ semantics | 9 / 9 focused PASS; real invalid publication reached `driveguard.urgent.dlq`                                                       |
+| Durable processor/deduplication   | 13 / 13 PASS; exact duplicate, concurrent duplicate, active lease, restart, and ID-content collision boundaries                    |
+| Formal safety integration         | 11 / 11 PASS; R0 Executor, R2 confirmation, current-Context conflict, failed-execution recovery, Context outage, and five RX names |
+| Architecture/observability/API    | 14 / 14 PASS; no direct Simulator path, bounded labels, trace parentage, safe history, and user/vehicle notification filtering     |
+| Docker clean deployment           | PASS from empty isolated volumes; migration exit 0 and all 8 long-running services healthy                                         |
+| Real LOW_SOC flow                 | NATS -> Context -> Policy R2 -> PendingAction -> explicit confirmation -> revalidation/authorization -> Executor SUCCEEDED         |
+| Real VEHICLE_FAULT flow           | NATS -> Context -> Policy R3 -> PendingAction; no unconfirmed side effect                                                          |
+| Duplicate event side effects      | 0; PostgreSQL attempt count remained 1 and only one action/execution effect was present                                            |
+| Invalid event execution / DLQ     | 0 / PASS                                                                                                                           |
+| Consumer restart recovery         | PASS; active lease redelivery survived API restart and was reacquired exactly once after expiry (`attempt_count = 2`)              |
+| API/HMI/observability             | safe history and live SSE PASS; urgent metrics present; secret leakage 0; forbidden high-cardinality metric label count 0          |
+| Full local Phase 0–12 regression  | 2,093 PASS; 43 environment-gated Phase 9 cases skipped in the no-database command                                                  |
+| Engineering/security gate         | format, lint, typecheck, build, diff check PASS; npm audit 0 vulnerabilities; `api_key.md` never read                              |
+
+### Safety and architecture boundary
+
+- NATS direct Tool execution = 0 and NATS/HTTP/HMI direct Simulator mutation = 0. Every candidate is
+  a registered formal Tool and reaches the existing Policy Engine before any business execution.
+- Policy bypass = 0, Confirmation bypass = 0, Executor bypass = 0, and RX execution = 0 in the
+  defined architecture and integration sets. CRITICAL events retain the same R2/R3 confirmation
+  requirements as non-urgent requests.
+- Event payload is not current world state. The processor reloads Context before deterministic
+  planning, and the dispatcher refreshes/revalidates it again before Policy. A reported SOC of 5%
+  with refreshed SOC of 20% resolves without an action.
+- PostgreSQL is the deduplication and lease authority. The validated-event SHA-256 fingerprint binds
+  ID equality without storing the payload; same-ID altered content is rejected, and active leases
+  use delayed redelivery rather than a terminal ACK.
+- Failure before durable ownership, unavailable Context, invalid schema, conflicting event identity,
+  missing Tool/profile, failed execution recovery, and exhausted redelivery all fail closed without
+  blind Tool execution.
+- Prometheus labels use only event type, severity, and status. Original payloads, credentials, user/
+  vehicle/session/run/trace/event IDs, secrets, and `api_key.md` are not logged or used as labels.
+- Phase 13 benchmark/evaluation implementation and broad event-bus refactoring added: 0. `main` was
+  not merged.
+
+### Review closure and known limitations
+
+- Focused self-review covered NATS reliability/restart/DLQ, event-ID equality, Context and safety
+  boundaries, persistence ownership, API/HMI projection, metrics cardinality, secrets, and Phase 13
+  leakage. It found and fixed: failed recovered executions incorrectly treated as handled; active
+  processing redeliveries incorrectly ACKed; broad stream-initialization exception handling; and
+  same-ID/different-content claim substitution.
+- Each finding has a direct regression test plus real Docker restart/DLQ evidence where applicable.
+  Final review result: Critical 0, High 0, safety/reliability-relevant Medium 0.
+- The SSE notification hub is process-local; safe history is durable, but missed confirmation
+  credentials are intentionally not replayed from history. Production authentication, durable
+  notification replay/outbox, multi-user routing, retention operations, and external OTLP storage
+  remain future work.
+- The Stage Gate passed. Phase 13 was not started and `main` was not merged.

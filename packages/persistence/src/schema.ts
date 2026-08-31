@@ -1,6 +1,12 @@
 import type { ExecutionAuthorization, PendingAction } from "@driveguard/action-lifecycle";
 import type { ContextSnapshot } from "@driveguard/domain";
 import type { ExecutionAttempt, ExecutionRequest, ExecutionResult } from "@driveguard/executor";
+import type {
+  UrgentEventResultMetadata,
+  UrgentEventSeverity,
+  UrgentEventStatus,
+  UrgentEventType,
+} from "@driveguard/urgent-events";
 import { sql } from "drizzle-orm";
 import {
   check,
@@ -189,6 +195,30 @@ export const auditEvents = pgTable(
   ],
 );
 
+export const urgentEvents = pgTable(
+  "urgent_events",
+  {
+    eventId: text("event_id").primaryKey(),
+    eventFingerprint: text("event_fingerprint").notNull(),
+    eventType: text("event_type").$type<UrgentEventType | "UNKNOWN">().notNull(),
+    vehicleId: text("vehicle_id").notNull(),
+    severity: text("severity").$type<UrgentEventSeverity>().notNull(),
+    status: text("status").$type<UrgentEventStatus>().notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true, mode: "date" }).notNull(),
+    processedAt: timestamp("processed_at", { withTimezone: true, mode: "date" }),
+    correlationId: text("correlation_id").notNull(),
+    processingOwner: text("processing_owner"),
+    processingExpiresAt: timestamp("processing_expires_at", { withTimezone: true, mode: "date" }),
+    attemptCount: integer("attempt_count").notNull(),
+    result: jsonb("result").$type<UrgentEventResultMetadata>().notNull(),
+  },
+  (table) => [
+    index("urgent_events_vehicle_received_idx").on(table.vehicleId, table.receivedAt),
+    index("urgent_events_status_expiry_idx").on(table.status, table.processingExpiresAt),
+    index("urgent_events_type_received_idx").on(table.eventType, table.receivedAt),
+  ],
+);
+
 export const persistenceSchema = {
   agentSessions,
   conversationMessages,
@@ -198,4 +228,5 @@ export const persistenceSchema = {
   executionAttempts,
   idempotencyRecords,
   auditEvents,
+  urgentEvents,
 };

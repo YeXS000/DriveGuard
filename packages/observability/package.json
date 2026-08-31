@@ -13,6 +13,7 @@
     "@driveguard/action-lifecycle": "0.0.0",
     "@driveguard/agent-runtime": "0.0.0",
     "@driveguard/executor": "0.0.0",
+    "@driveguard/urgent-events": "0.0.0",
     "@opentelemetry/api": "1.9.1",
     "@opentelemetry/exporter-trace-otlp-http": "0.221.0",
     "@opentelemetry/resources": "2.10.0",

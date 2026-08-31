@@ -90,10 +90,8 @@ describe("Phase 10 architecture and HMI boundary", () => {
     expect(`${routes}\n${service}`).not.toMatch(/jetstream|\.publish\(|\.subscribe\(/u);
   });
 
-  it("contains no Phase 11 or urgent-event implementation marker", () => {
+  it("keeps later additive phases free of benchmark orchestration", () => {
     const changedSurface = `${routes}\n${service}\n${hmiScript}`;
-    expect(changedSurface).not.toMatch(
-      /opentelemetry|urgent.event|urgent_event|benchmark orchestrator/iu,
-    );
+    expect(changedSurface).not.toMatch(/benchmark orchestrator/iu);
   });
 });

@@ -8,3 +8,4 @@ export * from "./pending-action.js";
 export * from "./runtime-bindings.js";
 export * from "./schema.js";
 export * from "./session.js";
+export * from "./urgent-event.js";
