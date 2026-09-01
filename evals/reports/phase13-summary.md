@@ -52,4 +52,5 @@ Native 共保留 642 条 typed failure record：WRONG_TOOL 239、WRONG_FINAL_RES
 - Final validation：format、lint、typecheck、build、Phase 13 57/57、全量 2,150 PASS + 43 个既有环境门控 skip、diff check、npm audit 0 vulnerabilities。
 - Review closure：Critical 0，High 0，影响 Benchmark 可信度的 Medium 0。
 - Engineering Gate：**PASS**；Quality Targets：**4/10 HIT**。
+- 后续改进实验统一追加到 `performance-history.csv`：按 `baseline_id + track + run_id + metric` 记录，百分比使用 0–100、延迟使用 ms、计数使用 count，目标运算符使用 `gte` / `eq` / `lt`；External 与 Native 不混算。
 - Phase 14 未开始。

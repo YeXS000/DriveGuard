@@ -1368,7 +1368,9 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - `evals/runner` and `evals/scorers`: deterministic and opt-in live modes, filters, case isolation,
   deterministic core metrics, production Runtime/Policy/Confirmation/Executor and Urgent Processor
   observations, latency collection and typed failure analysis.
-- `evals/reports`: separate External, Native and Phase 13 summary outputs; no combined accuracy.
+- `evals/reports`: separate External, Native and Phase 13 summary outputs; no combined accuracy; an
+  append-only long-form `performance-history.csv` records the 2026-09-01 baseline for future
+  experiment comparisons.
 - `docs/adr/0014-phase-13-agent-evaluation-benchmark.md`: dual-track boundary, original-plan
   refinement, metric, reproducibility, integrity and cost decisions.
 
