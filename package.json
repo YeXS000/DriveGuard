@@ -61,6 +61,10 @@
     "test:phase12": "vitest run tests/unit/phase12-*.test.ts tests/contract/phase12-*.test.ts tests/integration/phase12-*.test.ts",
     "test:phase12:coverage": "npm run test:phase12 -- --coverage --coverage.include=packages/urgent-events/src/**/*.ts --coverage.include=packages/persistence/src/urgent-event.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html",
     "test:phase12:docker": "node tests/smoke/phase12-docker-smoke.mjs",
+    "test:phase13": "vitest run tests/unit/phase13-*.test.ts tests/contract/phase13-*.test.ts tests/integration/phase13-*.test.ts",
+    "eval:phase13:native": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode deterministic",
+    "eval:phase13:native:live": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode live",
+    "eval:phase13:native:write-dataset": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode deterministic --write-dataset",
     "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
   },
   "dependencies": {

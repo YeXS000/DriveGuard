@@ -1350,3 +1350,67 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
   notification replay/outbox, multi-user routing, retention operations, and external OTLP storage
   remain future work.
 - The Stage Gate passed. Phase 13 was not started and `main` was not merged.
+
+## Phase 13 — Agent Evaluation Benchmark
+
+- Status: COMPLETE; Engineering Gate **PASS**.
+- Scope: dual-track official CAR-bench integration and DriveGuard-Native evaluation framework only.
+  Phase 14 Safety/Adversarial Evaluation was not started.
+- Verification date: 2026-09-01 (Asia/Shanghai).
+
+### Implemented modules
+
+- `evals/external/car-bench`: pinned official metadata, pre-run 125-task compatibility manifest,
+  evaluation-only Python adapter, Pi/DeepSeek JSON bridge, and official-run wrapper.
+- `evals/native`: versioned 600-case `DriveGuard-Eval-v1.0.0` Ground Truth across ten categories,
+  with natural-language prompts, explicit Tool/argument/Policy/confirmation/outcome fields and
+  optional Context/fault/urgent data.
+- `evals/runner` and `evals/scorers`: deterministic and opt-in live modes, filters, case isolation,
+  deterministic core metrics, production Runtime/Policy/Confirmation/Executor and Urgent Processor
+  observations, latency collection and typed failure analysis.
+- `evals/reports`: separate External, Native and Phase 13 summary outputs; no combined accuracy.
+- `docs/adr/0014-phase-13-agent-evaluation-benchmark.md`: dual-track boundary, original-plan
+  refinement, metric, reproducibility, integrity and cost decisions.
+
+### Current measured verification
+
+| Check                           | Current result                                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Phase 0–12 preflight regression | 2,093 PASS; 43 existing environment-gated Phase 9 cases skipped                                                 |
+| Phase 13 focused tests          | 57 / 57 PASS across 4 files                                                                                     |
+| Final full regression           | 2,150 PASS; 43 existing environment-gated Phase 9 cases skipped                                                 |
+| Native dataset validation       | 600 / 600 valid; category counts 50/70/70/90/60/50/60/70/45/35                                                  |
+| Native benchmark integrity      | 600/600 structured unique; prompt Ground Truth leakage 0; max exact prompt reuse 7                              |
+| CAR-bench compatibility         | 125 / 125 generated before model execution                                                                      |
+| CAR-bench official final        | Full Test 125/125; Base 56%; Hallucination 14%; Disambiguation 52%; Overall Pass@1 38.40%                       |
+| Native live final               | 600/600; run `phase13:d6acfddd-0179-41b2-956e-ec950b34ca2d`; Quality Targets 4/10 HIT                           |
+| Native hard safety counters     | Forbidden Action Executed 0; Confirmation Bypass 0; Duplicate Side Effect 0                                     |
+| Native Context / Urgent         | Context Refresh Accuracy 100%; Urgent Event Handling Success 100%                                               |
+| Native latency                  | Simple p50/p95 2011.40/4121.10 ms; Multi-tool p50/p95 3853.38/10745.26 ms                                       |
+| Failure retention               | Native 642 typed records; External all 77 official failures retained, including timeout/upstream simulator rows |
+
+### Gate, integrity and limitations
+
+- CAR-bench official evaluator semantics, tasks and post-result selection were not modified. The
+  DeepSeek transport patch preserves original Pydantic validation; Python non-finite diagnostic
+  values are normalized to strict JSON `null` only in the aggregate artifact.
+- External failures comprise 26 official reward failures without infrastructure error, 24 bounded
+  planning bridge timeouts, and 27 official LLM user-simulator `UnboundLocalError` failures. They
+  all remain official failures; no case was deleted or reclassified as a pass.
+- Native prompts contain zero formal Tool/Policy labels. The final live result follows that fix and
+  supersedes earlier diagnostic runs. Required-Tool execution, successful forbidden execution,
+  confirmation bypass and duplicate Tool+argument side effects have distinct measured semantics.
+- Native quality misses are retained: Normal 55.38%, Tool Selection 51.61%, Argument Validity
+  92.06%, Critical Policy Recall 78.39%, Simple p95 4.12s and Multi-tool p95 10.75s. Quality target
+  misses do not alter the Engineering Gate or authorize data deletion.
+- `api_key.md` was never read. Live credentials were injected only through an interactive process
+  environment and removed after each run. The temporary credential must be rotated because a local
+  PowerShell type-conversion error included it in terminal diagnostics before the corrected
+  SecureString path was used; it was not written into repository artifacts.
+- Final validation passed: format, lint, typecheck, build, 57/57 focused tests, 2,150-test full
+  regression, diff check, and npm audit with 0 vulnerabilities.
+- Review closure: Critical 0, High 0, and benchmark-credibility-relevant Medium 0 after fixing strict
+  JSON serialization, prompt Ground Truth leakage, expected REPLAN handling, confirmation-bypass
+  attribution, required-Tool execution, forbidden-execution, and duplicate-side-effect semantics.
+- Engineering Gate **PASS**; Quality Targets **4/10 HIT**. Phase 14 was not started and `main` was
+  not merged.
