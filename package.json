@@ -62,9 +62,17 @@
     "test:phase12:coverage": "npm run test:phase12 -- --coverage --coverage.include=packages/urgent-events/src/**/*.ts --coverage.include=packages/persistence/src/urgent-event.ts --coverage.reporter=text --coverage.reporter=json-summary --coverage.reporter=html",
     "test:phase12:docker": "node tests/smoke/phase12-docker-smoke.mjs",
     "test:phase13": "vitest run tests/unit/phase13-*.test.ts tests/contract/phase13-*.test.ts tests/integration/phase13-*.test.ts",
+    "test:phase13.1": "vitest run tests/unit/phase13.1-*.test.ts tests/contract/phase13.1-*.test.ts tests/integration/phase13.1-*.test.ts 13.1-evaluation-calibration-scorer-v2/tests/scorer-regression/scorer-v2.test.ts",
     "eval:phase13:native": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode deterministic",
     "eval:phase13:native:live": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode live",
     "eval:phase13:native:write-dataset": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode deterministic --write-dataset",
+    "eval:phase13.1:native": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode deterministic --profile quality --concurrency 4 --write-dataset --output-dir 13.1-evaluation-calibration-scorer-v2/reports/native-v2/deterministic",
+    "eval:phase13.1:native:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile quality --concurrency 4 --output-dir 13.1-evaluation-calibration-scorer-v2/reports/native-v2/quality-live",
+    "eval:phase13.1:latency:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile latency --concurrency 1 --output-dir 13.1-evaluation-calibration-scorer-v2/reports/native-v2/latency-live",
+    "eval:phase13.1:offline-rescore": "npm run build --silent && node dist/evals/runner/offline-rescore-cli.js",
+    "eval:phase13.1:offline-rescore:live": "npm run build --silent && node dist/evals/runner/offline-rescore-cli.js --v2-report 13.1-evaluation-calibration-scorer-v2/reports/native-v2/quality-live/native-v2.json --output-dir 13.1-evaluation-calibration-scorer-v2/reports/offline-rescore/live-v2",
+    "eval:phase13.1:rescore:quality": "npm run build --silent && node dist/evals/runner/rescore-v2-cli.js --input 13.1-evaluation-calibration-scorer-v2/reports/native-v2/quality-live/native-v2.json",
+    "eval:phase13.1:rescore:latency": "npm run build --silent && node dist/evals/runner/rescore-v2-cli.js --input 13.1-evaluation-calibration-scorer-v2/reports/native-v2/latency-live/native-v2.json",
     "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
   },
   "dependencies": {

@@ -1,0 +1,526 @@
+{
+  "sourceRunId": "car-bench-20260901T023629Z",
+  "benchmark": "CAR-bench",
+  "coverage": "125/125",
+  "nativeScoreCombined": false,
+  "rerunPerformed": false,
+  "retryPolicy": {
+    "maxInfraRetries": 0,
+    "retryableClassifications": ["INFRA_FAILURE"],
+    "agentFailureRetries": 0,
+    "originalResultsRetained": true
+  },
+  "categories": {
+    "base": {
+      "tasks": 50,
+      "classificationCounts": {
+        "VALID": 28,
+        "AGENT_FAILURE": 8,
+        "INFRA_FAILURE": 14,
+        "EVALUATOR_FAILURE": 0
+      },
+      "rawPassAt1": 0.56,
+      "validPassAt1": 0.7777777777777778,
+      "failures": [
+        {
+          "caseId": "base_15",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_35",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_37",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_39",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_43",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_45",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_47",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_49",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_53",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_55",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_61",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_67",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_69",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_71",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_75",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_77",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_81",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_85",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_91",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_95",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_97",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "base_99",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        }
+      ]
+    },
+    "hallucination": {
+      "tasks": 50,
+      "classificationCounts": {
+        "VALID": 7,
+        "AGENT_FAILURE": 11,
+        "INFRA_FAILURE": 32,
+        "EVALUATOR_FAILURE": 0
+      },
+      "rawPassAt1": 0.14,
+      "validPassAt1": 0.3888888888888889,
+      "failures": [
+        {
+          "caseId": "hallucination_3",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_5",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_7",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_11",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_13",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_17",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_19",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_21",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_23",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_25",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_27",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_29",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_31",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_33",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_35",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_37",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_39",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_41",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_43",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_45",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_47",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_49",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_51",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_53",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_55",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_57",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_59",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_61",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_63",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_67",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_69",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_73",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_75",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_77",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_79",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_81",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_87",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_89",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_91",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_93",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_95",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_96",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "hallucination_97",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        }
+      ]
+    },
+    "disambiguation": {
+      "tasks": 25,
+      "classificationCounts": {
+        "VALID": 13,
+        "AGENT_FAILURE": 7,
+        "INFRA_FAILURE": 5,
+        "EVALUATOR_FAILURE": 0
+      },
+      "rawPassAt1": 0.52,
+      "validPassAt1": 0.65,
+      "failures": [
+        {
+          "caseId": "disambiguation_1",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_7",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_11",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_17",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_23",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_25",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_29",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_31",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_39",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_45",
+          "classification": "AGENT_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_47",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        },
+        {
+          "caseId": "disambiguation_49",
+          "classification": "INFRA_FAILURE",
+          "retryCount": 0,
+          "originalFailureReason": "official evaluator reward = 0"
+        }
+      ]
+    }
+  },
+  "overall": {
+    "classificationCounts": {
+      "VALID": 48,
+      "AGENT_FAILURE": 26,
+      "INFRA_FAILURE": 51,
+      "EVALUATOR_FAILURE": 0
+    },
+    "rawPassAt1": 0.384,
+    "validPassAt1": 0.6486486486486487
+  }
+}

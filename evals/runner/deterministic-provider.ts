@@ -1,4 +1,6 @@
 import type { NativeEvalCase, NativeObservation } from "../native/types.js";
+import { toNativeEvalCaseV2 } from "../native/datasets/v2.js";
+import { createPerfectV2Observation, defaultCaseIdentityV2 } from "./v2-observation.js";
 
 function stableLatency(item: NativeEvalCase): number {
   const base = item.expectedTools.required.length > 1 ? 45 : 18;
@@ -14,6 +16,7 @@ export function executeDeterministicCase(item: NativeEvalCase): NativeObservatio
     item.contextMutation === undefined
       ? {}
       : { [item.contextMutation.path]: structuredClone(item.contextMutation.after) };
+  const latencyMs = stableLatency(item);
   return Object.freeze({
     caseId: item.caseId,
     toolCalls: Object.freeze(
@@ -35,6 +38,11 @@ export function executeDeterministicCase(item: NativeEvalCase): NativeObservatio
     contextFacts: Object.freeze(contextFacts),
     urgentEventHandled: item.urgentEvent === undefined ? null : true,
     finalOutcome: Object.freeze(structuredClone(item.expectedOutcome)),
-    latencyMs: stableLatency(item),
+    latencyMs,
+    v2: createPerfectV2Observation(
+      toNativeEvalCaseV2(item),
+      defaultCaseIdentityV2(item.caseId),
+      latencyMs,
+    ),
   });
 }

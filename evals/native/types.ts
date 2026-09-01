@@ -82,6 +82,8 @@ export interface NativeObservation {
   readonly finalOutcome: Readonly<Record<string, unknown>>;
   readonly latencyMs: number;
   readonly failureReason?: string;
+  /** Phase 13.1 raw, action-level trace. Absent from historical Phase 13 observations. */
+  readonly v2?: import("./v2-types.js").NativeObservationV2;
 }
 
 export interface CaseFailure {

@@ -9,6 +9,7 @@
     "services/*/src/**/*.ts",
     "evals/**/*.ts",
     "tests/**/*.ts",
+    "13.1-evaluation-calibration-scorer-v2/tests/**/*.ts",
     "vitest.config.ts"
   ]
 }

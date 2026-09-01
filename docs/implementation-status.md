@@ -1416,3 +1416,61 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
   attribution, required-Tool execution, forbidden-execution, and duplicate-side-effect semantics.
 - Engineering Gate **PASS**; Quality Targets **4/10 HIT**. Phase 14 was not started and `main` was
   not merged.
+
+## Phase 13.1 — Evaluation Calibration & Scorer V2
+
+- Status: COMPLETE; Stage Gate **PASS**.
+- Scope: Ground Truth V2, deterministic Scorer V2, trace sufficiency/offline rescore, CAR-bench
+  validity taxonomy, isolated Native concurrency, and independent reporting only. Agent prompt,
+  Tool descriptions/routing, Policy rules, production confirmation/execution semantics, and Phase
+  13.2 optimization were not changed.
+- Verification date: 2026-09-02 (Asia/Shanghai).
+
+### Implemented modules
+
+- `evals/native/v2-types.ts`, `evals/native/datasets/v2.ts`, and `v2-validator.ts`: 600 Task
+  Contracts with conditional Tool use, typed arguments, action Policy, lifecycle, outcome, recovery,
+  and final-response requirements.
+- `evals/scorers/argument-matchers.ts` and `evals/scorers/v2.ts`: deterministic action/channel-level
+  scoring and Agent/Evaluation/Infrastructure attribution.
+- `evals/runner/native-v2-runner.ts`, `v2-cli.ts`, and live trace extensions: ordered output,
+  configurable concurrency, five-part identity, independent per-case Simulator, and isolated retry
+  semantics.
+- `evals/reports/offline-rescore.ts` and CAR-bench classification: explicit legacy trace
+  insufficiency, OLD/NEW transition buckets, audit manifests, and independent external validity.
+- `13.1-evaluation-calibration-scorer-v2`: design, V1/V2 comparison, baseline status, required
+  regression matrix, and frozen generated reports.
+
+### Current measured verification
+
+| Check                       | Current result                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| V1 preservation             | 600 cases; SHA-256 `3429011c3ed86889812ffcdd66d1c1cc3d1b26bf4bc2eb615381524adcae51a8` |
+| V2 schema                   | 600/600 PASS                                                                          |
+| Required scorer regressions | 15/15 PASS                                                                            |
+| Focused Phase 13.1 suite    | 33/33 PASS across 5 files                                                             |
+| Full local regression       | 2,183 PASS across 71 files; 43 existing Phase 9 DB cases environment-gated            |
+| Engineering checks          | format, lint, typecheck, build, diff check PASS; npm audit 0 vulnerabilities          |
+| Deterministic V2            | 600/600 PASS, concurrency 4; explicitly non-live                                      |
+| Live offline rescore        | PASS/PASS 220; PASS/FAIL 84; FAIL/PASS 32; FAIL/FAIL 264; 600/600 scorable            |
+| Trace-sufficiency audit     | Critical 199/199; confirmation 151/151; fault 45/45; urgent 35/35                     |
+| CAR-bench reclassification  | VALID 48; AGENT 26; INFRA 51; EVALUATOR 0; no rerun/reward change                     |
+| Live Native quality         | 600 VALID; case pass 42.00%; concurrency 4; Agent/Eval/Infra errors 869/0/0           |
+| Live serial latency         | 600 VALID; concurrency 1; Simple P50/P95 2571.21/6750.62 ms; Multi 3389.41/5635.76 ms |
+
+### Gate and limitations
+
+- Known last-Policy, strict free-text equality, urgent REPLAN execution, fake-verbal-confirmation,
+  stale-final-response, and Boolean fault-recovery scorer defects have direct regression coverage.
+- Confirmation Bypass, Duplicate Side Effect, and Forbidden Action Executed remain independent hard
+  zero counters; classification failure cannot be hidden by downstream safety enforcement.
+- Historical V1-only traces remain insufficient, but the frozen 600-case live V2 trace supports the
+  complete delta without guessed fields. All Critical, Confirmation, Fault, Urgent, PASS-to-FAIL,
+  and scorer-bug FAIL-to-PASS populations were audited at 100% coverage.
+- Both credential-backed Native runs completed with benchmark retries 0. Provider-internal retries
+  remain unobserved rather than guessed. The three hard safety counters remained zero.
+- The phase-level Stage Gate is **PASS**. The frozen baseline identifies real Agent weaknesses for a
+  separately authorized Phase 13.2; no optimization was performed here.
+- The temporary live credential was injected through no-echo stdin into child-process memory only
+  and expired with the process. `api_key.md` was not read or used; no key was persisted or committed.
+- `main` remains unchanged and Phase 13.2 was not started.

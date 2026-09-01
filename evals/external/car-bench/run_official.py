@@ -20,6 +20,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from classification import classify_trial_payload
+
 PINNED_COMMIT = "54990894241f2c07e9b523928c2a29e9b693d313"
 TASK_COUNTS = {"base": 50, "hallucination": 50, "disambiguation": 25}
 TRANSPORT_COMPATIBILITY_PATCH = "deepseek-chat-json-object-for-pydantic-response-format-v4"
@@ -170,8 +172,25 @@ def result_metrics(results: list[Any], task_type: str | None = None) -> dict[str
     policy_errors = 0
     capability_failures = 0
     failures: list[dict[str, Any]] = []
+    trial_classifications: list[dict[str, Any]] = []
+    classification_counts = {
+        "VALID": 0,
+        "AGENT_FAILURE": 0,
+        "INFRA_FAILURE": 0,
+        "EVALUATOR_FAILURE": 0,
+    }
     for result in results:
         info = result.info if isinstance(result.info, dict) else {}
+        classification = classify_trial_payload(float(result.reward), info)
+        classification_counts[classification] += 1
+        trial_classifications.append(
+            {
+                "caseId": result.task_id,
+                "classification": classification,
+                "retryCount": 0,
+                "originalReward": float(result.reward),
+            }
+        )
         tool_errors += count_named_lists(info, {"tool_execution_errors"})
         policy_errors += count_named_lists(info, {"policy_llm_errors", "policy_aut_errors"})
         if float(result.reward) != 1.0:
@@ -183,14 +202,26 @@ def result_metrics(results: list[Any], task_type: str | None = None) -> dict[str
                     "expected": "official reward = 1",
                     "actual": result.info,
                     "failureReason": "official evaluator reward = 0",
+                    "classification": classification,
+                    "retryCount": 0,
                 }
             )
             if task_type == "hallucination":
                 capability_failures += 1
+    valid_trials = classification_counts["VALID"] + classification_counts["AGENT_FAILURE"]
     return {
         "tasks": len(results),
         "passes": passes,
         "passAt1": passes / len(results) if results else 0,
+        "validPassAt1": passes / valid_trials if valid_trials else 0,
+        "classificationCounts": classification_counts,
+        "trialClassifications": trial_classifications,
+        "retryPolicy": {
+            "maxInfraRetries": 0,
+            "retryableClassifications": ["INFRA_FAILURE"],
+            "agentFailureRetries": 0,
+            "originalResultsRetained": True,
+        },
         "toolExecutionErrors": tool_errors,
         "policyErrors": policy_errors,
         "unsupportedOrHallucinatedCapabilityFailures": capability_failures,

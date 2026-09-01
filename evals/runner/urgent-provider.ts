@@ -21,7 +21,10 @@ import {
 import { isDeepStrictEqual } from "node:util";
 
 import type { NativeEvalCase, NativeObservation, ObservedToolCall } from "../native/types.js";
+import type { ConfirmationLifecycleStateV2, NativeCaseIdentityV2 } from "../native/v2-types.js";
+import { InMemoryActionLifecycleEventSink } from "@driveguard/action-lifecycle";
 import { InMemoryPendingActionRepository } from "../../packages/action-lifecycle/src/repository.js";
+import { defaultCaseIdentityV2 } from "./v2-observation.js";
 
 interface SimulatorStatePort {
   readonly simulationVersion: number;
@@ -186,11 +189,13 @@ export async function executeUrgentEvaluation(
   baseUrl: string,
   item: NativeEvalCase,
   state: () => Promise<SimulatorStatePort>,
+  requestedIdentity: NativeCaseIdentityV2 = defaultCaseIdentityV2(item.caseId),
 ): Promise<NativeObservation> {
   const before = await state();
   const repository = new EvaluationUrgentRepository();
   const durable = new EvaluationDurableCoordinator();
   const executionEvents = new InMemoryExecutionEventSink();
+  const actionEvents = new InMemoryActionLifecycleEventSink();
   const pending = new InMemoryPendingActionRepository();
   const system = createUrgentActionSystem({
     simulatorBaseUrl: baseUrl,
@@ -199,6 +204,7 @@ export async function executeUrgentEvaluation(
     pendingActionRepository: pending,
     durableExecutionCoordinator: durable,
     executionEventSink: executionEvents,
+    actionLifecycleEventSink: actionEvents,
     sessionRepository: new InMemorySessionRepository(),
     sessionCoordinator: new InMemorySessionCoordinator(),
     executionRecovery: {
@@ -260,6 +266,69 @@ export async function executeUrgentEvaluation(
   const argumentsCorrect = toolCalls.every((call) =>
     isDeepStrictEqual(call.arguments, item.expectedArguments[call.name] ?? {}),
   );
+  const actualSimulatorEffects = Math.max(0, after.simulationVersion - before.simulationVersion);
+  const actionTrace = actionEvents.slice();
+  const executionTrace = executionEvents.slice();
+  const confirmationLifecycle: ConfirmationLifecycleStateV2[] = [];
+  if (actualCandidate !== null) confirmationLifecycle.push("ACTION_PROPOSED");
+  confirmationLifecycle.push("POLICY_CHECKED");
+  if (actionTrace.some((entry) => entry.eventType === "action.pending.created")) {
+    confirmationLifecycle.push("CONFIRMATION_CREATED");
+  }
+  if (executionTrace.some((entry) => entry.eventType === "execution.started")) {
+    confirmationLifecycle.push("EXECUTING");
+  }
+  if (executionTrace.some((entry) => entry.eventType === "execution.succeeded")) {
+    confirmationLifecycle.push("EXECUTED", "STATE_REFRESHED");
+  }
+  confirmationLifecycle.push("FINAL_RESPONSE");
+  const finalBusinessOutcome =
+    first.disposition === "REPLAN_REQUIRED"
+      ? ("REPLAN_REQUIRED" as const)
+      : confirmationRequested
+        ? ("AWAITING_CONFIRMATION" as const)
+        : urgentEventHandled && argumentsCorrect
+          ? ("SUCCEEDED" as const)
+          : ("FAILED" as const);
+  const v2 = Object.freeze({
+    identity: requestedIdentity,
+    validity: "VALID" as const,
+    toolCalls: Object.freeze(toolCalls.map((call) => Object.freeze({ ...call }))),
+    policyEvaluations: Object.freeze([
+      Object.freeze({
+        toolName: actualCandidate ?? "urgent_event_processor",
+        decision: actualPolicy,
+      }),
+    ]),
+    confirmationLifecycle: Object.freeze(confirmationLifecycle),
+    execution: Object.freeze({
+      agentToolExecution: "NOT_APPLICABLE" as const,
+      urgentProcessorExecution:
+        urgentEventHandled && argumentsCorrect ? ("SUCCEEDED" as const) : ("FAILED" as const),
+      simulatorSideEffectCount: actualSimulatorEffects,
+      finalBusinessOutcome,
+      forbiddenActionExecuted: toolCalls.some((call) =>
+        item.expectedTools.forbidden.includes(call.name),
+      ),
+      duplicateSideEffectCount: duplicateSideEffects,
+    }),
+    recovery: Object.freeze({
+      attempted: false,
+      succeeded: false,
+      safeDegradation: false,
+      outcomeReconciled: false,
+      blindWriteRetry: false,
+      duplicateRequestCount: duplicate.disposition === "DUPLICATE" ? 1 : 0,
+    }),
+    finalResponse:
+      first.record?.result.safeSummary ??
+      (first.disposition === "REPLAN_REQUIRED"
+        ? "Urgent event requires replanning; no action was executed."
+        : "Urgent event processing completed."),
+    latencyMs,
+    benchmarkRetryCount: 0,
+    providerRetryCount: 0,
+  });
   return Object.freeze({
     caseId: item.caseId,
     toolCalls,
@@ -288,5 +357,6 @@ export async function executeUrgentEvaluation(
           },
     ),
     latencyMs,
+    v2,
   });
 }
