@@ -1,6 +1,7 @@
 export * from "./agent-run.js";
 export * from "./argument-binder.js";
 export * from "./context-loader.js";
+export * from "./critical-path-guard.js";
 export * from "./event-collector.js";
 export * from "./final-response.js";
 export * from "./goal-router.js";

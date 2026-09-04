@@ -1,11 +1,12 @@
 import type { NativeBenchmarkReportV2 } from "../runner/native-v2-runner.js";
 
-function percent(value: number): string {
-  return `${(value * 100).toFixed(2)}%`;
+function percent(value: number | null): string {
+  return value === null ? "N/A / NOT_APPLICABLE" : `${(value * 100).toFixed(2)}%`;
 }
 
 export function renderNativeV2Report(report: NativeBenchmarkReportV2): string {
   const metrics = report.metrics;
+  const v2_1 = "faultHandlingSuccess" in metrics ? metrics : undefined;
   return `# DriveGuard Native Evaluation V2
 
 - Run ID: \`${report.benchmarkRunId}\`
@@ -34,6 +35,18 @@ export function renderNativeV2Report(report: NativeBenchmarkReportV2): string {
 | Confirmation Lifecycle Compliance | ${percent(metrics.confirmationLifecycleCompliance)} |
 | Safety Enforcement Accuracy | ${percent(metrics.safetyEnforcementAccuracy)} |
 | Recovery Success / Safe Degradation | ${percent(metrics.recoverySuccess)} / ${percent(metrics.safeDegradation)} |
+${
+  v2_1 === undefined
+    ? ""
+    : `| Fault Handling Success | ${percent(v2_1.faultHandlingSuccess)} (${v2_1.faultHandlingSuccessfulCount}/${v2_1.validFaultCaseCount}) |
+| Recoverable subset | ${v2_1.recoverySuccessfulCount}/${v2_1.recoverableCaseCount} |
+| Conditional degradation subset | ${v2_1.safeDegradationSuccessfulCount}/${v2_1.degradationRequiredCaseCount} |
+| Recovered / Safe Degraded / Unsafe | ${v2_1.recoveredCount} / ${v2_1.safeDegradedCount} / ${v2_1.unsafeOrIncorrectCount} |
+| Blind Ambiguous Retry | ${v2_1.blindAmbiguousRetryCount} |
+| False Success Claim | ${v2_1.falseSuccessClaimCount} |
+| Empty Response | ${v2_1.emptyResponseCount} |
+| Post-execution Response Stale | ${v2_1.postExecutionResponseStaleCount} |`
+}
 | Outcome Reconciliation / Recovery Safety | ${percent(metrics.outcomeReconciliation)} / ${percent(metrics.recoverySafety)} |
 | Final Response Accuracy | ${percent(metrics.finalResponseAccuracy)} |
 | Confirmation Bypass | ${metrics.confirmationBypass} |

@@ -63,6 +63,7 @@
     "test:phase12:docker": "node tests/smoke/phase12-docker-smoke.mjs",
     "test:phase13": "vitest run tests/unit/phase13-*.test.ts tests/contract/phase13-*.test.ts tests/integration/phase13-*.test.ts",
     "test:phase13.1": "vitest run tests/unit/phase13.1-*.test.ts tests/contract/phase13.1-*.test.ts tests/integration/phase13.1-*.test.ts 13.1-evaluation-calibration-scorer-v2/tests/scorer-regression/scorer-v2.test.ts",
+    "test:phase13.2.1": "vitest run 13.2.1-gate-stabilization/tests/*.test.ts tests/unit/phase13.2-*.test.ts 13.1-evaluation-calibration-scorer-v2/tests/scorer-regression/scorer-v2.test.ts",
     "eval:phase13:native": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode deterministic",
     "eval:phase13:native:live": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode live",
     "eval:phase13:native:write-dataset": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode deterministic --write-dataset",
@@ -79,6 +80,11 @@
     "eval:phase13.2:holdout": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode deterministic --profile quality --partition holdout --concurrency 4 --output-dir 13.2-agent-quality-remediation/reports/native-v2/holdout-deterministic",
     "eval:phase13.2:holdout:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile quality --partition holdout --concurrency 4 --output-dir 13.2-agent-quality-remediation/reports/native-v2/holdout-live",
     "eval:phase13.2:latency:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile latency --partition holdout --concurrency 1 --output-dir 13.2-agent-quality-remediation/reports/native-v2/holdout-latency-live",
+    "eval:phase13.2.1:critical:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile quality --partition development --subset critical --scorer v2.1 --concurrency 4 --output-dir 13.2.1-gate-stabilization/reports/critical-stability/current",
+    "eval:phase13.2.1:fault:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile quality --partition development --subset fault --scorer v2.1 --concurrency 4 --output-dir 13.2.1-gate-stabilization/reports/fault-v2.1/current",
+    "eval:phase13.2.1:dev:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile quality --partition development --scorer v2.1 --concurrency 4 --output-dir 13.2.1-gate-stabilization/reports/development/current",
+    "eval:phase13.2.1:holdout:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile quality --partition holdout --scorer v2.1 --concurrency 4 --output-dir 13.2.1-gate-stabilization/reports/holdout/current",
+    "eval:phase13.2.1:latency:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile latency --partition holdout --scorer v2.1 --concurrency 1 --output-dir 13.2.1-gate-stabilization/reports/latency/current",
     "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
   },
   "dependencies": {

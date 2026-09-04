@@ -27,10 +27,16 @@ async function main(): Promise<void> {
   const mode = valueAfter(args, "--mode") ?? "deterministic";
   const profile = valueAfter(args, "--profile") ?? "quality";
   const partition = valueAfter(args, "--partition") ?? "all";
+  const scorer = valueAfter(args, "--scorer") ?? "v2";
+  const subset = valueAfter(args, "--subset") ?? "all";
   if (mode !== "deterministic" && mode !== "live") throw new Error("--mode is invalid");
   if (profile !== "quality" && profile !== "latency") throw new Error("--profile is invalid");
   if (partition !== "all" && partition !== "development" && partition !== "holdout") {
     throw new Error("--partition is invalid");
+  }
+  if (scorer !== "v2" && scorer !== "v2.1") throw new Error("--scorer is invalid");
+  if (subset !== "all" && subset !== "critical" && subset !== "fault") {
+    throw new Error("--subset is invalid");
   }
   const defaultConcurrency = profile === "latency" ? 1 : 4;
   const concurrency = positiveInteger(valueAfter(args, "--concurrency"), defaultConcurrency);
@@ -66,7 +72,16 @@ async function main(): Promise<void> {
         );
   const paired = source
     .map((item, index) => ({ source: item, contract: contracts[index]! }))
-    .filter(({ source: item }) => selectedIds === undefined || selectedIds.has(item.caseId));
+    .filter(({ source: item }) => selectedIds === undefined || selectedIds.has(item.caseId))
+    .filter(({ contract }) => {
+      if (subset === "fault") return contract.contract.recovery.kind !== "NONE";
+      if (subset === "critical") {
+        return contract.contract.policy.actions.some(
+          (action) => action.critical && action.requiredEvaluation,
+        );
+      }
+      return true;
+    });
   const limited = limit === undefined ? paired : paired.slice(0, limit);
   const selectedSource = limited.map(({ source: item }) => item);
   const selectedContracts = limited.map(({ contract }) => contract);
@@ -82,7 +97,9 @@ async function main(): Promise<void> {
       gitCommit: execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
       worktreeDirty:
         execFileSync("git", ["status", "--porcelain"], { encoding: "utf8" }).trim().length > 0,
-      benchmarkRunPrefix: partition === "all" ? "phase13.1" : "phase13.2",
+      benchmarkRunPrefix:
+        scorer === "v2.1" ? "phase13.2.1" : partition === "all" ? "phase13.1" : "phase13.2",
+      scorer,
       ...(liveHarness === undefined ? {} : { executeLiveCase: liveHarness.execute }),
     });
   } finally {
@@ -96,7 +113,7 @@ async function main(): Promise<void> {
   );
   await writeFile(resolve(outputDir, "native-v2.md"), renderNativeV2Report(report), "utf8");
   process.stdout.write(
-    `${JSON.stringify({ runId: report.benchmarkRunId, partition, cases: report.caseCount, concurrency, metrics: report.metrics })}\n`,
+    `${JSON.stringify({ runId: report.benchmarkRunId, partition, subset, scorer, cases: report.caseCount, concurrency, metrics: report.metrics })}\n`,
   );
 }
 

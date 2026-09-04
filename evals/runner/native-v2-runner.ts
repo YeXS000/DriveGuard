@@ -11,6 +11,11 @@ import {
   scoreNativeRunV2,
   type NativeRunMetricsV2,
 } from "../scorers/v2.js";
+import {
+  NATIVE_SCORER_V2_1_VERSION,
+  scoreNativeRunV2_1,
+  type NativeRunMetricsV2_1,
+} from "../scorers/v2-1.js";
 import { createPerfectV2Observation } from "./v2-observation.js";
 
 export type BenchmarkProfileV2 = "quality" | "latency";
@@ -18,7 +23,7 @@ export type BenchmarkProfileV2 = "quality" | "latency";
 export interface NativeBenchmarkReportV2 {
   readonly benchmarkRunId: string;
   readonly datasetVersion: "DriveGuard-Eval-v2.0.0";
-  readonly scorerVersion: typeof NATIVE_SCORER_V2_VERSION;
+  readonly scorerVersion: typeof NATIVE_SCORER_V2_VERSION | typeof NATIVE_SCORER_V2_1_VERSION;
   readonly gitCommit: string;
   readonly worktreeDirty?: boolean;
   readonly mode: "deterministic" | "live";
@@ -32,7 +37,7 @@ export interface NativeBenchmarkReportV2 {
   readonly caseCount: number;
   readonly benchmarkRequestRetryCount: number;
   readonly providerRetryCount: number | null;
-  readonly metrics: NativeRunMetricsV2;
+  readonly metrics: NativeRunMetricsV2 | NativeRunMetricsV2_1;
   readonly failures: ReturnType<typeof scoreNativeRunV2>["failures"];
   readonly observations: readonly NativeObservationV2[];
   readonly rescoredAt?: string;
@@ -138,7 +143,8 @@ export interface RunNativeBenchmarkV2Options {
   readonly concurrency?: number;
   readonly gitCommit: string;
   readonly infrastructureRetries?: number;
-  readonly benchmarkRunPrefix?: "phase13.1" | "phase13.2";
+  readonly benchmarkRunPrefix?: "phase13.1" | "phase13.2" | "phase13.2.1";
+  readonly scorer?: "v2" | "v2.1";
   readonly worktreeDirty?: boolean;
   readonly executeLiveCase?: (
     item: NativeEvalCase,
@@ -209,11 +215,15 @@ export async function runNativeBenchmarkV2(
       }
     },
   );
-  const scored = scoreNativeRunV2(options.cases, observations);
+  const scorer = options.scorer ?? "v2";
+  const scored =
+    scorer === "v2.1"
+      ? scoreNativeRunV2_1(options.cases, observations)
+      : scoreNativeRunV2(options.cases, observations);
   return Object.freeze({
     benchmarkRunId,
     datasetVersion: "DriveGuard-Eval-v2.0.0",
-    scorerVersion: NATIVE_SCORER_V2_VERSION,
+    scorerVersion: scorer === "v2.1" ? NATIVE_SCORER_V2_1_VERSION : NATIVE_SCORER_V2_VERSION,
     gitCommit: options.gitCommit,
     ...(options.worktreeDirty === undefined ? {} : { worktreeDirty: options.worktreeDirty }),
     mode: options.mode,

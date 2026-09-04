@@ -45,6 +45,7 @@ import {
   createConfirmedActionCompletion,
   type ConfirmedActionCompletion,
 } from "./final-response.js";
+import { CriticalPathGuard } from "./critical-path-guard.js";
 import { GoalToolRouter, renderGoalBoundPrompt } from "./goal-router.js";
 import { PiEventAdapter } from "./pi-event-adapter.js";
 import {
@@ -54,6 +55,7 @@ import {
 } from "./pi-tool-adapter.js";
 import {
   PHASE_6_POLICY_NOTICE,
+  PolicyControlError,
   PolicyGuardedToolHandler,
   type RuntimePolicyControlResult,
 } from "./policy-guarded-tool-handler.js";
@@ -651,6 +653,8 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         this.mode === "read_only" ? definition.riskLevel === "R0" : true,
       );
       const goalPlan = this.#goalToolRouter.plan(request.prompt, modeAvailable);
+      const criticalPathGuard = new CriticalPathGuard();
+      const criticalEnvelopes = criticalPathGuard.resolve(request.prompt, goalPlan, modeAvailable);
       const candidates = new Set<string>(goalPlan.candidateToolNames);
       const exposed = modeAvailable.filter((definition) => candidates.has(definition.name));
       if (definitions.some((definition) => !formalNames.has(definition.name))) {
@@ -681,77 +685,79 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       this.#throwIfSinkFailed(sinkFailed);
       const conflictDetector = new ContextConflictDetector();
       const confirmationIntents = new Set<string>();
+      const providePolicyInput = async (
+        definition: ToolDefinition,
+        validatedArguments: unknown,
+      ): Promise<PolicyEvaluationInput> => {
+        const profile = this.#policyProfiles.get(definition.name);
+        if (profile === undefined) throw new Error("Policy profile is unavailable");
+        const evaluatedContext = definition.sideEffect ? await this.#contextLoader.load() : loaded;
+        const conflict = definition.sideEffect
+          ? conflictDetector.detect(
+              loaded.snapshot,
+              evaluatedContext.snapshot,
+              profile.relevantContextPaths,
+            )
+          : undefined;
+        const freshnessEvaluator = new ContextFreshnessEvaluator(this.#clock);
+        const latestVersion = profile.freshnessRequirement.requiresLatest
+          ? evaluatedContext.freshness.context.latestVersion
+          : undefined;
+        const freshness = selectEffectiveFreshness([
+          freshnessEvaluator.evaluate(
+            evaluatedContext.snapshot,
+            profile.freshnessRequirement,
+            latestVersion,
+          ),
+          freshnessEvaluator.evaluate(
+            {
+              ...evaluatedContext.snapshot,
+              capturedAt: evaluatedContext.snapshot.vehicle.timestamp,
+            },
+            profile.freshnessRequirement,
+            latestVersion,
+          ),
+          freshnessEvaluator.evaluate(
+            {
+              ...evaluatedContext.snapshot,
+              capturedAt: evaluatedContext.snapshot.trip.timestamp,
+            },
+            profile.freshnessRequirement,
+            latestVersion,
+          ),
+        ]);
+        return {
+          toolDefinition: definition,
+          validatedArguments,
+          trustedDefinition: true,
+          contextSnapshot: evaluatedContext.snapshot,
+          freshness,
+          availability: {
+            capabilities: evaluatedContext.snapshot.capabilities,
+            services: evaluatedContext.services,
+          },
+          executionBinding: {
+            runId: run.runId,
+            sessionId: run.sessionId,
+            traceId: run.traceId,
+            actionFingerprint: createActionFingerprint({
+              toolName: definition.name,
+              validatedArguments,
+              sessionId: run.sessionId,
+              userId: evaluatedContext.snapshot.user.userId,
+              vehicleId: evaluatedContext.snapshot.vehicle.vehicleId,
+              contextSnapshotId: evaluatedContext.snapshot.snapshotId,
+              contextVersion: evaluatedContext.snapshot.contextVersion,
+            }),
+          },
+          ...(conflict === undefined ? {} : { conflict }),
+        };
+      };
       const policyGuard = new PolicyGuardedToolHandler({
         engine: this.#policyEngine,
         clock: this.#clock,
         isTrustedDefinition: (definition) => this.#toolRegistry.get(definition.name) === definition,
-        inputProvider: async (definition, validatedArguments): Promise<PolicyEvaluationInput> => {
-          const profile = this.#policyProfiles.get(definition.name);
-          if (profile === undefined) throw new Error("Policy profile is unavailable");
-          const evaluatedContext = definition.sideEffect
-            ? await this.#contextLoader.load()
-            : loaded;
-          const conflict = definition.sideEffect
-            ? conflictDetector.detect(
-                loaded.snapshot,
-                evaluatedContext.snapshot,
-                profile.relevantContextPaths,
-              )
-            : undefined;
-          const freshnessEvaluator = new ContextFreshnessEvaluator(this.#clock);
-          const latestVersion = profile.freshnessRequirement.requiresLatest
-            ? evaluatedContext.freshness.context.latestVersion
-            : undefined;
-          const freshness = selectEffectiveFreshness([
-            freshnessEvaluator.evaluate(
-              evaluatedContext.snapshot,
-              profile.freshnessRequirement,
-              latestVersion,
-            ),
-            freshnessEvaluator.evaluate(
-              {
-                ...evaluatedContext.snapshot,
-                capturedAt: evaluatedContext.snapshot.vehicle.timestamp,
-              },
-              profile.freshnessRequirement,
-              latestVersion,
-            ),
-            freshnessEvaluator.evaluate(
-              {
-                ...evaluatedContext.snapshot,
-                capturedAt: evaluatedContext.snapshot.trip.timestamp,
-              },
-              profile.freshnessRequirement,
-              latestVersion,
-            ),
-          ]);
-          return {
-            toolDefinition: definition,
-            validatedArguments,
-            trustedDefinition: true,
-            contextSnapshot: evaluatedContext.snapshot,
-            freshness,
-            availability: {
-              capabilities: evaluatedContext.snapshot.capabilities,
-              services: evaluatedContext.services,
-            },
-            executionBinding: {
-              runId: run.runId,
-              sessionId: run.sessionId,
-              traceId: run.traceId,
-              actionFingerprint: createActionFingerprint({
-                toolName: definition.name,
-                validatedArguments,
-                sessionId: run.sessionId,
-                userId: evaluatedContext.snapshot.user.userId,
-                vehicleId: evaluatedContext.snapshot.vehicle.vehicleId,
-                contextSnapshotId: evaluatedContext.snapshot.snapshotId,
-                contextVersion: evaluatedContext.snapshot.contextVersion,
-              }),
-            },
-            ...(conflict === undefined ? {} : { conflict }),
-          };
-        },
+        inputProvider: providePolicyInput,
         observer: {
           evaluationStarted: async (toolName) => {
             await emitRuntime("policy.evaluation.started", {
@@ -893,6 +899,42 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           return execution.result;
         },
       });
+      for (const envelope of criticalEnvelopes) {
+        if (envelope.supported && envelope.missingArguments.length > 0) continue;
+        await emitRuntime("policy.evaluation.started", {
+          toolName: envelope.toolMapping,
+          runtimeMode: this.mode,
+          boundary: "POLICY_GUARDED",
+        });
+        let precheckInput: unknown = {
+          toolDefinition: { name: envelope.toolMapping },
+          validatedArguments: envelope.knownArguments,
+          trustedDefinition: false,
+        };
+        if (envelope.supported) {
+          const definition = exposed.find((candidate) => candidate.name === envelope.toolMapping);
+          if (definition !== undefined && envelope.missingArguments.length === 0) {
+            precheckInput = await providePolicyInput(definition, envelope.knownArguments);
+          }
+        }
+        const policyDecision = this.#policyEngine.evaluate(
+          precheckInput,
+          toUtcTimestamp(this.#clock.nowMs()),
+        );
+        evidence.policyDecisions.push(policyDecision);
+        await emitRuntime("policy.decision.made", {
+          toolName: policyDecision.toolName,
+          decision: policyDecision.decision,
+          ruleId: policyDecision.ruleId,
+          reasonCode: policyDecision.reasonCode,
+          ...(policyDecision.contextVersion === null
+            ? {}
+            : { contextVersion: policyDecision.contextVersion }),
+          runtimeMode: this.mode,
+          boundary: "POLICY_GUARDED",
+        });
+        this.#throwIfSinkFailed(sinkFailed);
+      }
       toolAdapter = new PiToolAdapter(
         this.mode,
         (execution) => {
@@ -976,6 +1018,63 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         await session.prompt(renderGoalBoundPrompt(goalPlan, request.prompt));
       } finally {
         unsubscribe();
+      }
+
+      const plannedToolNames = evidence.toolExecutions.map((execution) => execution.toolName);
+      const completeness = criticalPathGuard.validate(criticalEnvelopes, plannedToolNames);
+      if (completeness.status === "PLAN_INCOMPLETE") {
+        let repairs;
+        try {
+          repairs = criticalPathGuard.constrainedRepair(criticalEnvelopes, plannedToolNames);
+        } catch {
+          throw new AgentRuntimeError(
+            "TOOL_ERROR",
+            "Critical plan is incomplete and cannot be repaired safely",
+          );
+        }
+        if (repairs.length > 0) {
+          if (run.status === "MODEL_RUNNING" || run.status === "MODEL_RESUMED") {
+            run.transition("TOOL_REQUESTED");
+            run.transition("TOOL_PROCESSING");
+          }
+          for (const [index, repair] of repairs.entries()) {
+            const definition = exposed.find((candidate) => candidate.name === repair.toolName);
+            if (definition === undefined) {
+              throw new AgentRuntimeError("TOOL_ERROR", "Critical plan repair Tool is unavailable");
+            }
+            const toolCallId = `constrained-repair:${index + 1}`;
+            await emitRuntime("tool.requested", {
+              toolName: repair.toolName,
+              toolCallId,
+              planStatus: "PLAN_INCOMPLETE",
+              runtimeMode: this.mode,
+              boundary: "POLICY_GUARDED",
+            });
+            let repairError: unknown;
+            try {
+              await toolAdapter.adapt(definition).execute(toolCallId, repair.arguments);
+            } catch (error) {
+              repairError = error;
+            }
+            await emitRuntime("tool.completed", {
+              toolName: repair.toolName,
+              toolCallId,
+              isError: repairError !== undefined,
+              runtimeMode: this.mode,
+              boundary: "POLICY_GUARDED",
+            });
+            if (repairError !== undefined && !(repairError instanceof PolicyControlError)) {
+              throw new AgentRuntimeError("TOOL_ERROR", "Critical plan repair failed safely");
+            }
+          }
+          if (run.status === "TOOL_PROCESSING") {
+            run.transition("MODEL_RESUMED");
+            await emitRuntime("model.resumed", {
+              runtimeMode: this.mode,
+              boundary: "POLICY_GUARDED",
+            });
+          }
+        }
       }
 
       await toolAdapter.waitForIdle();
