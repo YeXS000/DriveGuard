@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { shouldReleaseNativeFaultAfterEvent } from "../../evals/runner/live-provider.js";
+import {
+  createNativeEvaluationClock,
+  shouldReleaseNativeFaultAfterEvent,
+} from "../../evals/runner/live-provider.js";
 
 describe("Phase 13.2.1 Native fault lifetime", () => {
   it("releases a retry-safe duplicate-request injection after the first failed attempt", () => {
@@ -42,4 +45,17 @@ describe("Phase 13.2.1 Native fault lifetime", () => {
       ).toBe(false);
     },
   );
+});
+
+describe("Phase 13.2.1 Native evaluation policy clock", () => {
+  it("keeps one case snapshot age independent of provider wall time", () => {
+    const clock = createNativeEvaluationClock(1_000);
+
+    expect(clock.nowMs()).toBe(1_000);
+    expect(clock.nowMs()).toBe(1_000);
+  });
+
+  it.each([-1, 1.5, Number.NaN])("rejects invalid captured time %s", (value) => {
+    expect(() => createNativeEvaluationClock(value)).toThrow(TypeError);
+  });
 });

@@ -304,6 +304,15 @@ export function shouldReleaseNativeFaultAfterEvent(
   );
 }
 
+export function createNativeEvaluationClock(capturedAtMs = Date.now()): {
+  readonly nowMs: () => number;
+} {
+  if (!Number.isSafeInteger(capturedAtMs) || capturedAtMs < 0) {
+    throw new TypeError("Native evaluation clock requires a non-negative integer timestamp");
+  }
+  return Object.freeze({ nowMs: () => capturedAtMs });
+}
+
 async function mutateContext(baseUrl: string, item: NativeEvalCase): Promise<void> {
   if (item.contextMutation?.path === "vehicle.soc") {
     await post(baseUrl, "/simulator/vehicle/soc", { soc: item.contextMutation.after });
@@ -361,6 +370,7 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
           let eventSequence = 0;
           let faultArmed = false;
           let faultConfigured = false;
+          const evaluationClock = createNativeEvaluationClock();
           const runtime = createProductionDriveGuardRuntime({
             model: selection.model,
             streamFn: selection.models.streamSimple.bind(selection.models),
@@ -369,6 +379,7 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             serviceAvailability: DEFAULT_PHASE_5_SERVICES,
             mode: "development",
             developmentExecutionOptIn: true,
+            clock: evaluationClock,
             sensitiveValues: [apiKey],
             actionLifecycleEventSink: actionEvents,
             executionEventSink: {

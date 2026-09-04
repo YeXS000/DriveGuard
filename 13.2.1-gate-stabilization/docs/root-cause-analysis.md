@@ -57,3 +57,17 @@ key; it is not a benchmark-runner retry. Other injected fault lifetimes are unch
 Development-side regression asserts the mode-based lifetime without using Holdout case IDs or
 prompts. The original failed Holdout report is retained for audit, and all affected stability and
 Development gates are rerun before Holdout is reopened.
+
+## Provider-latency freshness drift
+
+During the corrected fault stability sequence, one case had a 6.3-second provider turn. The
+critical precheck correctly recorded `REQUIRE_CONFIRMATION`, but the later formal Tool Policy check
+evaluated the unchanged static Simulator source timestamps after the five-second freshness window
+and safely returned `REPLAN`. This made Policy classification and fault terminal state depend on
+provider wall time rather than case data.
+
+The isolated live harness now captures one fixed Policy clock per case after Simulator preparation.
+The Simulator snapshot, prompt, and policy context therefore describe one stable benchmark instant.
+End-to-end provider latency remains measured independently with `performance.now()`. Production
+runtimes still use `SystemClock`; no freshness rule, Policy profile, or production safety behavior is
+changed.
