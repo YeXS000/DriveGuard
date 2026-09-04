@@ -1,9 +1,5 @@
 # Phase 13.2.1 — Gate Stabilization & Reliability Closure
 
-Goal: close the remaining Phase 13.2 gate blockers without broad Agent redesign.
-
-# Phase 13.2.1 — Gate Stabilization & Reliability Closure
-
 This phase closes the two blockers left by Phase 13.2 without changing the frozen
 DriveGuard-Eval-v2 Ground Truth or the historical Scorer V2 result:
 
@@ -16,8 +12,9 @@ The original Agent safety boundary is unchanged. RX capabilities are not exposed
 all repaired side effects still traverse Policy, confirmation, Reliable Executor, persistence, and
 audit paths.
 
-Development gate status: **PASS** on one complete 420-case live observation set rescored in one pass
-with the corrected V2.1 aggregation. Agent code was frozen after this result. Holdout, serial
-latency, and CAR-bench evidence is recorded in `docs/final-report.md` after execution.
+Final Stage Gate: **PASS**. Development 420/420, Holdout 180/180, serial Holdout latency 180/180,
+Critical stability 3/3, Fault V2.1 stability 3/3, and external CAR-bench 125/125 all completed.
+Agent code remained frozen after `9a62b7df9a114c0dcb5965977b034ad2b90f64da`. The complete evidence
+and limitations are recorded in `docs/final-report.md`.
 
 Phase 14 is outside this directory and was not started.

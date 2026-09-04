@@ -1546,3 +1546,54 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - Final code-diff review found Critical 0 and High 0; no unresolved safety-boundary issue was found.
 - Final Stage Gate is **FAIL**. Holdout, serial latency, and CAR-bench stayed sealed; no Phase 13.2
   commit or merge to `main` was made. Phase 14 was not started.
+
+## Phase 13.2.1 — Gate Stabilization & Reliability Closure
+
+- Status: COMPLETE; final Stage Gate **PASS**.
+- Scope: Scorer V2.1 fault semantics, Critical Path Guard, constrained one-to-one plan repair,
+  evaluation clock/fault stabilization, three-round Critical and Fault gates, official Development,
+  sealed Holdout, serial latency, and external CAR-bench only. Phase 14 was not started.
+- Verification date: 2026-09-04 (Asia/Shanghai).
+
+### Implemented modules
+
+- `evals/scorers/v2.1.ts` and reporting: terminal fault states, applicability-specific recovery and
+  degradation denominators, and explicit audit counters without Ground Truth weakening.
+- Agent Runtime Critical Path Guard and precheck: records mandatory critical capabilities before
+  planning and permits one constrained repair of an already resolved one-to-one capability mapping.
+- Native runner/evaluator: duplicate-request fault lifetime, provider-latency-safe evaluation clock,
+  execution-event recapture, and response-staleness applicability corrections.
+- `13.2.1-gate-stabilization`: root-cause evidence, ADR, regression reports, official gate reports,
+  CAR-bench raw/aggregate evidence, and final report.
+
+### Measured verification
+
+| Check                | Result                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Critical stability   | 3/3 rounds; 130 cases each; Critical Policy 100%, Safety 100%, hard/audit counters 0                                 |
+| Fault V2.1 stability | 3/3 rounds; 31/31 handling, 10/10 recovery, 21/21 safe degradation each round                                        |
+| Development          | 420/420; case 90.00%; normal 92.03%; Tool/argument/Policy/Critical/Safety 100%; confirmation 94.59%; hard counters 0 |
+| Holdout              | 180/180; case 92.22%; normal 91.03%; all named quality/safety gates 100%; hard counters 0                            |
+| Serial latency       | 180/180, concurrency 1; Simple P50/P95 1689.12/3220.14 ms; Multi 2109.48/2564.85 ms                                  |
+| External CAR-bench   | 125/125; Raw/Valid Pass@1 41.60%/66.67%; VALID/AGENT/INFRA/EVALUATOR 52/26/47/0                                      |
+| Focused regression   | 80/80 PASS across 13 files                                                                                           |
+| Full regression      | 2,252 PASS across 83 files; 43 existing environment-gated tests skipped                                              |
+| Engineering checks   | format, lint, typecheck, build, diff check, frozen hashes, and secret scan PASS                                      |
+
+### Gate, integrity, and limitations
+
+- Agent code was frozen at `9a62b7df9a114c0dcb5965977b034ad2b90f64da`; later changes were
+  limited to evaluation correctness and evidence. The final evaluator correction is
+  `49ad013e5a4ed0e75f8cc327cdada7762d1a6f68`.
+- The frozen dataset and Scorer V2 hashes remain
+  `70ef4ea213bd0d46674b70a4d99334d11e2ec16644777fe5054a6a52278d601f` and
+  `d185ee551dcafaef3a87a160f99073c646b2b10f89bc4db3a1b8314093524d4f`.
+- CAR-bench remains an independent external track. It used official commit
+  `54990894241f2c07e9b523928c2a29e9b693d313`, one trial, no task/evaluator-semantic
+  modifications, and no post-result cherry-picking. Its 47 infrastructure failures, dominated by
+  upstream user-simulator invalid JSON/`UnboundLocalError` and bridge timeouts, remain raw failures.
+- Development retains 51 Agent failures and Holdout 14. Passing the phase gates is not a claim of
+  perfect general quality. PostgreSQL/Redis cases remain environment-gated when unavailable.
+- Review closure: Critical 0, High 0, unresolved safety-boundary issues 0. The temporary credential
+  existed only in the no-echo child process and expired with it; no secret was persisted.
+- Final Stage Gate **PASS**. `main` was not merged and Phase 14 was not started.
