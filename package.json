@@ -73,6 +73,12 @@
     "eval:phase13.1:offline-rescore:live": "npm run build --silent && node dist/evals/runner/offline-rescore-cli.js --v2-report 13.1-evaluation-calibration-scorer-v2/reports/native-v2/quality-live/native-v2.json --output-dir 13.1-evaluation-calibration-scorer-v2/reports/offline-rescore/live-v2",
     "eval:phase13.1:rescore:quality": "npm run build --silent && node dist/evals/runner/rescore-v2-cli.js --input 13.1-evaluation-calibration-scorer-v2/reports/native-v2/quality-live/native-v2.json",
     "eval:phase13.1:rescore:latency": "npm run build --silent && node dist/evals/runner/rescore-v2-cli.js --input 13.1-evaluation-calibration-scorer-v2/reports/native-v2/latency-live/native-v2.json",
+    "eval:phase13.2:split": "npm run build --silent && node dist/evals/runner/split-v2-cli.js",
+    "eval:phase13.2:dev": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode deterministic --profile quality --partition development --concurrency 4 --output-dir 13.2-agent-quality-remediation/reports/native-v2/development-deterministic",
+    "eval:phase13.2:dev:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile quality --partition development --concurrency 4 --output-dir 13.2-agent-quality-remediation/reports/native-v2/development-live",
+    "eval:phase13.2:holdout": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode deterministic --profile quality --partition holdout --concurrency 4 --output-dir 13.2-agent-quality-remediation/reports/native-v2/holdout-deterministic",
+    "eval:phase13.2:holdout:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile quality --partition holdout --concurrency 4 --output-dir 13.2-agent-quality-remediation/reports/native-v2/holdout-live",
+    "eval:phase13.2:latency:live": "npm run build --silent && node dist/evals/runner/v2-cli.js --mode live --profile latency --partition holdout --concurrency 1 --output-dir 13.2-agent-quality-remediation/reports/native-v2/holdout-latency-live",
     "test:phase1:live": "npm run build --silent && node dist/packages/agent-runtime/src/live-smoke.js"
   },
   "dependencies": {

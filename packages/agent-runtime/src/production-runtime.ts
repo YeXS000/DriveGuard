@@ -18,7 +18,7 @@ import {
   type ToolPolicyProfileRegistry,
 } from "@driveguard/policy";
 import type { Clock } from "@driveguard/shared";
-import type { ExecutionResult, ReliableToolExecutor } from "@driveguard/executor";
+import type { ExecutionResult, RecoveryReceipt, ReliableToolExecutor } from "@driveguard/executor";
 import type {
   ConversationMemory,
   SessionCoordinator,
@@ -34,11 +34,18 @@ import {
 } from "@driveguard/tools";
 
 import { AgentRun, type AgentRunSnapshot } from "./agent-run.js";
+import { ToolArgumentBinder } from "./argument-binder.js";
 import {
   ContextLoader,
+  ContextLoadFailure,
   selectEffectiveFreshness,
   type ContextFreshnessReport,
 } from "./context-loader.js";
+import {
+  createConfirmedActionCompletion,
+  type ConfirmedActionCompletion,
+} from "./final-response.js";
+import { GoalToolRouter, renderGoalBoundPrompt } from "./goal-router.js";
 import { PiEventAdapter } from "./pi-event-adapter.js";
 import {
   PiToolAdapter,
@@ -102,6 +109,7 @@ export interface DriveGuardRuntimeOptions {
     readonly cost: number;
     readonly isError: boolean;
   }) => void | Promise<void>;
+  readonly goalToolRouter?: GoalToolRouter;
 }
 
 export interface AgentRunRequest {
@@ -130,6 +138,7 @@ export interface AgentRunResult {
   readonly policyDecisions: readonly PolicyDecision[];
   /** Safe for model/application display. Never contains a confirmation token. */
   readonly confirmationRequired: readonly SafeConfirmationRequiredResult[];
+  readonly recoveryReceipts?: readonly RecoveryReceipt[];
   readonly context?: AgentRunContextSummary;
   readonly error?: RuntimeFailure;
 }
@@ -140,6 +149,7 @@ interface MutableRunEvidence {
   toolExecutions: FormalToolExecutionEvidence[];
   policyDecisions: PolicyDecision[];
   confirmationRequired: SafeConfirmationRequiredResult[];
+  recoveryReceipts: RecoveryReceipt[];
 }
 
 export interface ProductionDriveGuardRuntime {
@@ -151,6 +161,7 @@ export interface ProductionDriveGuardRuntime {
   sessionSnapshot(sessionId: string): AgentSessionSnapshot | undefined;
   sessionSnapshots(): readonly AgentSessionSnapshot[];
   confirmAndExecute(command: ConfirmActionCommand): Promise<ExecutionResult>;
+  confirmAndComplete(command: ConfirmActionCommand): Promise<ConfirmedActionCompletion>;
   run(request: AgentRunRequest): Promise<AgentRunResult>;
 }
 
@@ -203,6 +214,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   readonly #sessionCoordinator: SessionCoordinator | undefined;
   readonly #assistantTextDeltaSink: DriveGuardRuntimeOptions["assistantTextDeltaSink"];
   readonly #modelUsageSink: DriveGuardRuntimeOptions["modelUsageSink"];
+  readonly #goalToolRouter: GoalToolRouter;
   readonly confirmationService: ConfirmationService;
   readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   readonly #cancelledRunIds = new Set<string>();
@@ -242,6 +254,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     this.#sessionCoordinator = options.sessionCoordinator;
     this.#assistantTextDeltaSink = options.assistantTextDeltaSink;
     this.#modelUsageSink = options.modelUsageSink;
+    this.#goalToolRouter = options.goalToolRouter ?? new GoalToolRouter();
     this.confirmationService = options.confirmationService;
     this.trustedConfirmationChallengeChannel = options.trustedConfirmationChallengeChannel;
     this.#sessions = new AgentSessionStore(async (sessionId, identity) => {
@@ -350,6 +363,31 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     }
   }
 
+  async confirmAndComplete(command: ConfirmActionCommand): Promise<ConfirmedActionCompletion> {
+    const pending = await this.confirmationService.get(command.actionId);
+    if (pending === undefined) {
+      throw new AgentRuntimeError("INTERNAL_ERROR", "Pending action was not found");
+    }
+    const execution = await this.confirmAndExecute(command);
+    let stateRefresh: ConfirmedActionCompletion["stateRefresh"];
+    try {
+      const current = await this.#contextLoader.load();
+      stateRefresh = Object.freeze({
+        status: "REFRESHED",
+        snapshotId: current.snapshot.snapshotId,
+        contextVersion: current.snapshot.contextVersion,
+      });
+    } catch {
+      stateRefresh = Object.freeze({ status: "UNAVAILABLE" });
+    }
+    return createConfirmedActionCompletion({
+      command,
+      toolName: pending.toolName,
+      execution,
+      stateRefresh,
+    });
+  }
+
   async run(request: AgentRunRequest): Promise<AgentRunResult> {
     validateRequest(request);
     const generatedRunId = this.#generateId(this.#runIdFactory, "run", this.#issuedRunIds);
@@ -373,6 +411,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       toolExecutions: [],
       policyDecisions: [],
       confirmationRequired: [],
+      recoveryReceipts: [],
     };
     let sinkFailed = false;
     const fallbackEventFactory = new RuntimeEventFactory({
@@ -434,7 +473,14 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           boundary: "POLICY_GUARDED",
         }),
       );
-      return this.#result("failed", "", run, events, evidence, error.toFailure());
+      return this.#result(
+        "failed",
+        this.#safeFailureResponse(error),
+        run,
+        events,
+        evidence,
+        error.toFailure(),
+      );
     }
     await emit(startedEvent);
     if (sinkFailed) {
@@ -447,7 +493,14 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           boundary: "POLICY_GUARDED",
         }),
       );
-      return this.#result("failed", "", run, events, evidence, error.toFailure());
+      return this.#result(
+        "failed",
+        this.#safeFailureResponse(error),
+        run,
+        events,
+        evidence,
+        error.toFailure(),
+      );
     }
 
     const coordinated =
@@ -467,7 +520,14 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           boundary: "POLICY_GUARDED",
         }),
       );
-      return this.#result("failed", "", run, events, evidence, error.toFailure());
+      return this.#result(
+        "failed",
+        this.#safeFailureResponse(error),
+        run,
+        events,
+        evidence,
+        error.toFailure(),
+      );
     }
     let sessionLeaseLost = false;
     let reliableExecutionCommitted = false;
@@ -499,6 +559,9 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       sessionForLease = session;
       throwIfSessionLeaseLost();
     } catch (error) {
+      if (error instanceof ContextLoadFailure && error.recovery !== undefined) {
+        evidence.recoveryReceipts.push(error.recovery);
+      }
       await leaseHeartbeat.stop();
       await this.#sessionCoordinator?.release(request.sessionId, run.runId);
       const failure = sessionLeaseLost
@@ -516,7 +579,14 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           boundary: "POLICY_GUARDED",
         }),
       );
-      return this.#result("failed", "", run, events, evidence, failure.toFailure());
+      return this.#result(
+        "failed",
+        this.#safeFailureResponse(failure),
+        run,
+        events,
+        evidence,
+        failure.toFailure(),
+      );
     }
     if (!session.acquire(run)) {
       await leaseHeartbeat.stop();
@@ -533,7 +603,14 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           boundary: "POLICY_GUARDED",
         }),
       );
-      return this.#result("failed", "", run, events, evidence, error.toFailure());
+      return this.#result(
+        "failed",
+        this.#safeFailureResponse(error),
+        run,
+        events,
+        evidence,
+        error.toFailure(),
+      );
     }
     throwIfSessionLeaseLost();
     const transcriptCheckpoint = session.checkpoint();
@@ -570,9 +647,12 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           "Dynamic Tool capability resolution failed",
         );
       }
-      const exposed = definitions.filter((definition) =>
+      const modeAvailable = definitions.filter((definition) =>
         this.mode === "read_only" ? definition.riskLevel === "R0" : true,
       );
+      const goalPlan = this.#goalToolRouter.plan(request.prompt, modeAvailable);
+      const candidates = new Set<string>(goalPlan.candidateToolNames);
+      const exposed = modeAvailable.filter((definition) => candidates.has(definition.name));
       if (definitions.some((definition) => !formalNames.has(definition.name))) {
         throw new AgentRuntimeError(
           "CAPABILITY_RESOLUTION_FAILED",
@@ -600,6 +680,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       });
       this.#throwIfSinkFailed(sinkFailed);
       const conflictDetector = new ContextConflictDetector();
+      const confirmationIntents = new Set<string>();
       const policyGuard = new PolicyGuardedToolHandler({
         engine: this.#policyEngine,
         clock: this.#clock,
@@ -716,38 +797,54 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           policyInput: PolicyEvaluationInput,
         ) => {
           throwIfSessionLeaseLost();
-          const created = await this.confirmationService.create({
-            definition,
+          const intentKey = createActionFingerprint({
+            toolName: definition.name,
             validatedArguments,
-            runId: run.runId,
             sessionId: run.sessionId,
-            traceId: run.traceId,
             userId: policyInput.contextSnapshot.user.userId,
             vehicleId: policyInput.contextSnapshot.vehicle.vehicleId,
-            policyDecision,
-            contextSnapshot: policyInput.contextSnapshot,
+            contextSnapshotId: loaded.snapshot.snapshotId,
+            contextVersion: loaded.snapshot.contextVersion,
           });
+          if (confirmationIntents.has(intentKey)) return;
+          confirmationIntents.add(intentKey);
           try {
-            await this.trustedConfirmationChallengeChannel.publish(created.trustedChallenge);
-          } catch (error) {
+            const created = await this.confirmationService.create({
+              definition,
+              validatedArguments,
+              runId: run.runId,
+              sessionId: run.sessionId,
+              traceId: run.traceId,
+              userId: policyInput.contextSnapshot.user.userId,
+              vehicleId: policyInput.contextSnapshot.vehicle.vehicleId,
+              policyDecision,
+              contextSnapshot: policyInput.contextSnapshot,
+            });
             try {
-              await this.confirmationService.cancel({
-                actionId: created.action.actionId,
-                sessionId: created.action.sessionId,
-                userId: created.action.userId,
-              });
-            } catch {
-              // Preserve the original trusted-publication failure. cancel() transitions before emit.
-            } finally {
+              await this.trustedConfirmationChallengeChannel.publish(created.trustedChallenge);
+            } catch (error) {
               try {
-                this.trustedConfirmationChallengeChannel.discard(created.action.actionId);
+                await this.confirmationService.cancel({
+                  actionId: created.action.actionId,
+                  sessionId: created.action.sessionId,
+                  userId: created.action.userId,
+                });
               } catch {
-                // The original trusted-publication failure remains authoritative.
+                // Preserve the original trusted-publication failure. cancel() transitions before emit.
+              } finally {
+                try {
+                  this.trustedConfirmationChallengeChannel.discard(created.action.actionId);
+                } catch {
+                  // The original trusted-publication failure remains authoritative.
+                }
               }
+              throw error;
             }
+            evidence.confirmationRequired.push(created.safeResult);
+          } catch (error) {
+            confirmationIntents.delete(intentKey);
             throw error;
           }
-          evidence.confirmationRequired.push(created.safeResult);
         },
         allowedExecution: async (definition, validatedArguments, policyDecision, policyInput) => {
           throwIfSessionLeaseLost();
@@ -782,6 +879,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
             .finally(() => {
               reliableExecutionInFlight = false;
             });
+          if (execution.recovery !== undefined) evidence.recoveryReceipts.push(execution.recovery);
           if (execution.status !== "SUCCEEDED") {
             throw new ToolExecutionError(
               execution.error?.code === "DEPENDENCY_TIMEOUT"
@@ -803,6 +901,9 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
               toolName: execution.toolName,
               outcome: execution.outcome,
               completedAfterCancel: execution.completedAfterCancel,
+              ...(execution.validatedArguments === undefined
+                ? {}
+                : { validatedArguments: structuredClone(execution.validatedArguments) }),
               ...(execution.result === undefined
                 ? {}
                 : { result: structuredClone(execution.result) }),
@@ -813,6 +914,12 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
           );
         },
         policyGuard,
+        (definition, proposed) =>
+          new ToolArgumentBinder().bind(
+            definition.name as FormalToolName,
+            request.prompt,
+            proposed,
+          ),
       );
       session.setTools(toolAdapter.adaptAll(exposed));
       this.#throwIfCancelled(run);
@@ -866,7 +973,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       });
       const unsubscribe = session.subscribe(piEvents.observe);
       try {
-        await session.prompt(request.prompt);
+        await session.prompt(renderGoalBoundPrompt(goalPlan, request.prompt));
       } finally {
         unsubscribe();
       }
@@ -959,9 +1066,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       );
       return this.#result(
         cancelled && !effectiveSessionLeaseLost ? "cancelled" : "failed",
-        failure.code === "POLICY_CONFIRMATION_REQUIRED"
-          ? "User confirmation is required before this action can proceed."
-          : "",
+        this.#safeFailureResponse(failure),
         run,
         events,
         evidence,
@@ -1043,6 +1148,25 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     }
   }
 
+  #safeFailureResponse(failure: AgentRuntimeError): string {
+    switch (failure.code) {
+      case "POLICY_CONFIRMATION_REQUIRED":
+        return "User confirmation is required before this action can proceed.";
+      case "CONTEXT_LOAD_FAILED":
+        return "Current vehicle or trip state is temporarily unavailable after a bounded retry. No action was executed, and the requested result cannot be confirmed.";
+      case "TOOL_ERROR":
+        return "The requested operation did not complete after bounded recovery. The system stopped safely and cannot confirm the result.";
+      case "POLICY_DENIED":
+        return "Deterministic safety policy denied the requested operation. No action was executed.";
+      case "POLICY_REPLAN_REQUIRED":
+        return "The current context changed or is stale. No action was executed; a fresh plan is required.";
+      case "RUN_CANCELLED":
+        return "The request was cancelled before completion. The result cannot be confirmed.";
+      default:
+        return "The request failed safely. No action was executed, and the current result cannot be confirmed.";
+    }
+  }
+
   #throwIfSinkFailed(sinkFailed: boolean): void {
     if (sinkFailed) {
       throw new AgentRuntimeError("INTERNAL_ERROR", "Runtime event delivery failed safely");
@@ -1100,6 +1224,9 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
             toolName: execution.toolName,
             outcome: execution.outcome,
             completedAfterCancel: execution.completedAfterCancel,
+            ...(execution.validatedArguments === undefined
+              ? {}
+              : { validatedArguments: structuredClone(execution.validatedArguments) }),
             ...(execution.result === undefined
               ? {}
               : { result: structuredClone(execution.result) }),
@@ -1111,6 +1238,9 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       ),
       policyDecisions: Object.freeze([...evidence.policyDecisions]),
       confirmationRequired: Object.freeze([...evidence.confirmationRequired]),
+      recoveryReceipts: Object.freeze(
+        evidence.recoveryReceipts.map((receipt) => Object.freeze(structuredClone(receipt))),
+      ),
       ...(evidence.context === undefined ? {} : { context: evidence.context }),
       ...(error === undefined ? {} : { error }),
     });

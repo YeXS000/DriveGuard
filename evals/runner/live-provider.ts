@@ -5,10 +5,15 @@ import {
   DEFAULT_PHASE_5_CAPABILITIES,
   DEFAULT_PHASE_5_SERVICES,
   type AgentRunResult,
+  type ConfirmedActionCompletion,
   type ProductionDriveGuardRuntime,
 } from "@driveguard/agent-runtime";
 import { InMemoryActionLifecycleEventSink } from "@driveguard/action-lifecycle";
-import { InMemoryExecutionEventSink } from "@driveguard/executor";
+import {
+  InMemoryExecutionEventSink,
+  type ExecutionResult,
+  type RecoveryReceipt,
+} from "@driveguard/executor";
 import { buildVehicleSimulator } from "@driveguard/vehicle-simulator";
 import type { FastifyInstance } from "fastify";
 import { isDeepStrictEqual } from "node:util";
@@ -18,11 +23,26 @@ import { toNativeEvalCaseV2 } from "../native/datasets/v2.js";
 import type {
   BusinessOutcomeStatusV2,
   NativeCaseIdentityV2,
+  NativeObservationV2,
   PolicyDecisionV2,
   TaskContractV2,
 } from "../native/v2-types.js";
 import { executeUrgentEvaluation } from "./urgent-provider.js";
 import { defaultCaseIdentityV2, lifecycleFromLiveEvidence } from "./v2-observation.js";
+
+export function classifyLiveModelFailure(
+  failure: AgentRunResult["error"],
+): Pick<NativeObservationV2, "validity" | "infrastructureError"> {
+  if (failure?.code !== "MODEL_ERROR") return { validity: "VALID" };
+  const infrastructureFailure =
+    /(?:insufficient_user_quota|credit insufficient|quota|\b429\b|rate.?limit|\b5\d\d\b|ECONNRESET|ENOTFOUND|EAI_AGAIN|ETIMEDOUT|fetch failed|network|socket|connection aborted)/iu.test(
+      failure.message,
+    );
+  return {
+    validity: infrastructureFailure ? "INFRA_FAILURE" : "EVALUATOR_FAILURE",
+    infrastructureError: failure.message,
+  };
+}
 
 interface SimulatorSnapshot {
   readonly vehicle: Readonly<Record<string, unknown>>;
@@ -197,6 +217,29 @@ function argumentsFromResult(toolName: string, result: unknown): Record<string, 
   return {};
 }
 
+function argumentsFromExecution(
+  execution: AgentRunResult["toolExecutions"][number],
+): Record<string, unknown> {
+  if (
+    typeof execution.validatedArguments === "object" &&
+    execution.validatedArguments !== null &&
+    !Array.isArray(execution.validatedArguments)
+  ) {
+    return structuredClone(execution.validatedArguments as Record<string, unknown>);
+  }
+  return argumentsFromResult(execution.toolName, execution.result);
+}
+
+export function formalToolSchemaWasValidated(
+  execution: AgentRunResult["toolExecutions"][number],
+): boolean {
+  return (
+    execution.validatedArguments !== undefined ||
+    execution.policyControlResult !== undefined ||
+    execution.outcome === "succeeded"
+  );
+}
+
 async function post(baseUrl: string, path: string, body: unknown): Promise<void> {
   const response = await fetch(`${baseUrl}${path}`, {
     method: "POST",
@@ -228,6 +271,9 @@ export async function prepareNativeCase(baseUrl: string, item: NativeEvalCase): 
     await post(baseUrl, "/media/volume", { volume: initial.mediaVolume });
   }
   assertInitialState(await simulatorState(baseUrl), initial);
+}
+
+export async function configureNativeFault(baseUrl: string, item: NativeEvalCase): Promise<void> {
   if (item.faultInjection !== undefined) {
     const mode =
       item.faultInjection.mode === "ambiguous_side_effect"
@@ -298,6 +344,8 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
           let runSequence = 0;
           let traceSequence = 0;
           let eventSequence = 0;
+          let faultArmed = false;
+          let faultConfigured = false;
           const runtime = createProductionDriveGuardRuntime({
             model: selection.model,
             streamFn: selection.models.streamSimple.bind(selection.models),
@@ -310,6 +358,14 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             actionLifecycleEventSink: actionEvents,
             executionEventSink: executionEvents,
             runtimeOverrides: {
+              eventSink: {
+                emit: async (event) => {
+                  if (faultArmed && !faultConfigured && event.eventType === "context.loaded") {
+                    faultConfigured = true;
+                    await configureNativeFault(baseUrl, item);
+                  }
+                },
+              },
               runIdFactory: () => `${requestedIdentity.runId}:runtime:${++runSequence}`,
               traceIdFactory: () => `${requestedIdentity.traceId}:runtime:${++traceSequence}`,
               eventIdFactory: () => `${requestedIdentity.runId}:event:${++eventSequence}`,
@@ -323,6 +379,7 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             await runtime.run({ sessionId, prompt: "请先读取当前状态，稍后我会要求刷新。" });
             await mutateContext(baseUrl, item);
           }
+          faultArmed = true;
           const actionEventStart = actionEvents.slice().length;
           const executionEventStart = executionEvents.slice().length;
           const beforeExecution = await simulatorState(baseUrl);
@@ -332,7 +389,19 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             prompt: item.userPrompt,
             traceId: requestedIdentity.traceId,
           });
+          if (process.env.DRIVEGUARD_EVAL_DEBUG === "1" && result.error !== undefined) {
+            process.stderr.write(
+              `[native-v2-debug] ${JSON.stringify({
+                caseId: item.caseId,
+                code: result.error.code,
+                message: result.error.message,
+                retryable: result.error.retryable,
+              })}\n`,
+            );
+          }
+          const liveValidity = classifyLiveModelFailure(result.error);
           const confirmedToolNames: string[] = [];
+          const confirmedCompletions: ConfirmedActionCompletion[] = [];
           const pendingByTool = new Map<string, Record<string, unknown>>();
           for (const required of result.confirmationRequired) {
             pendingByTool.set(
@@ -342,12 +411,17 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             const challenge = runtime.trustedConfirmationChallengeChannel.take(required.actionId);
             if (challenge !== undefined) {
               const didSucceed = await confirmationExecutionSucceeded(() =>
-                runtime.confirmAndExecute({
-                  actionId: challenge.actionId,
-                  confirmationToken: challenge.confirmationToken,
-                  sessionId: challenge.sessionId,
-                  userId: challenge.userId,
-                }),
+                runtime
+                  .confirmAndComplete({
+                    actionId: challenge.actionId,
+                    confirmationToken: challenge.confirmationToken,
+                    sessionId: challenge.sessionId,
+                    userId: challenge.userId,
+                  })
+                  .then((completion) => {
+                    confirmedCompletions.push(completion);
+                    return completion.execution;
+                  }),
               );
               if (didSucceed) confirmedToolNames.push(required.toolName);
             }
@@ -356,15 +430,25 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
           const toolCalls: ObservedToolCall[] = result.toolExecutions.map((execution) => ({
             name: execution.toolName,
             arguments: Object.freeze(
-              pendingByTool.get(execution.toolName) ??
-                argumentsFromResult(execution.toolName, execution.result),
+              execution.validatedArguments === undefined
+                ? (pendingByTool.get(execution.toolName) ?? argumentsFromExecution(execution))
+                : argumentsFromExecution(execution),
             ),
-            schemaValid:
-              execution.policyControlResult !== undefined || execution.outcome === "succeeded",
+            schemaValid: formalToolSchemaWasValidated(execution),
           }));
           const snapshot = await simulatorState(baseUrl);
+          const confirmedExecutionResults: readonly ExecutionResult[] = confirmedCompletions.map(
+            (completion) => completion.execution,
+          );
+          const finalResponse = confirmedCompletions.at(-1)?.response ?? result.response;
           const currentActionEvents = actionEvents.slice().slice(actionEventStart);
           const currentExecutionEvents = executionEvents.slice().slice(executionEventStart);
+          const recoveryReceipts: readonly RecoveryReceipt[] = Object.freeze([
+            ...(result.recoveryReceipts ?? []),
+            ...confirmedExecutionResults.flatMap((execution) =>
+              execution.recovery === undefined ? [] : [execution.recovery],
+            ),
+          ]);
           const contextFacts =
             item.contextMutation === undefined
               ? {}
@@ -428,7 +512,9 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             (call) => call.name === "get_charging_status",
           );
           const recoveryContract = v2Case.contract.recovery;
-          const outcomeReconciled = outcomeUnknown && recoveryAuxiliaryCalled;
+          const outcomeReconciled =
+            (outcomeUnknown && recoveryAuxiliaryCalled) ||
+            recoveryReceipts.some((receipt) => receipt.reconciliationStatus !== undefined);
           const blindWriteRetry =
             recoveryContract.kind === "AMBIGUOUS_SIDE_EFFECT" &&
             attemptCount > 1 &&
@@ -453,7 +539,7 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             faultInjected: item.faultInjection !== undefined,
             ambiguousSideEffect: recoveryContract.kind === "AMBIGUOUS_SIDE_EFFECT",
             outcomeReconciled,
-            response: result.response,
+            response: finalResponse,
           });
           const v2 = Object.freeze({
             identity: Object.freeze({
@@ -461,7 +547,7 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
               runId: result.run.runId,
               traceId: result.run.traceId,
             }),
-            validity: "VALID" as const,
+            ...liveValidity,
             toolCalls: Object.freeze(toolCalls.map((call) => Object.freeze({ ...call }))),
             policyEvaluations: Object.freeze(
               result.policyDecisions.map((decision) =>
@@ -476,7 +562,9 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
               userConfirmed,
               executionStarted,
               executionSucceeded: executionEventSucceeded,
-              stateRefreshed: executionEventSucceeded,
+              stateRefreshed: confirmedCompletions.some((completion) =>
+                completion.lifecycle.includes("STATE_REFRESHED"),
+              ),
             }),
             execution: Object.freeze({
               agentToolExecution:
@@ -495,23 +583,33 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             }),
             recovery: Object.freeze({
               attempted: item.faultInjection !== undefined,
-              succeeded: item.faultInjection !== undefined && executionSucceeded,
+              succeeded:
+                item.faultInjection !== undefined &&
+                (executionSucceeded ||
+                  recoveryReceipts.some((receipt) => receipt.status !== "UNKNOWN")),
               safeDegradation:
                 item.faultInjection !== undefined &&
                 !executionSucceeded &&
-                result.response.trim().length > 0 &&
+                finalResponse.trim().length > 0 &&
                 duplicateSideEffects === 0,
               outcomeReconciled,
               blindWriteRetry,
               duplicateRequestCount: Math.max(
                 attemptCount - 1,
+                recoveryReceipts.reduce(
+                  (maximum, receipt) => Math.max(maximum, receipt.retryCount),
+                  0,
+                ),
                 0,
                 toolCalls.filter((call) => SIDE_EFFECT_TOOL_NAMES.has(call.name)).length -
                   uniqueAttemptedSideEffects,
               ),
-              ...(attemptCount > 1 ? { idempotencyKeyReused: true } : {}),
+              ...(attemptCount > 1 ||
+              recoveryReceipts.some((receipt) => receipt.idempotencyKeyReused)
+                ? { idempotencyKeyReused: true }
+                : {}),
             }),
-            finalResponse: result.response,
+            finalResponse,
             latencyMs,
             benchmarkRetryCount: 0,
             providerRetryCount: null,
@@ -534,7 +632,7 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
                 ? structuredClone(item.expectedOutcome)
                 : {
                     status: result.status,
-                    response: result.response,
+                    response: finalResponse,
                     actualSimulatorEffects,
                     duplicateSideEffects,
                   },

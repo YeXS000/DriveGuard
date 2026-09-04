@@ -15,6 +15,11 @@ import type {
 } from "@driveguard/domain";
 import { DomainValidationError } from "@driveguard/domain";
 import type { ServiceAvailability } from "@driveguard/capabilities";
+import {
+  RecoveryExhaustedError,
+  RecoveryManager,
+  type RecoveryReceipt,
+} from "@driveguard/executor";
 import type { SimulatorClient } from "@driveguard/tools";
 
 import { AgentRuntimeError } from "./runtime-errors.js";
@@ -47,6 +52,21 @@ export interface ContextLoaderOptions {
   readonly freshnessEvaluator: ContextFreshnessEvaluator;
   readonly freshnessRequirement?: FreshnessRequirement;
   readonly latestVersionProvider?: (snapshot: ContextSnapshot) => unknown;
+  readonly recoveryManager?: RecoveryManager;
+}
+
+export class ContextLoadFailure extends AgentRuntimeError {
+  readonly recovery: RecoveryReceipt | undefined;
+
+  constructor(recovery?: RecoveryReceipt) {
+    super(
+      "CONTEXT_LOAD_FAILED",
+      "Current vehicle or trip context could not be loaded after bounded recovery",
+      true,
+    );
+    this.name = "ContextLoadFailure";
+    this.recovery = recovery;
+  }
 }
 
 export function selectEffectiveFreshness(
@@ -71,6 +91,7 @@ export class ContextLoader {
   readonly #freshnessEvaluator: ContextFreshnessEvaluator;
   readonly #requirement: FreshnessRequirement;
   readonly #latestVersionProvider: (snapshot: ContextSnapshot) => unknown;
+  readonly #recoveryManager: RecoveryManager;
 
   constructor(options: ContextLoaderOptions) {
     this.#provider = options.provider;
@@ -82,6 +103,7 @@ export class ContextLoader {
     };
     this.#latestVersionProvider =
       options.latestVersionProvider ?? ((snapshot) => snapshot.contextVersion);
+    this.#recoveryManager = options.recoveryManager ?? new RecoveryManager();
   }
 
   async load(): Promise<LoadedRuntimeContext> {
@@ -95,19 +117,17 @@ export class ContextLoader {
     };
     try {
       const [vehicle, trip, weather, user, capabilities, services] = await Promise.all([
-        this.#provider.loadVehicleState(),
-        this.#provider.loadTripState(),
+        this.#recoveryManager.executeRead(() => this.#provider.loadVehicleState()),
+        this.#recoveryManager.executeRead(() => this.#provider.loadTripState()),
         this.#provider.loadWeatherState(),
         this.#provider.loadUser(),
         this.#provider.loadCapabilities(),
         this.#provider.loadServiceAvailability(),
       ]);
       source = { vehicle, trip, weather, user, capabilities, services };
-    } catch {
-      throw new AgentRuntimeError(
-        "CONTEXT_LOAD_FAILED",
-        "Current vehicle or trip context could not be loaded",
-        true,
+    } catch (error) {
+      throw new ContextLoadFailure(
+        error instanceof RecoveryExhaustedError ? error.receipt : undefined,
       );
     }
 

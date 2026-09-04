@@ -96,12 +96,11 @@ export function lifecycleFromLiveEvidence(input: {
   if (input.toolRequested) states.push("ACTION_PROPOSED");
   if (input.policyChecked) states.push("POLICY_CHECKED");
   if (input.confirmationCreated) states.push("CONFIRMATION_CREATED");
-  // The current Runtime emits its model response before the trusted confirmation turn.
-  if (input.finalResponseProduced) states.push("FINAL_RESPONSE");
   if (input.userConfirmed) states.push("USER_CONFIRMED");
   if (input.executionStarted) states.push("EXECUTING");
   if (input.executionSucceeded) states.push("EXECUTED");
   if (input.stateRefreshed) states.push("STATE_REFRESHED");
+  if (input.finalResponseProduced) states.push("FINAL_RESPONSE");
   return Object.freeze(states);
 }
 

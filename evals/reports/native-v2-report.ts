@@ -16,6 +16,7 @@ export function renderNativeV2Report(report: NativeBenchmarkReportV2): string {
 - Comparable to Phase 13 serial latency: \`${report.latencyComparableToPhase13Serial}\`
 - Benchmark retries: \`${report.benchmarkRequestRetryCount}\`
 - Provider retries: \`${report.providerRetryCount ?? "unobserved"}\`
+- Git commit / dirty worktree: \`${report.gitCommit}\` / \`${report.worktreeDirty ?? "unrecorded"}\`
 
 | Metric | V2 result |
 | --- | ---: |

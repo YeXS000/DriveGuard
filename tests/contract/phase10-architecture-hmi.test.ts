@@ -67,7 +67,7 @@ describe("Phase 10 architecture and HMI boundary", () => {
   });
 
   it("routes confirmation through the formal Runtime and ConfirmationService", () => {
-    expect(service).toContain("runtime.confirmAndExecute");
+    expect(service).toContain("runtime.confirmAndComplete");
     expect(service).toContain("runtime.confirmationService.reject");
     expect(service).toContain("runtime.confirmationService.cancel");
     expect(service).not.toMatch(/action\.state\s*=(?!=)/u);

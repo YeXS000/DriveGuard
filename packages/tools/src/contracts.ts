@@ -90,15 +90,30 @@ export const TOOL_ERROR_CODES = [
 ] as const;
 export type ToolErrorCode = (typeof TOOL_ERROR_CODES)[number];
 
+export type ToolFailureType =
+  | "TIMEOUT"
+  | "HTTP_503"
+  | "CONNECTION_ABORT"
+  | "DEFINITE_FAILURE"
+  | "AMBIGUOUS_SIDE_EFFECT"
+  | "DUPLICATE_REQUEST";
+
 export class ToolExecutionError extends Error {
   readonly code: ToolErrorCode;
   readonly toolName: string;
+  readonly failureType: ToolFailureType | undefined;
 
-  constructor(code: ToolErrorCode, toolName: string, message: string) {
+  constructor(
+    code: ToolErrorCode,
+    toolName: string,
+    message: string,
+    failureType?: ToolFailureType,
+  ) {
     super(message);
     this.name = "ToolExecutionError";
     this.code = code;
     this.toolName = toolName;
+    this.failureType = failureType;
   }
 
   toJSON(): {

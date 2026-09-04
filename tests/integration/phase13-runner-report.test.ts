@@ -7,7 +7,9 @@ import {
   assertInitialState,
   confirmationExecutionSucceeded,
   confirmationWasBypassed,
+  configureNativeFault,
   duplicateSideEffectCount,
+  formalToolSchemaWasValidated,
   forbiddenActionWasExecuted,
   prepareNativeCase,
   requiredExecutionSucceeded,
@@ -294,5 +296,42 @@ describe("Phase 13 runner isolation, filtering and reports", () => {
     } finally {
       await app.close();
     }
+  });
+
+  it("arms Native executor faults only after the initial Context load boundary", async () => {
+    const app = buildVehicleSimulator();
+    const baseUrl = await app.listen({ host: "127.0.0.1", port: 0 });
+    const item = dataset.find(
+      (candidate) =>
+        candidate.faultInjection?.target === "vehicle.get_state" &&
+        candidate.faultInjection.mode === "http_503",
+    );
+    expect(item).toBeDefined();
+    try {
+      await prepareNativeCase(baseUrl, item!);
+      expect((await fetch(`${baseUrl}/vehicle/state`)).status).toBe(200);
+      await configureNativeFault(baseUrl, item!);
+      expect((await fetch(`${baseUrl}/vehicle/state`)).status).toBe(503);
+    } finally {
+      await app.close();
+    }
+  });
+
+  it("keeps schema-valid evidence distinct from a downstream dependency failure", () => {
+    expect(
+      formalToolSchemaWasValidated({
+        toolName: "get_vehicle_state",
+        outcome: "failed",
+        completedAfterCancel: false,
+        validatedArguments: {},
+      }),
+    ).toBe(true);
+    expect(
+      formalToolSchemaWasValidated({
+        toolName: "get_vehicle_state",
+        outcome: "failed",
+        completedAfterCancel: false,
+      }),
+    ).toBe(false);
   });
 });

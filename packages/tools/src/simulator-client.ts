@@ -290,16 +290,27 @@ export class SimulatorClient {
     } catch (error) {
       if (error instanceof ToolExecutionError) throw error;
       if (controller.signal.aborted) {
-        throw new ToolExecutionError("DEPENDENCY_TIMEOUT", toolName, "Simulator request timed out");
+        throw new ToolExecutionError(
+          "DEPENDENCY_TIMEOUT",
+          toolName,
+          "Simulator request timed out",
+          "TIMEOUT",
+        );
       }
       if (options.signal?.aborted === true) {
         throw new ToolExecutionError(
           "DEPENDENCY_UNAVAILABLE",
           toolName,
           "Simulator request aborted",
+          "CONNECTION_ABORT",
         );
       }
-      throw new ToolExecutionError("DEPENDENCY_UNAVAILABLE", toolName, "Simulator request failed");
+      throw new ToolExecutionError(
+        "DEPENDENCY_UNAVAILABLE",
+        toolName,
+        "Simulator request failed",
+        "CONNECTION_ABORT",
+      );
     } finally {
       clearTimeout(timer);
     }
@@ -317,6 +328,7 @@ export class SimulatorClient {
         "DEPENDENCY_UNAVAILABLE",
         toolName,
         "Simulator dependency is unavailable",
+        status === 503 ? "HTTP_503" : "DEFINITE_FAILURE",
       );
     }
     throw new ToolExecutionError(

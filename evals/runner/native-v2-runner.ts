@@ -20,6 +20,7 @@ export interface NativeBenchmarkReportV2 {
   readonly datasetVersion: "DriveGuard-Eval-v2.0.0";
   readonly scorerVersion: typeof NATIVE_SCORER_V2_VERSION;
   readonly gitCommit: string;
+  readonly worktreeDirty?: boolean;
   readonly mode: "deterministic" | "live";
   readonly profile: BenchmarkProfileV2;
   readonly concurrency: number;
@@ -137,6 +138,8 @@ export interface RunNativeBenchmarkV2Options {
   readonly concurrency?: number;
   readonly gitCommit: string;
   readonly infrastructureRetries?: number;
+  readonly benchmarkRunPrefix?: "phase13.1" | "phase13.2";
+  readonly worktreeDirty?: boolean;
   readonly executeLiveCase?: (
     item: NativeEvalCase,
     identity: NativeCaseIdentityV2,
@@ -162,7 +165,7 @@ export async function runNativeBenchmarkV2(
   if (options.mode === "live" && options.executeLiveCase === undefined) {
     throw new Error("Live V2 mode requires a live case executor");
   }
-  const benchmarkRunId = `phase13.1:${randomUUID()}`;
+  const benchmarkRunId = `${options.benchmarkRunPrefix ?? "phase13.1"}:${randomUUID()}`;
   const startedAt = new Date().toISOString();
   const observations = await mapWithConcurrency(
     options.cases.map((contract, index) => ({ contract, source: options.sourceCases[index]! })),
@@ -212,6 +215,7 @@ export async function runNativeBenchmarkV2(
     datasetVersion: "DriveGuard-Eval-v2.0.0",
     scorerVersion: NATIVE_SCORER_V2_VERSION,
     gitCommit: options.gitCommit,
+    ...(options.worktreeDirty === undefined ? {} : { worktreeDirty: options.worktreeDirty }),
     mode: options.mode,
     profile,
     concurrency,

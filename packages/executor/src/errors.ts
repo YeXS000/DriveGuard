@@ -6,14 +6,17 @@ import type {
   ExecutionErrorCode,
   SafeExecutionError,
 } from "./types.js";
+import { recoveryFailureType, type RecoveryFailureType } from "./recovery.js";
 
 export class ExecutorFault extends Error {
   readonly code: ExecutionErrorCode;
+  readonly failureType: RecoveryFailureType | undefined;
 
-  constructor(code: ExecutionErrorCode, message: string) {
+  constructor(code: ExecutionErrorCode, message: string, failureType?: RecoveryFailureType) {
     super(message);
     this.name = "ExecutorFault";
     this.code = code;
+    this.failureType = failureType;
   }
 }
 
@@ -48,11 +51,15 @@ export function authorizationErrorCode(error: unknown): ExecutionErrorCode {
   return "EXECUTION_NOT_AUTHORIZED";
 }
 
-export function classifyToolError(
+export function classifyToolFailure(
   error: unknown,
   sideEffect: boolean,
   downstreamRetrySafe: boolean,
-): { readonly classification: ExecutionErrorClassification; readonly code: ExecutionErrorCode } {
+): {
+  readonly classification: ExecutionErrorClassification;
+  readonly code: ExecutionErrorCode;
+  readonly failureType: RecoveryFailureType;
+} {
   let code: ExecutionErrorCode = "TOOL_EXECUTION_FAILED";
   let transient = false;
   if (error instanceof ExecutorFault) {
@@ -67,9 +74,29 @@ export function classifyToolError(
       transient = true;
     }
   }
-  if (!transient) return { classification: "NON_RETRYABLE", code };
-  if (sideEffect && !downstreamRetrySafe) {
-    return { classification: "AMBIGUOUS_SIDE_EFFECT", code };
+  const failureType = recoveryFailureType(error);
+  const hasExplicitFailureType =
+    typeof error === "object" && error !== null && Reflect.get(error, "failureType") !== undefined;
+  const explicitlyAmbiguous =
+    hasExplicitFailureType &&
+    (failureType === "TIMEOUT" ||
+      failureType === "CONNECTION_ABORT" ||
+      failureType === "AMBIGUOUS_SIDE_EFFECT");
+  if (!transient) return { classification: "NON_RETRYABLE", code, failureType };
+  if (sideEffect && (explicitlyAmbiguous || (!hasExplicitFailureType && !downstreamRetrySafe))) {
+    return { classification: "AMBIGUOUS_SIDE_EFFECT", code, failureType };
   }
-  return { classification: "RETRYABLE", code };
+  if (sideEffect && !downstreamRetrySafe) {
+    return { classification: "NON_RETRYABLE", code, failureType };
+  }
+  return { classification: "RETRYABLE", code, failureType };
+}
+
+export function classifyToolError(
+  error: unknown,
+  sideEffect: boolean,
+  downstreamRetrySafe: boolean,
+): { readonly classification: ExecutionErrorClassification; readonly code: ExecutionErrorCode } {
+  const classified = classifyToolFailure(error, sideEffect, downstreamRetrySafe);
+  return { classification: classified.classification, code: classified.code };
 }

@@ -13,6 +13,8 @@ export const EXECUTION_EVENT_TYPES = [
   "execution.succeeded",
   "execution.failed",
   "execution.outcome_unknown",
+  "execution.reconciliation.started",
+  "execution.reconciliation.completed",
 ] as const;
 export type ExecutionEventType = (typeof EXECUTION_EVENT_TYPES)[number];
 
