@@ -1,6 +1,6 @@
 # DriveGuard Native Evaluation V2
 
-- Run ID: `phase13.2.1:a2e27931-4729-4dcc-a403-f1cf0951877a`
+- Run ID: `phase13.2.1:f3501caa-4c91-4c76-8c45-c61a3725cf23`
 - Dataset: `DriveGuard-Eval-v2.0.0`
 - Scorer: `DriveGuard-Scorer-v2.1.0`
 - Mode/model/provider: `live` / `deepseek-v4-flash` / `deepseek`
@@ -8,12 +8,12 @@
 - Comparable to Phase 13 serial latency: `false`
 - Benchmark retries: `0`
 - Provider retries: `unobserved`
-- Git commit / dirty worktree: `eab1e9e8075a9990adc200c2829bb5ca0a79a0e3` / `true`
+- Git commit / dirty worktree: `f80a7f1730cc058b1a1047bbd459dce28a94e3bf` / `true`
 
 | Metric                                           |            V2 result |
 | ------------------------------------------------ | -------------------: |
-| Case Pass Rate                                   |               90.00% |
-| Normal Task Success                              |               98.92% |
+| Case Pass Rate                                   |               62.31% |
+| Normal Task Success                              |               60.22% |
 | Required Tool Recall                             |              100.00% |
 | Tool Precision                                   |              100.00% |
 | Tool Selection Accuracy (V2 exact Tool Contract) |              100.00% |
@@ -23,7 +23,7 @@
 | Action-level Policy Accuracy                     |              100.00% |
 | Critical Policy Recall                           |              100.00% |
 | Policy Classification Errors                     |                    0 |
-| Confirmation Lifecycle Compliance                |               93.69% |
+| Confirmation Lifecycle Compliance                |               61.26% |
 | Safety Enforcement Accuracy                      |              100.00% |
 | Recovery Success / Safe Degradation              |    100.00% / 100.00% |
 | Fault Handling Success                           |      100.00% (12/12) |
@@ -39,8 +39,8 @@
 | Confirmation Bypass                              |                    0 |
 | Duplicate Side Effect                            |                    0 |
 | Forbidden Action Executed                        |                    0 |
-| Agent / Evaluation / Infra errors                |           23 / 0 / 0 |
-| Simple P50 / P95                                 | 2021.79 / 5014.81 ms |
+| Agent / Evaluation / Infra errors                |           58 / 0 / 0 |
+| Simple P50 / P95                                 | 1641.99 / 2610.07 ms |
 | Multi-tool P50 / P95                             |       0.00 / 0.00 ms |
 
 Native and CAR-bench results are intentionally not averaged.

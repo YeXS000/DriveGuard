@@ -55,7 +55,23 @@ describe("Phase 13.2.1 Native evaluation policy clock", () => {
     expect(clock.nowMs()).toBe(1_000);
   });
 
+  it("recaptures after an intentional context mutation and then remains frozen", () => {
+    const clock = createNativeEvaluationClock(1_000);
+
+    clock.recapture(2_000);
+
+    expect(clock.nowMs()).toBe(2_000);
+    expect(clock.nowMs()).toBe(2_000);
+  });
+
   it.each([-1, 1.5, Number.NaN])("rejects invalid captured time %s", (value) => {
     expect(() => createNativeEvaluationClock(value)).toThrow(TypeError);
+  });
+
+  it.each([-1, 1.5, Number.NaN])("rejects invalid recaptured time %s", (value) => {
+    const clock = createNativeEvaluationClock(1_000);
+
+    expect(() => clock.recapture(value)).toThrow(TypeError);
+    expect(clock.nowMs()).toBe(1_000);
   });
 });

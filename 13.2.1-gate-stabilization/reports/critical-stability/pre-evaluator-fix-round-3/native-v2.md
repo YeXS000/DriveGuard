@@ -1,6 +1,6 @@
 # DriveGuard Native Evaluation V2
 
-- Run ID: `phase13.2.1:8c0b8b30-5cc8-41e0-b740-268cc842e3c6`
+- Run ID: `phase13.2.1:6ac88cca-43ee-4d7c-9e38-c7839b9b3640`
 - Dataset: `DriveGuard-Eval-v2.0.0`
 - Scorer: `DriveGuard-Scorer-v2.1.0`
 - Mode/model/provider: `live` / `deepseek-v4-flash` / `deepseek`
@@ -8,22 +8,22 @@
 - Comparable to Phase 13 serial latency: `false`
 - Benchmark retries: `0`
 - Provider retries: `unobserved`
-- Git commit / dirty worktree: `f80a7f1730cc058b1a1047bbd459dce28a94e3bf` / `true`
+- Git commit / dirty worktree: `eab1e9e8075a9990adc200c2829bb5ca0a79a0e3` / `true`
 
 | Metric                                           |            V2 result |
 | ------------------------------------------------ | -------------------: |
-| Case Pass Rate                                   |               62.31% |
-| Normal Task Success                              |               60.22% |
+| Case Pass Rate                                   |               90.00% |
+| Normal Task Success                              |               98.92% |
 | Required Tool Recall                             |              100.00% |
-| Tool Precision                                   |              100.00% |
-| Tool Selection Accuracy (V2 exact Tool Contract) |              100.00% |
-| Exact Plan Success                               |              100.00% |
-| Missing / Unnecessary Tool Count                 |                0 / 0 |
+| Tool Precision                                   |               99.19% |
+| Tool Selection Accuracy (V2 exact Tool Contract) |               99.23% |
+| Exact Plan Success                               |               99.23% |
+| Missing / Unnecessary Tool Count                 |                0 / 1 |
 | Argument Validity                                |              100.00% |
 | Action-level Policy Accuracy                     |              100.00% |
 | Critical Policy Recall                           |              100.00% |
 | Policy Classification Errors                     |                    0 |
-| Confirmation Lifecycle Compliance                |               61.26% |
+| Confirmation Lifecycle Compliance                |               94.59% |
 | Safety Enforcement Accuracy                      |              100.00% |
 | Recovery Success / Safe Degradation              |    100.00% / 100.00% |
 | Fault Handling Success                           |      100.00% (12/12) |
@@ -39,8 +39,8 @@
 | Confirmation Bypass                              |                    0 |
 | Duplicate Side Effect                            |                    0 |
 | Forbidden Action Executed                        |                    0 |
-| Agent / Evaluation / Infra errors                |           58 / 0 / 0 |
-| Simple P50 / P95                                 | 1572.66 / 2917.89 ms |
+| Agent / Evaluation / Infra errors                |           22 / 0 / 0 |
+| Simple P50 / P95                                 | 2071.82 / 3724.91 ms |
 | Multi-tool P50 / P95                             |       0.00 / 0.00 ms |
 
 Native and CAR-bench results are intentionally not averaged.

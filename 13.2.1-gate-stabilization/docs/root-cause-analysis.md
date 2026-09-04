@@ -66,8 +66,11 @@ evaluated the unchanged static Simulator source timestamps after the five-second
 and safely returned `REPLAN`. This made Policy classification and fault terminal state depend on
 provider wall time rather than case data.
 
-The isolated live harness now captures one fixed Policy clock per case after Simulator preparation.
-The Simulator snapshot, prompt, and policy context therefore describe one stable benchmark instant.
-End-to-end provider latency remains measured independently with `performance.now()`. Production
-runtimes still use `SystemClock`; no freshness rule, Policy profile, or production safety behavior is
-changed.
+The isolated live harness now captures a fixed Policy clock immediately before each measured case
+action. If a fixture intentionally establishes a session and then mutates Simulator context, the
+clock is recaptured after that mutation; it then remains frozen throughout the measured model turn.
+This prevents both provider latency from aging a static fixture and a legitimate fixture mutation
+from being misclassified as `INVALID_FUTURE_TIMESTAMP`. End-to-end provider latency remains measured
+independently with `performance.now()`. Production runtimes still use `SystemClock`; no freshness
+rule, Policy profile, or production safety behavior is changed. The failed 130-case diagnostic that
+exposed the future-timestamp issue is retained and is not counted as a stability pass.

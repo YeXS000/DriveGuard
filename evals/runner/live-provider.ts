@@ -306,11 +306,21 @@ export function shouldReleaseNativeFaultAfterEvent(
 
 export function createNativeEvaluationClock(capturedAtMs = Date.now()): {
   readonly nowMs: () => number;
+  readonly recapture: (nextCapturedAtMs?: number) => void;
 } {
-  if (!Number.isSafeInteger(capturedAtMs) || capturedAtMs < 0) {
-    throw new TypeError("Native evaluation clock requires a non-negative integer timestamp");
-  }
-  return Object.freeze({ nowMs: () => capturedAtMs });
+  const validate = (value: number): number => {
+    if (!Number.isSafeInteger(value) || value < 0) {
+      throw new TypeError("Native evaluation clock requires a non-negative integer timestamp");
+    }
+    return value;
+  };
+  let currentCapturedAtMs = validate(capturedAtMs);
+  return Object.freeze({
+    nowMs: () => currentCapturedAtMs,
+    recapture: (nextCapturedAtMs = Date.now()) => {
+      currentCapturedAtMs = validate(nextCapturedAtMs);
+    },
+  });
 }
 
 async function mutateContext(baseUrl: string, item: NativeEvalCase): Promise<void> {
@@ -426,6 +436,7 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
           faultArmed = true;
           const actionEventStart = actionEvents.slice().length;
           const executionEventStart = executionEvents.slice().length;
+          evaluationClock.recapture();
           const beforeExecution = await simulatorState(baseUrl);
           const started = performance.now();
           const result = await runtime.run({
