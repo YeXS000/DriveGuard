@@ -74,3 +74,13 @@ from being misclassified as `INVALID_FUTURE_TIMESTAMP`. End-to-end provider late
 independently with `performance.now()`. Production runtimes still use `SystemClock`; no freshness
 rule, Policy profile, or production safety behavior is changed. The failed 130-case diagnostic that
 exposed the future-timestamp issue is retained and is not counted as a stability pass.
+
+The first full Development rerun exposed the complementary boundary: Simulator side effects create
+new source timestamps during a Tool execution. Keeping the pre-action time frozen through that
+execution made the post-execution refresh look future-dated and removed `STATE_REFRESHED` from many
+confirmation lifecycles. The harness now recaptures time on Executor events, before and after the
+external call, while remaining frozen during provider-only waiting. A separate Scorer audit false
+positive was also fixed: confirmation guidance after an unprotected read is not a stale response;
+the zero-tolerance stale counter applies only when the Case contract required a protected
+confirmation lifecycle. Both changes are covered by Development-side regression tests, and the
+failed complete Development report remains preserved rather than rescored or spliced.

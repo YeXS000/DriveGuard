@@ -394,6 +394,7 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             actionLifecycleEventSink: actionEvents,
             executionEventSink: {
               emit: async (event) => {
+                evaluationClock.recapture();
                 executionEvents.emit(event);
                 if (
                   item.faultInjection !== undefined &&

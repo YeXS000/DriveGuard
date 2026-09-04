@@ -205,6 +205,11 @@ describe("Scorer V2.1 fault metric regression", () => {
       ...faultCase(1),
       contract: {
         ...faultCase(1).contract,
+        confirmation: {
+          required: true,
+          protectedTools: ["reserve_charging_slot"],
+          requiredLifecycle: ["ACTION_PROPOSED", "POLICY_CHECKED", "FINAL_RESPONSE"],
+        } as const,
         finalResponse: { allowEmpty: false, expectedExecutionClaim: "EXECUTED" as const },
       },
     };
@@ -219,5 +224,23 @@ describe("Scorer V2.1 fault metric regression", () => {
 
     expect(scoreNativeRunV2_1([item], [completed]).metrics.postExecutionResponseStaleCount).toBe(0);
     expect(scoreNativeRunV2_1([item], [stale]).metrics.postExecutionResponseStaleCount).toBe(1);
+  });
+
+  it("does not treat confirmation guidance after an unprotected read as a stale response", () => {
+    const item = {
+      ...faultCase(1),
+      contract: {
+        ...faultCase(1).contract,
+        recovery: { kind: "NONE" as const },
+        confirmation: { required: false, protectedTools: [], requiredLifecycle: [] },
+        finalResponse: { allowEmpty: false, expectedExecutionClaim: "EXECUTED" as const },
+      },
+    };
+    const actual = {
+      ...observation(item, "RECOVERED"),
+      finalResponse: "状态查询已完成。充电操作需要与驾驶员确认后才能执行。",
+    };
+
+    expect(scoreNativeRunV2_1([item], [actual]).metrics.postExecutionResponseStaleCount).toBe(0);
   });
 });

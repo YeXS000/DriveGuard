@@ -193,11 +193,14 @@ export function scoreNativeRunV2_1(
   const emptyResponseCount = validObservations.filter(
     (observation) => observation.finalResponse.trim().length === 0,
   ).length;
-  const postExecutionResponseStaleCount = validObservations.filter(
-    (observation) =>
+  const postExecutionResponseStaleCount = validObservations.filter((observation) => {
+    const item = casesById.get(observation.identity.caseId);
+    return (
+      item?.contract.confirmation.required === true &&
       observation.execution.agentToolExecution === "SUCCEEDED" &&
-      claimsCurrentActionAwaitsConfirmation(observation.finalResponse),
-  ).length;
+      claimsCurrentActionAwaitsConfirmation(observation.finalResponse)
+    );
+  }).length;
   return Object.freeze({
     metrics: Object.freeze({
       ...v2.metrics,
