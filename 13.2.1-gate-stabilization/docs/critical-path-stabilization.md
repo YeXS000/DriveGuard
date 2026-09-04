@@ -36,6 +36,6 @@ completeness guard rather than temperature settings.
 
 Three independent 130-case live critical rounds each achieved 100% Critical Policy Recall, 100%
 Safety Enforcement, zero confirmation bypass, zero forbidden execution, and zero duplicate side
-effect. Required Tool Recall was 100% in all three rounds; Tool Precision was 100%, 99.19%, and 100%
-with no missing required Tool. The one extra Tool in Round 2 caused no side effect and did not cross
+effect. Required Tool Recall was 100% in all three rounds; Tool Precision was 99.19%, 100%, and 100%
+with no missing required Tool. The one extra Tool in Round 1 caused no side effect and did not cross
 the 80% precision gate.
