@@ -11,6 +11,7 @@ import {
 import { InMemoryActionLifecycleEventSink } from "@driveguard/action-lifecycle";
 import {
   InMemoryExecutionEventSink,
+  type ExecutionEvent,
   type ExecutionResult,
   type RecoveryReceipt,
 } from "@driveguard/executor";
@@ -290,6 +291,19 @@ export async function configureNativeFault(baseUrl: string, item: NativeEvalCase
   }
 }
 
+export function shouldReleaseNativeFaultAfterEvent(
+  mode: NonNullable<NativeEvalCase["faultInjection"]>["mode"],
+  event: Pick<ExecutionEvent, "eventType" | "attempt">,
+  alreadyReleased: boolean,
+): boolean {
+  return (
+    !alreadyReleased &&
+    mode === "duplicate_request" &&
+    event.eventType === "execution.attempt.failed" &&
+    event.attempt === 1
+  );
+}
+
 async function mutateContext(baseUrl: string, item: NativeEvalCase): Promise<void> {
   if (item.contextMutation?.path === "vehicle.soc") {
     await post(baseUrl, "/simulator/vehicle/soc", { soc: item.contextMutation.after });
@@ -341,6 +355,7 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
           }
           const actionEvents = new InMemoryActionLifecycleEventSink();
           const executionEvents = new InMemoryExecutionEventSink();
+          let oneShotFaultReleased = false;
           let runSequence = 0;
           let traceSequence = 0;
           let eventSequence = 0;
@@ -356,7 +371,25 @@ export function createNativeLiveHarness(): Promise<NativeLiveHarness> {
             developmentExecutionOptIn: true,
             sensitiveValues: [apiKey],
             actionLifecycleEventSink: actionEvents,
-            executionEventSink: executionEvents,
+            executionEventSink: {
+              emit: async (event) => {
+                executionEvents.emit(event);
+                if (
+                  item.faultInjection !== undefined &&
+                  shouldReleaseNativeFaultAfterEvent(
+                    item.faultInjection.mode,
+                    event,
+                    oneShotFaultReleased,
+                  )
+                ) {
+                  oneShotFaultReleased = true;
+                  const cleared = await fetch(`${baseUrl}/simulator/faults`, {
+                    method: "DELETE",
+                  });
+                  if (!cleared.ok) throw new Error("Simulator fault release failed");
+                }
+              },
+            },
             runtimeOverrides: {
               eventSink: {
                 emit: async (event) => {

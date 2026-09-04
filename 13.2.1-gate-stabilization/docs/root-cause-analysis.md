@@ -38,3 +38,22 @@ mistook the request event for a complete plan even though no validated formal To
 Completeness now uses validated formal execution evidence, so a malformed proposal triggers the same
 single constrained repair as a fully omitted proposal. The diagnostic run is retained separately and
 is not one of the three accepted stability rounds.
+
+## Holdout fault-lifetime finding
+
+The first frozen Holdout run exposed a general evaluation-harness coverage defect. Its three
+mandatory-recovery failures all had `DUPLICATE_REQUEST`, `IDEMPOTENT_REPLAY`, and
+`allowSafeDegradation=false`. The Development split contained no mandatory-recovery case, so the
+gap was not observable before Holdout.
+
+The production Recovery Manager already performs a bounded retry for a retry-safe 503 and reuses the
+idempotency key. The live harness, however, translated `duplicate_request` to an HTTP 503 configured
+with probability 1 and never released it. Every Executor attempt was therefore reinjected with 503,
+making recovery impossible by construction. This was not an Agent or model failure.
+
+The generic harness correction releases only `duplicate_request` after the first failed execution
+attempt. The next attempt remains an Agent-side Reliable Executor recovery with the same idempotency
+key; it is not a benchmark-runner retry. Other injected fault lifetimes are unchanged. A new
+Development-side regression asserts the mode-based lifetime without using Holdout case IDs or
+prompts. The original failed Holdout report is retained for audit, and all affected stability and
+Development gates are rerun before Holdout is reopened.
