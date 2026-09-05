@@ -11,7 +11,7 @@ export class AbortTimeoutController implements TimeoutController {
     const timeout = new Promise<never>((_resolve, reject) => {
       timer = setTimeout(() => {
         controller.abort();
-        reject(new ExecutorFault("DEPENDENCY_TIMEOUT", "Attempt timeout"));
+        reject(new ExecutorFault("DEPENDENCY_TIMEOUT", "Attempt timeout", "TIMEOUT"));
       }, timeoutMs);
     });
     const operationPromise = Promise.resolve().then(() => operation(controller.signal));

@@ -168,6 +168,39 @@ export class FakePhase10RuntimeFactory implements Phase10RuntimeFactory {
         else this.actions.set(command.actionId, transitioned(action, "READY_FOR_EXECUTION"));
         return Promise.resolve(fakeExecution);
       },
+      confirmAndComplete: (command) => {
+        this.confirmCalls += 1;
+        if (this.confirmError !== undefined) return Promise.reject(this.confirmError);
+        const action = this.requireBound(command);
+        if (command.confirmationToken !== "credential:test") {
+          return Promise.reject(
+            new ActionLifecycleError("CONFIRMATION_TOKEN_INVALID", "invalid", command.actionId),
+          );
+        }
+        if (this.disappearAfterConfirm) this.actions.delete(command.actionId);
+        else this.actions.set(command.actionId, transitioned(action, "READY_FOR_EXECUTION"));
+        return Promise.resolve(
+          Object.freeze({
+            actionId: command.actionId,
+            toolName: action.toolName,
+            idempotencyKey: `confirmed:${command.actionId}`,
+            execution: fakeExecution,
+            stateRefresh: Object.freeze({ status: "REFRESHED" as const }),
+            lifecycle: Object.freeze([
+              "ACTION_PROPOSED" as const,
+              "POLICY_CHECKED" as const,
+              "CONFIRMATION_CREATED" as const,
+              "USER_CONFIRMED" as const,
+              "EXECUTING" as const,
+              "EXECUTED" as const,
+              "STATE_REFRESHED" as const,
+              "FINAL_RESPONSE" as const,
+            ]),
+            response:
+              "The requested action completed successfully, and the current state was refreshed.",
+          }),
+        );
+      },
       run: async (request) => {
         if (this.delayRun) {
           await new Promise<void>((resolve) => {

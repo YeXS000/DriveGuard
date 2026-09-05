@@ -127,6 +127,7 @@ describe("Phase 5 architecture and security boundaries", () => {
       "idempotency.ts",
       "index.ts",
       "lifecycle.ts",
+      "recovery.ts",
       "retry.ts",
       "timeout.ts",
       "types.ts",

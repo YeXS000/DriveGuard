@@ -22,6 +22,8 @@ dist/
 coverage/
 *.tsbuildinfo
 .cache/
+evals/reports/car-bench-raw/
+__pycache__/
 
 # Logs and local tooling
 *.log

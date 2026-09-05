@@ -27,11 +27,13 @@ export interface FormalToolExecutionEvidence {
   readonly toolName: string;
   readonly outcome: "succeeded" | "failed";
   readonly completedAfterCancel: boolean;
+  readonly validatedArguments?: unknown;
   readonly result?: unknown;
   readonly policyControlResult?: RuntimePolicyControlResult;
 }
 
 export type FormalToolExecutionObserver = (evidence: FormalToolExecutionEvidence) => void;
+export type FormalToolArgumentResolver = (definition: ToolDefinition, proposed: unknown) => unknown;
 
 function toolResultText(toolName: string, result: unknown): string {
   return JSON.stringify({ toolName, result });
@@ -45,16 +47,19 @@ export class PiToolAdapter {
   readonly #runtimeMode: Phase5RuntimeMode;
   readonly #observer: FormalToolExecutionObserver | undefined;
   readonly #policyGuard: PolicyGuardedToolHandler | undefined;
+  readonly #argumentResolver: FormalToolArgumentResolver | undefined;
   readonly #activeExecutions = new Set<Promise<void>>();
 
   constructor(
     runtimeMode: Phase5RuntimeMode,
     observer?: FormalToolExecutionObserver,
     policyGuard?: PolicyGuardedToolHandler,
+    argumentResolver?: FormalToolArgumentResolver,
   ) {
     this.#runtimeMode = runtimeMode;
     this.#observer = observer;
     this.#policyGuard = policyGuard;
+    this.#argumentResolver = argumentResolver;
   }
 
   adapt(definition: ToolDefinition): AgentTool<TSchema, FormalToolDetails> {
@@ -75,7 +80,9 @@ export class PiToolAdapter {
         }
         let safeInput: Static<TSchema>;
         try {
-          safeInput = structuredClone(parameters);
+          safeInput = structuredClone(
+            this.#argumentResolver?.(definition, parameters) ?? parameters,
+          );
         } catch {
           throw new ToolExecutionError(
             "TOOL_VALIDATION_ERROR",
@@ -122,6 +129,7 @@ export class PiToolAdapter {
               toolName: definition.name,
               outcome: "failed",
               completedAfterCancel: signalAborted(signal),
+              validatedArguments: structuredClone(safeInput),
               ...(error instanceof PolicyControlError ? { policyControlResult: error.code } : {}),
             }),
           );
@@ -133,6 +141,7 @@ export class PiToolAdapter {
               toolName: definition.name,
               outcome: "failed",
               completedAfterCancel: signalAborted(signal),
+              validatedArguments: structuredClone(safeInput),
             }),
           );
           throw new ToolExecutionError(
@@ -150,6 +159,7 @@ export class PiToolAdapter {
               toolName: definition.name,
               outcome: "failed",
               completedAfterCancel: signalAborted(signal),
+              validatedArguments: structuredClone(safeInput),
             }),
           );
           throw new ToolExecutionError(
@@ -164,6 +174,7 @@ export class PiToolAdapter {
             toolName: definition.name,
             outcome: "succeeded",
             completedAfterCancel,
+            validatedArguments: structuredClone(safeInput),
             result: safeResult,
           }),
         );

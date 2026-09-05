@@ -132,10 +132,20 @@ describe("Phase 5 PiToolAdapter contract", () => {
   it("propagates a formal Tool error as a rejected Pi Tool execution", async () => {
     const source = definition();
     const failing = { ...source, execute: vi.fn(() => Promise.reject(new Error("failure"))) };
-    const tool = guardedAdapter("read_only").adapt(failing);
+    const evidence: unknown[] = [];
+    const tool = guardedAdapter("read_only", (execution) => evidence.push(execution)).adapt(
+      failing,
+    );
 
     await expect(tool.execute("call-failure", { value: 1 })).rejects.toThrow("failure");
     expect(failing.execute).toHaveBeenCalledOnce();
+    expect(evidence).toMatchObject([
+      {
+        toolName: "formal_test_tool",
+        outcome: "failed",
+        validatedArguments: { value: 1 },
+      },
+    ]);
   });
 
   it("rejects a schema-invalid handler result at the Pi boundary", async () => {
@@ -229,6 +239,7 @@ describe("Phase 5 PiToolAdapter contract", () => {
         toolName: "formal_test_tool",
         outcome: "succeeded",
         completedAfterCancel: true,
+        validatedArguments: { value: 1 },
         result: { doubled: 2 },
       },
     ]);

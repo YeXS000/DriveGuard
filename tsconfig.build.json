@@ -6,6 +6,11 @@
     "rootDir": ".",
     "sourceMap": true
   },
-  "include": ["apps/*/src/**/*.ts", "packages/*/src/**/*.ts", "services/*/src/**/*.ts"],
+  "include": [
+    "apps/*/src/**/*.ts",
+    "packages/*/src/**/*.ts",
+    "services/*/src/**/*.ts",
+    "evals/**/*.ts"
+  ],
   "exclude": ["**/*.test.ts", "**/*.spec.ts"]
 }

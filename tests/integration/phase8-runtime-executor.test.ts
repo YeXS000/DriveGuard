@@ -154,4 +154,55 @@ describe("Phase 8 formal Runtime coverage", () => {
     expect(events).toHaveLength(0);
     expect((await state()).charging.reservations).toHaveLength(0);
   });
+
+  it("completes confirmation from the frozen action and returns refreshed final state", async () => {
+    await reset();
+    const events: ExecutionEvent[] = [];
+    const instance = runtime(
+      [
+        call("reserve_charging_slot", { stationId: "station-pudong-001" }, "phase13-2-complete"),
+        fauxAssistantMessage("Confirmation required"),
+      ],
+      events,
+    );
+    const run = await instance.run({
+      sessionId: "phase13-2-confirm-complete",
+      prompt: "Reserve station-pudong-001",
+    });
+    const actionId = run.confirmationRequired[0]?.actionId ?? "missing";
+    const before = await instance.confirmationService.get(actionId);
+    const challenge = instance.trustedConfirmationChallengeChannel.take(actionId);
+    const command = {
+      actionId: challenge?.actionId ?? "missing",
+      confirmationToken: challenge?.confirmationToken ?? "missing",
+      sessionId: challenge?.sessionId ?? "missing",
+      userId: challenge?.userId ?? "missing",
+    };
+
+    const completion = await instance.confirmAndComplete(command);
+    const after = await instance.confirmationService.get(actionId);
+
+    expect(before?.validatedArguments).toEqual({ stationId: "station-pudong-001" });
+    expect(after?.validatedArguments).toEqual(before?.validatedArguments);
+    expect(after?.actionFingerprint).toBe(before?.actionFingerprint);
+    expect(completion.actionId).toBe(actionId);
+    expect(completion.idempotencyKey).toBe(`confirmed:${actionId}`);
+    expect(completion.execution.status).toBe("SUCCEEDED");
+    expect(completion.lifecycle).toEqual([
+      "ACTION_PROPOSED",
+      "POLICY_CHECKED",
+      "CONFIRMATION_CREATED",
+      "USER_CONFIRMED",
+      "EXECUTING",
+      "EXECUTED",
+      "STATE_REFRESHED",
+      "FINAL_RESPONSE",
+    ]);
+    expect(completion.response).toContain("completed successfully");
+    expect((await state()).charging.reservations).toHaveLength(1);
+
+    const replay = await instance.confirmAndComplete(command);
+    expect(replay.execution).toMatchObject({ status: "SUCCEEDED", deduplicated: true });
+    expect((await state()).charging.reservations).toHaveLength(1);
+  });
 });

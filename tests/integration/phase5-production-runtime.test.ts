@@ -137,7 +137,7 @@ describe("Phase 5 production Agent Runtime integration", () => {
     expect(result.response).toContain('"soc":72');
     expect(result.availableToolNames).toContain("get_vehicle_state");
     expect(result.toolExecutions).toMatchObject([
-      { toolName: "get_vehicle_state", result: { soc: 72 } },
+      { toolName: "get_vehicle_state", validatedArguments: {}, result: { soc: 72 } },
     ]);
     expect(Object.isFrozen(result.toolExecutions)).toBe(true);
     expect(result.response).not.toContain("PHASE_1_FIXTURE_ONLY");

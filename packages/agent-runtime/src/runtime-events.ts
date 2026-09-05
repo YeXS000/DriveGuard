@@ -31,6 +31,7 @@ export interface RuntimeEventMetadata {
   readonly decision?: "ALLOW" | "DENY" | "REQUIRE_CONFIRMATION" | "REPLAN";
   readonly ruleId?: string;
   readonly reasonCode?: string;
+  readonly planStatus?: "PLAN_INCOMPLETE";
 }
 
 export interface RuntimeEvent {

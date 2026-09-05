@@ -1,0 +1,1886 @@
+{
+  "generatedBeforeModelRun": true,
+  "repositoryCommit": "54990894241f2c07e9b523928c2a29e9b693d313",
+  "datasetCommit": "1fcf24ad802c42e04a0d8fe05b5ca0d481a4e7af",
+  "testTaskCount": 125,
+  "supportedCount": 125,
+  "coverage": "125/125",
+  "tasks": [
+    {
+      "taskId": "base_1",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["open_close_sunshade"],
+      "mapping": {
+        "open_close_sunshade": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_11",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_exterior_lights_status", "set_head_lights_high_beams"],
+      "mapping": {
+        "get_exterior_lights_status": "car-bench passthrough",
+        "set_head_lights_high_beams": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_13",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_reading_light"],
+      "mapping": {
+        "set_reading_light": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_15",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_steering_wheel_heating"],
+      "mapping": {
+        "set_steering_wheel_heating": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_17",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_charging_specs_and_status"],
+      "mapping": {
+        "get_charging_specs_and_status": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_19",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_contact_id_by_contact_name",
+        "get_contact_information",
+        "call_phone_by_number"
+      ],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "call_phone_by_number": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_21",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_contact_id_by_contact_name"],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_23",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_distance_by_soc"],
+      "mapping": {
+        "get_distance_by_soc": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_25",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_vehicle_window_positions", "open_close_window"],
+      "mapping": {
+        "get_vehicle_window_positions": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_27",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_car_color", "set_ambient_lights"],
+      "mapping": {
+        "get_car_color": "car-bench passthrough",
+        "set_ambient_lights": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_29",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_climate_settings", "set_fan_speed"],
+      "mapping": {
+        "get_climate_settings": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_3",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["open_close_window"],
+      "mapping": {
+        "open_close_window": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_31",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_seats_occupancy", "set_reading_light"],
+      "mapping": {
+        "get_seats_occupancy": "car-bench passthrough",
+        "set_reading_light": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_33",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_current_navigation_state", "set_new_navigation"],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_35",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["navigation_replace_final_destination"],
+      "mapping": {
+        "navigation_replace_final_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_37",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_contact_id_by_contact_name",
+        "get_entries_from_calendar",
+        "get_contact_information",
+        "send_email"
+      ],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough",
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_39",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "get_charging_specs_and_status",
+        "search_poi_at_location",
+        "calculate_charging_time_by_soc",
+        "get_distance_by_soc"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "get_charging_specs_and_status": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "calculate_charging_time_by_soc": "car-bench passthrough",
+        "get_distance_by_soc": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_41",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_car_color", "set_ambient_lights"],
+      "mapping": {
+        "get_car_color": "car-bench passthrough",
+        "set_ambient_lights": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_43",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_exterior_lights_status", "get_weather", "set_fog_lights"],
+      "mapping": {
+        "get_exterior_lights_status": "car-bench passthrough",
+        "get_weather": "car-bench passthrough",
+        "set_fog_lights": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_45",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "search_poi_at_location",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_final_destination"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_47",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_entries_from_calendar",
+        "get_distance_by_soc",
+        "get_contact_information",
+        "search_poi_along_the_route",
+        "send_email"
+      ],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_distance_by_soc": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_49",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_routes_from_start_to_destination",
+        "navigation_replace_final_destination",
+        "navigation_delete_waypoint"
+      ],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough",
+        "navigation_delete_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_5",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_vehicle_window_positions",
+        "get_climate_settings",
+        "set_air_conditioning",
+        "open_close_window",
+        "set_fan_speed"
+      ],
+      "mapping": {
+        "get_vehicle_window_positions": "car-bench passthrough",
+        "get_climate_settings": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_51",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_climate_settings",
+        "open_close_window",
+        "set_air_conditioning",
+        "set_fan_speed",
+        "set_air_circulation"
+      ],
+      "mapping": {
+        "get_climate_settings": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough",
+        "set_air_circulation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_53",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_seats_occupancy", "set_climate_temperature", "set_seat_heating"],
+      "mapping": {
+        "get_seats_occupancy": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_55",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_final_destination"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_57",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_routes_from_start_to_destination", "navigation_delete_destination"],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_delete_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_59",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_contact_id_by_contact_name", "get_contact_information", "send_email"],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_61",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_entries_from_calendar", "get_contact_information", "send_email"],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_63",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_seats_occupancy",
+        "get_seat_heating_level",
+        "set_seat_heating",
+        "set_climate_temperature"
+      ],
+      "mapping": {
+        "get_seats_occupancy": "car-bench passthrough",
+        "get_seat_heating_level": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_65",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_vehicle_window_positions",
+        "get_climate_settings",
+        "open_close_window",
+        "set_window_defrost",
+        "set_fan_speed",
+        "set_fan_airflow_direction",
+        "set_air_conditioning"
+      ],
+      "mapping": {
+        "get_vehicle_window_positions": "car-bench passthrough",
+        "get_climate_settings": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough",
+        "set_window_defrost": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough",
+        "set_fan_airflow_direction": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_67",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_seats_occupancy",
+        "get_temperature_inside_car",
+        "get_seat_heating_level",
+        "set_seat_heating",
+        "set_climate_temperature"
+      ],
+      "mapping": {
+        "get_seats_occupancy": "car-bench passthrough",
+        "get_temperature_inside_car": "car-bench passthrough",
+        "get_seat_heating_level": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_69",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_entries_from_calendar",
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "set_new_navigation",
+        "search_poi_along_the_route"
+      ],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_7",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_climate_temperature"],
+      "mapping": {
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_71",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "search_poi_at_location",
+        "get_routes_from_start_to_destination",
+        "navigation_delete_destination"
+      ],
+      "mapping": {
+        "search_poi_at_location": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_delete_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_73",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_temperature_inside_car",
+        "get_seat_heating_level",
+        "set_seat_heating",
+        "set_climate_temperature"
+      ],
+      "mapping": {
+        "get_temperature_inside_car": "car-bench passthrough",
+        "get_seat_heating_level": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_75",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_entries_from_calendar",
+        "get_contact_information",
+        "get_weather",
+        "send_email"
+      ],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "get_weather": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_77",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_current_navigation_state",
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_one_waypoint"
+      ],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_one_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_79",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "set_climate_temperature",
+        "get_seat_heating_level",
+        "set_seat_heating",
+        "set_steering_wheel_heating"
+      ],
+      "mapping": {
+        "set_climate_temperature": "car-bench passthrough",
+        "get_seat_heating_level": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_steering_wheel_heating": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_81",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_routes_from_start_to_destination", "navigation_delete_waypoint"],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_delete_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_83",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_routes_from_start_to_destination",
+        "set_new_navigation",
+        "navigation_delete_destination"
+      ],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough",
+        "navigation_delete_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_85",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_current_navigation_state",
+        "get_location_id_by_location_name",
+        "get_charging_specs_and_status",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_one_waypoint",
+        "search_poi_along_the_route",
+        "calculate_charging_time_by_soc"
+      ],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_charging_specs_and_status": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_one_waypoint": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough",
+        "calculate_charging_time_by_soc": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_87",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_temperature_inside_car", "set_climate_temperature"],
+      "mapping": {
+        "get_temperature_inside_car": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_89",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_current_navigation_state",
+        "get_charging_specs_and_status",
+        "get_distance_by_soc",
+        "search_poi_along_the_route",
+        "navigation_delete_destination"
+      ],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "get_charging_specs_and_status": "car-bench passthrough",
+        "get_distance_by_soc": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough",
+        "navigation_delete_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_9",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_fan_speed"],
+      "mapping": {
+        "set_fan_speed": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_91",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_weather",
+        "get_sunroof_and_sunshade_position",
+        "open_close_sunshade",
+        "open_close_sunroof"
+      ],
+      "mapping": {
+        "get_weather": "car-bench passthrough",
+        "get_sunroof_and_sunshade_position": "car-bench passthrough",
+        "open_close_sunshade": "car-bench passthrough",
+        "open_close_sunroof": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_93",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_vehicle_window_positions",
+        "get_climate_settings",
+        "set_air_conditioning",
+        "set_fan_speed",
+        "open_close_window",
+        "set_window_defrost",
+        "set_fan_airflow_direction"
+      ],
+      "mapping": {
+        "get_vehicle_window_positions": "car-bench passthrough",
+        "get_climate_settings": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough",
+        "set_window_defrost": "car-bench passthrough",
+        "set_fan_airflow_direction": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_95",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "set_new_navigation"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_97",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "search_poi_at_location",
+        "set_new_navigation"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "base_99",
+      "taskType": "base",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "search_poi_along_the_route",
+        "set_new_navigation"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_1",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["open_close_sunshade"],
+      "mapping": {
+        "open_close_sunshade": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_11",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_exterior_lights_status", "set_head_lights_high_beams"],
+      "mapping": {
+        "get_exterior_lights_status": "car-bench passthrough",
+        "set_head_lights_high_beams": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_13",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_reading_light"],
+      "mapping": {
+        "set_reading_light": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_15",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_steering_wheel_heating"],
+      "mapping": {
+        "set_steering_wheel_heating": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_17",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_charging_specs_and_status"],
+      "mapping": {
+        "get_charging_specs_and_status": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_19",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_contact_id_by_contact_name",
+        "get_contact_information",
+        "call_phone_by_number"
+      ],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "call_phone_by_number": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_21",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_contact_id_by_contact_name"],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_23",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_distance_by_soc"],
+      "mapping": {
+        "get_distance_by_soc": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_25",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_vehicle_window_positions", "open_close_window"],
+      "mapping": {
+        "get_vehicle_window_positions": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_27",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_car_color", "set_ambient_lights"],
+      "mapping": {
+        "get_car_color": "car-bench passthrough",
+        "set_ambient_lights": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_29",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_climate_settings", "set_fan_speed"],
+      "mapping": {
+        "get_climate_settings": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_3",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["open_close_window"],
+      "mapping": {
+        "open_close_window": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_31",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_seats_occupancy", "set_reading_light"],
+      "mapping": {
+        "get_seats_occupancy": "car-bench passthrough",
+        "set_reading_light": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_33",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_current_navigation_state",
+        "get_location_id_by_location_name",
+        "navigation_replace_one_waypoint"
+      ],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "navigation_replace_one_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_35",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_contact_id_by_contact_name",
+        "get_entries_from_calendar",
+        "get_contact_information",
+        "send_email"
+      ],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough",
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_37",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "get_charging_specs_and_status",
+        "search_poi_at_location",
+        "calculate_charging_time_by_soc",
+        "get_distance_by_soc"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "get_charging_specs_and_status": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "calculate_charging_time_by_soc": "car-bench passthrough",
+        "get_distance_by_soc": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_39",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_car_color", "set_ambient_lights"],
+      "mapping": {
+        "get_car_color": "car-bench passthrough",
+        "set_ambient_lights": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_41",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_exterior_lights_status", "get_weather", "set_fog_lights"],
+      "mapping": {
+        "get_exterior_lights_status": "car-bench passthrough",
+        "get_weather": "car-bench passthrough",
+        "set_fog_lights": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_43",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "search_poi_at_location",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_final_destination"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_45",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_entries_from_calendar",
+        "get_distance_by_soc",
+        "get_contact_information",
+        "search_poi_along_the_route",
+        "send_email"
+      ],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_distance_by_soc": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_47",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_routes_from_start_to_destination",
+        "navigation_replace_final_destination",
+        "navigation_delete_waypoint"
+      ],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough",
+        "navigation_delete_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_49",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_climate_settings",
+        "open_close_window",
+        "set_air_conditioning",
+        "set_air_circulation"
+      ],
+      "mapping": {
+        "get_climate_settings": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough",
+        "set_air_circulation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_5",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_vehicle_window_positions",
+        "get_climate_settings",
+        "set_air_conditioning",
+        "open_close_window",
+        "set_fan_speed"
+      ],
+      "mapping": {
+        "get_vehicle_window_positions": "car-bench passthrough",
+        "get_climate_settings": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_51",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_seats_occupancy", "set_climate_temperature", "set_seat_heating"],
+      "mapping": {
+        "get_seats_occupancy": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_53",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_final_destination"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_55",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_routes_from_start_to_destination", "navigation_delete_destination"],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_delete_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_57",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_contact_id_by_contact_name", "get_contact_information", "send_email"],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_59",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_entries_from_calendar", "get_contact_information", "send_email"],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_61",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_seats_occupancy",
+        "get_seat_heating_level",
+        "set_seat_heating",
+        "set_climate_temperature"
+      ],
+      "mapping": {
+        "get_seats_occupancy": "car-bench passthrough",
+        "get_seat_heating_level": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_63",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_vehicle_window_positions",
+        "get_climate_settings",
+        "open_close_window",
+        "set_window_defrost",
+        "set_fan_speed",
+        "set_fan_airflow_direction",
+        "set_air_conditioning"
+      ],
+      "mapping": {
+        "get_vehicle_window_positions": "car-bench passthrough",
+        "get_climate_settings": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough",
+        "set_window_defrost": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough",
+        "set_fan_airflow_direction": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_65",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_seats_occupancy",
+        "get_temperature_inside_car",
+        "get_seat_heating_level",
+        "set_seat_heating",
+        "set_climate_temperature"
+      ],
+      "mapping": {
+        "get_seats_occupancy": "car-bench passthrough",
+        "get_temperature_inside_car": "car-bench passthrough",
+        "get_seat_heating_level": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_67",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_entries_from_calendar",
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "set_new_navigation",
+        "search_poi_along_the_route"
+      ],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_69",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "search_poi_at_location",
+        "get_routes_from_start_to_destination",
+        "navigation_delete_destination"
+      ],
+      "mapping": {
+        "search_poi_at_location": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_delete_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_7",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_climate_temperature"],
+      "mapping": {
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_71",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_temperature_inside_car",
+        "get_seat_heating_level",
+        "set_seat_heating",
+        "set_climate_temperature"
+      ],
+      "mapping": {
+        "get_temperature_inside_car": "car-bench passthrough",
+        "get_seat_heating_level": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_73",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_entries_from_calendar",
+        "get_contact_information",
+        "get_weather",
+        "send_email"
+      ],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "get_weather": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_75",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_current_navigation_state",
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_one_waypoint"
+      ],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_one_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_77",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "set_climate_temperature",
+        "get_seat_heating_level",
+        "set_seat_heating",
+        "set_steering_wheel_heating"
+      ],
+      "mapping": {
+        "set_climate_temperature": "car-bench passthrough",
+        "get_seat_heating_level": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_steering_wheel_heating": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_79",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_routes_from_start_to_destination", "navigation_delete_waypoint"],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_delete_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_81",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_routes_from_start_to_destination",
+        "set_new_navigation",
+        "navigation_delete_destination"
+      ],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough",
+        "navigation_delete_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_83",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_current_navigation_state",
+        "get_location_id_by_location_name",
+        "get_charging_specs_and_status",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_one_waypoint",
+        "search_poi_along_the_route",
+        "calculate_charging_time_by_soc"
+      ],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_charging_specs_and_status": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_one_waypoint": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough",
+        "calculate_charging_time_by_soc": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_85",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_temperature_inside_car", "set_climate_temperature"],
+      "mapping": {
+        "get_temperature_inside_car": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_87",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_current_navigation_state",
+        "get_charging_specs_and_status",
+        "get_distance_by_soc",
+        "search_poi_along_the_route",
+        "navigation_delete_destination"
+      ],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "get_charging_specs_and_status": "car-bench passthrough",
+        "get_distance_by_soc": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough",
+        "navigation_delete_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_89",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_weather",
+        "get_sunroof_and_sunshade_position",
+        "open_close_sunshade",
+        "open_close_sunroof"
+      ],
+      "mapping": {
+        "get_weather": "car-bench passthrough",
+        "get_sunroof_and_sunshade_position": "car-bench passthrough",
+        "open_close_sunshade": "car-bench passthrough",
+        "open_close_sunroof": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_9",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_fan_speed"],
+      "mapping": {
+        "set_fan_speed": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_91",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_vehicle_window_positions",
+        "get_climate_settings",
+        "set_air_conditioning",
+        "set_fan_speed",
+        "open_close_window",
+        "set_window_defrost",
+        "set_fan_airflow_direction"
+      ],
+      "mapping": {
+        "get_vehicle_window_positions": "car-bench passthrough",
+        "get_climate_settings": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough",
+        "set_window_defrost": "car-bench passthrough",
+        "set_fan_airflow_direction": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_93",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "set_new_navigation"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_95",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "search_poi_at_location",
+        "set_new_navigation"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_96",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_entries_from_calendar",
+        "get_charging_specs_and_status",
+        "get_routes_from_start_to_destination",
+        "search_poi_at_location",
+        "calculate_charging_time_by_soc",
+        "set_new_navigation",
+        "call_phone_by_number"
+      ],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_charging_specs_and_status": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "calculate_charging_time_by_soc": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough",
+        "call_phone_by_number": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "hallucination_97",
+      "taskType": "hallucination",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_routes_from_start_to_destination",
+        "search_poi_along_the_route",
+        "set_new_navigation"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_1",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["open_close_sunshade"],
+      "mapping": {
+        "open_close_sunshade": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_11",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_reading_light"],
+      "mapping": {
+        "set_reading_light": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_13",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_steering_wheel_heating"],
+      "mapping": {
+        "set_steering_wheel_heating": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_15",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_contact_id_by_contact_name",
+        "get_contact_information",
+        "call_phone_by_number"
+      ],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "call_phone_by_number": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_17",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "open_close_window",
+        "set_air_conditioning",
+        "set_fan_speed",
+        "set_air_circulation"
+      ],
+      "mapping": {
+        "open_close_window": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough",
+        "set_air_circulation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_19",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_climate_settings", "set_fan_speed"],
+      "mapping": {
+        "get_climate_settings": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_21",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_seats_occupancy", "set_reading_light"],
+      "mapping": {
+        "get_seats_occupancy": "car-bench passthrough",
+        "set_reading_light": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_23",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_current_navigation_state",
+        "get_location_id_by_location_name",
+        "navigation_replace_one_waypoint"
+      ],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "navigation_replace_one_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_25",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_contact_id_by_contact_name",
+        "get_entries_from_calendar",
+        "get_contact_information",
+        "send_email"
+      ],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough",
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_27",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_temperature_inside_car",
+        "set_air_conditioning",
+        "open_close_window",
+        "set_fan_speed",
+        "set_climate_temperature"
+      ],
+      "mapping": {
+        "get_temperature_inside_car": "car-bench passthrough",
+        "set_air_conditioning": "car-bench passthrough",
+        "open_close_window": "car-bench passthrough",
+        "set_fan_speed": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_29",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "search_poi_at_location",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_final_destination"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_3",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_air_circulation"],
+      "mapping": {
+        "set_air_circulation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_31",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_routes_from_start_to_destination",
+        "navigation_replace_final_destination",
+        "navigation_delete_waypoint"
+      ],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough",
+        "navigation_delete_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_33",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_climate_temperature", "set_seat_heating"],
+      "mapping": {
+        "set_climate_temperature": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_35",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_seat_heating_level",
+        "get_seats_occupancy",
+        "set_climate_temperature",
+        "set_seat_heating",
+        "set_steering_wheel_heating"
+      ],
+      "mapping": {
+        "get_seat_heating_level": "car-bench passthrough",
+        "get_seats_occupancy": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_steering_wheel_heating": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_37",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_contact_id_by_contact_name", "get_contact_information", "send_email"],
+      "mapping": {
+        "get_contact_id_by_contact_name": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_39",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_entries_from_calendar", "get_contact_information", "send_email"],
+      "mapping": {
+        "get_entries_from_calendar": "car-bench passthrough",
+        "get_contact_information": "car-bench passthrough",
+        "send_email": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_41",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "search_poi_at_location",
+        "get_routes_from_start_to_destination",
+        "navigation_replace_final_destination"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_43",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_temperature_inside_car",
+        "get_seat_heating_level",
+        "set_seat_heating",
+        "set_climate_temperature"
+      ],
+      "mapping": {
+        "get_temperature_inside_car": "car-bench passthrough",
+        "get_seat_heating_level": "car-bench passthrough",
+        "set_seat_heating": "car-bench passthrough",
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_45",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_routes_from_start_to_destination", "navigation_delete_waypoint"],
+      "mapping": {
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "navigation_delete_waypoint": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_47",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_location_id_by_location_name",
+        "get_charging_specs_and_status",
+        "get_routes_from_start_to_destination",
+        "search_poi_at_location",
+        "calculate_charging_time_by_soc",
+        "set_new_navigation"
+      ],
+      "mapping": {
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_charging_specs_and_status": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "search_poi_at_location": "car-bench passthrough",
+        "calculate_charging_time_by_soc": "car-bench passthrough",
+        "set_new_navigation": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_49",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": [
+        "get_current_navigation_state",
+        "get_location_id_by_location_name",
+        "get_charging_specs_and_status",
+        "get_routes_from_start_to_destination",
+        "search_poi_along_the_route",
+        "navigation_replace_final_destination",
+        "call_phone_by_number"
+      ],
+      "mapping": {
+        "get_current_navigation_state": "car-bench passthrough",
+        "get_location_id_by_location_name": "car-bench passthrough",
+        "get_charging_specs_and_status": "car-bench passthrough",
+        "get_routes_from_start_to_destination": "car-bench passthrough",
+        "search_poi_along_the_route": "car-bench passthrough",
+        "navigation_replace_final_destination": "car-bench passthrough",
+        "call_phone_by_number": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_5",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_climate_temperature"],
+      "mapping": {
+        "set_climate_temperature": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_7",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["set_fan_speed"],
+      "mapping": {
+        "set_fan_speed": "car-bench passthrough"
+      }
+    },
+    {
+      "taskId": "disambiguation_9",
+      "taskType": "disambiguation",
+      "supported": true,
+      "reason": "Official dynamic tool schema is passed through the evaluation-only CarBenchAgentAdapter.",
+      "requiredTools": ["get_exterior_lights_status", "set_head_lights_high_beams"],
+      "mapping": {
+        "get_exterior_lights_status": "car-bench passthrough",
+        "set_head_lights_high_beams": "car-bench passthrough"
+      }
+    }
+  ]
+}

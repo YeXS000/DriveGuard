@@ -169,22 +169,42 @@ describe("Phase 8 Simulator fault integration", () => {
     expect(result.attemptCount).toBe(2);
   });
 
-  it("Case B survives a client-side applied reservation timeout with one downstream side effect", async () => {
+  it("Case B reconciles an applied reservation timeout without a blind retry", async () => {
     await setFault("charging.create_reservation", "timeout", 3_100);
-    const sleeper: Sleeper = { sleep: async () => clearFaults() };
     const clock = new MutableClock();
+    const events = new InMemoryExecutionEventSink();
     const executor = new ReliableToolExecutor({
       registry,
       authorizationConsumer,
       clock,
-      sleeper,
-      eventSink: { emit: () => undefined },
+      sleeper: { sleep: () => Promise.resolve() },
+      eventSink: events,
+      reconciler: {
+        async reconcile(input) {
+          const state = await client.getChargingStatus();
+          const stationId = (input.validatedArguments as { stationId: string }).stationId;
+          const reservation = state.reservations.find(
+            (candidate) => candidate.stationId === stationId,
+          );
+          return reservation === undefined
+            ? { status: "NOT_EXECUTED" }
+            : { status: "EXECUTED", result: { reservation } };
+        },
+      },
     });
     const result = await executor.execute(
       request("reserve_charging_slot", { stationId: "station-pudong-001" }),
     );
     expect(result.status).toBe("SUCCEEDED");
-    expect(result.attemptCount).toBe(2);
+    expect(result.attemptCount).toBe(1);
+    expect(result.recovery?.reconciliationStatus).toBe("EXECUTED");
+    expect(events.slice().map((event) => event.eventType)).toEqual(
+      expect.arrayContaining([
+        "execution.outcome_unknown",
+        "execution.reconciliation.started",
+        "execution.reconciliation.completed",
+      ]),
+    );
     const state = (await (await fetch(`${baseUrl}/simulator/state`)).json()) as {
       charging: { reservations: unknown[] };
     };

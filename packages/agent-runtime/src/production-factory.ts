@@ -18,6 +18,7 @@ import {
 } from "@driveguard/context";
 import type { DrivingUser, VehicleCapabilities, WeatherState } from "@driveguard/domain";
 import {
+  RecoveryManager,
   ReliableToolExecutor,
   type DurableExecutionCoordinator,
   type ExecutionEventSink,
@@ -182,6 +183,7 @@ export function parsePhase5RuntimeMode(value: string | undefined): Phase5Runtime
 
 export function createDeepSeekPhase5Selection(
   requestedModelId = process.env.DEEPSEEK_MODEL,
+  requestedBaseUrl = process.env.DEEPSEEK_BASE_URL,
 ): DeepSeekPhase5Selection {
   const models = createModels();
   models.setProvider(deepseekProvider());
@@ -196,12 +198,34 @@ export function createDeepSeekPhase5Selection(
         .join(", ")}`,
     );
   }
+  let model = selected;
+  if (requestedBaseUrl !== undefined && requestedBaseUrl.trim().length > 0) {
+    let parsed: URL;
+    try {
+      parsed = new URL(requestedBaseUrl);
+    } catch {
+      throw new AgentRuntimeError("CONFIGURATION_ERROR", "DEEPSEEK_BASE_URL is invalid");
+    }
+    if (
+      parsed.protocol !== "https:" ||
+      parsed.username.length > 0 ||
+      parsed.password.length > 0 ||
+      parsed.search.length > 0 ||
+      parsed.hash.length > 0
+    ) {
+      throw new AgentRuntimeError(
+        "CONFIGURATION_ERROR",
+        "DEEPSEEK_BASE_URL must be a credential-free HTTPS URL",
+      );
+    }
+    model = Object.freeze({ ...selected, baseUrl: parsed.toString().replace(/\/$/u, "") });
+  }
   return {
     models,
-    model: selected,
-    modelId: selected.id,
+    model,
+    modelId: model.id,
     providerId: "deepseek",
-    api: selected.api,
+    api: model.api,
   };
 }
 
@@ -230,6 +254,7 @@ export function createProductionDriveGuardRuntime(
   }
   const clock = options.clock ?? new SystemClock();
   const simulator = new SimulatorClient({ baseUrl: options.simulatorBaseUrl });
+  const recoveryManager = new RecoveryManager();
   const contextProvider = new SimulatorContextProvider({
     simulator,
     weather: options.weather ?? DEFAULT_WEATHER,
@@ -252,6 +277,7 @@ export function createProductionDriveGuardRuntime(
     provider: contextProvider,
     snapshotBuilder,
     freshnessEvaluator: new ContextFreshnessEvaluator(clock),
+    recoveryManager,
     ...(options.latestContextVersionProvider === undefined
       ? {}
       : {
@@ -323,6 +349,25 @@ export function createProductionDriveGuardRuntime(
     registry,
     authorizationConsumer: confirmationService,
     clock,
+    recoveryManager,
+    reconciler: {
+      async reconcile(input) {
+        if (input.toolName !== "reserve_charging_slot") return { status: "UNKNOWN" };
+        const argumentsRecord =
+          typeof input.validatedArguments === "object" && input.validatedArguments !== null
+            ? (input.validatedArguments as Readonly<Record<string, unknown>>)
+            : {};
+        const stationId = argumentsRecord.stationId;
+        if (typeof stationId !== "string") return { status: "UNKNOWN" };
+        const status = await simulator.getChargingStatus();
+        const reservation = status.reservations.find(
+          (candidate) => candidate.stationId === stationId && candidate.status === "active",
+        );
+        return reservation === undefined
+          ? { status: "NOT_EXECUTED" }
+          : { status: "EXECUTED", result: { reservation } };
+      },
+    },
     ...(options.executionEventSink === undefined ? {} : { eventSink: options.executionEventSink }),
     ...(options.durableExecutionCoordinator === undefined
       ? {}

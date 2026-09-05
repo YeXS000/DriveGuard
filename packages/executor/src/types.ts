@@ -6,6 +6,8 @@ import type { UtcTimestamp } from "@driveguard/domain";
 import type { PolicyDecision } from "@driveguard/policy";
 import type { ToolRiskLevel } from "@driveguard/tools";
 
+import type { RecoveryReceipt } from "./recovery.js";
+
 export const EXECUTION_STATES = [
   "CREATED",
   "RUNNING",
@@ -96,6 +98,7 @@ export interface ExecutionResult {
   readonly completedAt: UtcTimestamp;
   readonly result?: unknown;
   readonly error?: SafeExecutionError;
+  readonly recovery?: RecoveryReceipt;
 }
 
 export interface ExecutionAuthorizationConsumer {

@@ -4,3 +4,4 @@ node_modules/
 dist/
 coverage/
 package-lock.json
+13.2.1-gate-stabilization/reports/car-bench/**/car-bench-raw/

@@ -22,7 +22,7 @@ import { CircuitBreaker } from "./circuit-breaker.js";
 import type { DurableExecutionCoordinator } from "./durable.js";
 import {
   authorizationErrorCode,
-  classifyToolError,
+  classifyToolFailure,
   ExecutorFault,
   safeExecutionError,
 } from "./errors.js";
@@ -35,6 +35,12 @@ import {
 import { IdempotencyManager } from "./idempotency.js";
 import { ExecutionRecordStore } from "./lifecycle.js";
 import { RetryPolicy, SystemSleeper, type Sleeper } from "./retry.js";
+import {
+  RecoveryManager,
+  type ExecutionReconciler,
+  type ReconciliationStatus,
+  type RecoveryReceipt,
+} from "./recovery.js";
 import { AbortTimeoutController, type TimeoutController } from "./timeout.js";
 import type {
   ExecutionAuthorizationConsumer,
@@ -62,6 +68,8 @@ export interface ReliableToolExecutorOptions {
   readonly eventSink?: ExecutionEventSink;
   readonly records?: ExecutionRecordStore;
   readonly durableCoordinator?: DurableExecutionCoordinator;
+  readonly recoveryManager?: RecoveryManager;
+  readonly reconciler?: ExecutionReconciler;
 }
 
 function safeIdentity(value: unknown, fallback: string): string {
@@ -84,6 +92,8 @@ export class ReliableToolExecutor {
   readonly #eventSink: ExecutionEventSink;
   readonly #records: ExecutionRecordStore;
   readonly #durableCoordinator: DurableExecutionCoordinator | undefined;
+  readonly #recoveryManager: RecoveryManager;
+  readonly #reconciler: ExecutionReconciler | undefined;
   readonly #durableOwnerContext = new AsyncLocalStorage<boolean>();
 
   constructor(options: ReliableToolExecutorOptions) {
@@ -98,6 +108,8 @@ export class ReliableToolExecutor {
     this.#eventSink = options.eventSink ?? new InMemoryExecutionEventSink();
     this.#records = options.records ?? new ExecutionRecordStore();
     this.#durableCoordinator = options.durableCoordinator;
+    this.#recoveryManager = options.recoveryManager ?? new RecoveryManager();
+    this.#reconciler = options.reconciler;
   }
 
   record(executionId: string) {
@@ -435,6 +447,7 @@ export class ReliableToolExecutor {
       !definition.sideEffect ||
       definition.idempotencyHint === "READ_ONLY" ||
       definition.idempotencyHint === "IDEMPOTENT";
+    let recoveryReceipt: RecoveryReceipt | undefined;
 
     for (let attempt = 1; attempt <= this.#retryPolicy.maxAttempts; attempt += 1) {
       const permit = this.#circuitBreaker.acquire(circuitKey);
@@ -494,9 +507,23 @@ export class ReliableToolExecutor {
         } catch {
           return this.#finishAfterSuccessfulEffectEventFailure(request, definition, attempt);
         }
-        return this.#finish(request, "SUCCEEDED", attempt, undefined, cloneResult(value));
+        return this.#finish(
+          request,
+          "SUCCEEDED",
+          attempt,
+          undefined,
+          cloneResult(value),
+          recoveryReceipt === undefined
+            ? undefined
+            : Object.freeze({
+                ...recoveryReceipt,
+                status: "RECOVERED" as const,
+                attemptCount: attempt,
+                retryCount: Math.max(0, attempt - 1),
+              }),
+        );
       } catch (error) {
-        const classified = classifyToolError(error, definition.sideEffect, retrySafe);
+        const classified = classifyToolFailure(error, definition.sideEffect, retrySafe);
         const attemptCompletedAt = toUtcTimestamp(this.#clock.nowMs());
         this.#records.addAttempt(request.executionId, {
           attempt,
@@ -548,11 +575,96 @@ export class ReliableToolExecutor {
           } catch {
             // Preserve the conservative Tool outcome even when audit delivery fails.
           }
+          let reconciliationStatus: ReconciliationStatus = "UNKNOWN";
+          let reconciledResult: unknown;
+          if (this.#reconciler !== undefined) {
+            try {
+              await this.#emit("execution.reconciliation.started", request, attempt);
+              const reconciliation = await this.#reconciler.reconcile({
+                toolName: request.toolName,
+                validatedArguments: request.validatedArguments,
+                idempotencyKey: request.idempotencyKey,
+              });
+              reconciliationStatus = reconciliation.status;
+              reconciledResult = reconciliation.result;
+              await this.#emit(
+                "execution.reconciliation.completed",
+                request,
+                attempt,
+                reconciliation.status,
+              );
+            } catch {
+              reconciliationStatus = "UNKNOWN";
+            }
+          }
+          const decision = this.#recoveryManager.decide({
+            operationType: "WRITE",
+            failureType: classified.failureType,
+            idempotencyHint: definition.idempotencyHint,
+            attempt,
+            maxAttempts: this.#retryPolicy.maxAttempts,
+            reconciliationStatus,
+          });
+          recoveryReceipt = Object.freeze({
+            operationType: "WRITE",
+            failureType: classified.failureType,
+            action: decision.action,
+            status:
+              reconciliationStatus === "EXECUTED"
+                ? "RECOVERED"
+                : reconciliationStatus === "UNKNOWN"
+                  ? "UNKNOWN"
+                  : "SAFE_DEGRADATION",
+            attemptCount: attempt,
+            retryCount: Math.max(0, attempt - 1),
+            idempotencyKeyReused: attempt > 1,
+            reconciliationStatus,
+          });
+          if (reconciliationStatus === "EXECUTED") {
+            try {
+              await this.#emit("execution.succeeded", request, attempt);
+            } catch {
+              return this.#finishAfterSuccessfulEffectEventFailure(request, definition, attempt);
+            }
+            return this.#finish(
+              request,
+              "SUCCEEDED",
+              attempt,
+              undefined,
+              reconciledResult,
+              recoveryReceipt,
+            );
+          }
+          if (decision.action === "RETRY") {
+            const delayMs = this.#retryPolicy.delayForRetry(attempt);
+            try {
+              await this.#emit(
+                "execution.retry.scheduled",
+                request,
+                attempt,
+                classified.code,
+                delayMs,
+              );
+              await this.#sleeper.sleep(delayMs);
+              continue;
+            } catch {
+              return this.#finish(
+                request,
+                "FAILED",
+                attempt,
+                safeExecutionError("INTERNAL_EXECUTION_ERROR"),
+                undefined,
+                recoveryReceipt,
+              );
+            }
+          }
           return this.#finish(
             request,
             "OUTCOME_UNKNOWN",
             attempt,
             safeExecutionError("OUTCOME_UNKNOWN"),
+            undefined,
+            recoveryReceipt,
           );
         }
         if (!this.#retryPolicy.shouldRetry(classified.classification, attempt)) {
@@ -564,9 +676,27 @@ export class ReliableToolExecutor {
           } catch {
             // Preserve the already known Tool failure while failing audit delivery closed.
           }
-          return this.#finish(request, status, attempt, safeError);
+          const receipt = Object.freeze({
+            operationType: definition.sideEffect ? ("WRITE" as const) : ("READ" as const),
+            failureType: classified.failureType,
+            action: "SAFE_DEGRADATION" as const,
+            status: "SAFE_DEGRADATION" as const,
+            attemptCount: attempt,
+            retryCount: Math.max(0, attempt - 1),
+            idempotencyKeyReused: attempt > 1,
+          });
+          return this.#finish(request, status, attempt, safeError, undefined, receipt);
         }
         const delayMs = this.#retryPolicy.delayForRetry(attempt);
+        recoveryReceipt = Object.freeze({
+          operationType: definition.sideEffect ? ("WRITE" as const) : ("READ" as const),
+          failureType: classified.failureType,
+          action: "RETRY" as const,
+          status: "UNKNOWN" as const,
+          attemptCount: attempt,
+          retryCount: Math.max(0, attempt - 1),
+          idempotencyKeyReused: attempt > 1,
+        });
         try {
           await this.#emit("execution.retry.scheduled", request, attempt, classified.code, delayMs);
           await this.#sleeper.sleep(delayMs);
@@ -649,6 +779,7 @@ export class ReliableToolExecutor {
     attemptCount: number,
     error?: SafeExecutionError,
     result?: unknown,
+    recovery?: RecoveryReceipt,
   ): ExecutionResult {
     const at = toUtcTimestamp(this.#clock.nowMs());
     const record = this.#records.get(request.executionId);
@@ -663,6 +794,7 @@ export class ReliableToolExecutor {
       completedAt: at,
       ...(result === undefined ? {} : { result }),
       ...(error === undefined ? {} : { error }),
+      ...(recovery === undefined ? {} : { recovery }),
     });
   }
 

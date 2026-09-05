@@ -7,7 +7,10 @@
     "apps/*/src/**/*.ts",
     "packages/*/src/**/*.ts",
     "services/*/src/**/*.ts",
+    "evals/**/*.ts",
     "tests/**/*.ts",
+    "13.1-evaluation-calibration-scorer-v2/tests/**/*.ts",
+    "13.2.1-gate-stabilization/tests/**/*.ts",
     "vitest.config.ts"
   ]
 }

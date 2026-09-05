@@ -1350,3 +1350,250 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
   notification replay/outbox, multi-user routing, retention operations, and external OTLP storage
   remain future work.
 - The Stage Gate passed. Phase 13 was not started and `main` was not merged.
+
+## Phase 13 — Agent Evaluation Benchmark
+
+- Status: COMPLETE; Engineering Gate **PASS**.
+- Scope: dual-track official CAR-bench integration and DriveGuard-Native evaluation framework only.
+  Phase 14 Safety/Adversarial Evaluation was not started.
+- Verification date: 2026-09-01 (Asia/Shanghai).
+
+### Implemented modules
+
+- `evals/external/car-bench`: pinned official metadata, pre-run 125-task compatibility manifest,
+  evaluation-only Python adapter, Pi/DeepSeek JSON bridge, and official-run wrapper.
+- `evals/native`: versioned 600-case `DriveGuard-Eval-v1.0.0` Ground Truth across ten categories,
+  with natural-language prompts, explicit Tool/argument/Policy/confirmation/outcome fields and
+  optional Context/fault/urgent data.
+- `evals/runner` and `evals/scorers`: deterministic and opt-in live modes, filters, case isolation,
+  deterministic core metrics, production Runtime/Policy/Confirmation/Executor and Urgent Processor
+  observations, latency collection and typed failure analysis.
+- `evals/reports`: separate External, Native and Phase 13 summary outputs; no combined accuracy; an
+  append-only long-form `performance-history.csv` records the 2026-09-01 baseline for future
+  experiment comparisons.
+- `docs/adr/0014-phase-13-agent-evaluation-benchmark.md`: dual-track boundary, original-plan
+  refinement, metric, reproducibility, integrity and cost decisions.
+
+### Current measured verification
+
+| Check                           | Current result                                                                                                  |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Phase 0–12 preflight regression | 2,093 PASS; 43 existing environment-gated Phase 9 cases skipped                                                 |
+| Phase 13 focused tests          | 57 / 57 PASS across 4 files                                                                                     |
+| Final full regression           | 2,150 PASS; 43 existing environment-gated Phase 9 cases skipped                                                 |
+| Native dataset validation       | 600 / 600 valid; category counts 50/70/70/90/60/50/60/70/45/35                                                  |
+| Native benchmark integrity      | 600/600 structured unique; prompt Ground Truth leakage 0; max exact prompt reuse 7                              |
+| CAR-bench compatibility         | 125 / 125 generated before model execution                                                                      |
+| CAR-bench official final        | Full Test 125/125; Base 56%; Hallucination 14%; Disambiguation 52%; Overall Pass@1 38.40%                       |
+| Native live final               | 600/600; run `phase13:d6acfddd-0179-41b2-956e-ec950b34ca2d`; Quality Targets 4/10 HIT                           |
+| Native hard safety counters     | Forbidden Action Executed 0; Confirmation Bypass 0; Duplicate Side Effect 0                                     |
+| Native Context / Urgent         | Context Refresh Accuracy 100%; Urgent Event Handling Success 100%                                               |
+| Native latency                  | Simple p50/p95 2011.40/4121.10 ms; Multi-tool p50/p95 3853.38/10745.26 ms                                       |
+| Failure retention               | Native 642 typed records; External all 77 official failures retained, including timeout/upstream simulator rows |
+
+### Gate, integrity and limitations
+
+- CAR-bench official evaluator semantics, tasks and post-result selection were not modified. The
+  DeepSeek transport patch preserves original Pydantic validation; Python non-finite diagnostic
+  values are normalized to strict JSON `null` only in the aggregate artifact.
+- External failures comprise 26 official reward failures without infrastructure error, 24 bounded
+  planning bridge timeouts, and 27 official LLM user-simulator `UnboundLocalError` failures. They
+  all remain official failures; no case was deleted or reclassified as a pass.
+- Native prompts contain zero formal Tool/Policy labels. The final live result follows that fix and
+  supersedes earlier diagnostic runs. Required-Tool execution, successful forbidden execution,
+  confirmation bypass and duplicate Tool+argument side effects have distinct measured semantics.
+- Native quality misses are retained: Normal 55.38%, Tool Selection 51.61%, Argument Validity
+  92.06%, Critical Policy Recall 78.39%, Simple p95 4.12s and Multi-tool p95 10.75s. Quality target
+  misses do not alter the Engineering Gate or authorize data deletion.
+- `api_key.md` was never read. Live credentials were injected only through an interactive process
+  environment and removed after each run. The temporary credential must be rotated because a local
+  PowerShell type-conversion error included it in terminal diagnostics before the corrected
+  SecureString path was used; it was not written into repository artifacts.
+- Final validation passed: format, lint, typecheck, build, 57/57 focused tests, 2,150-test full
+  regression, diff check, and npm audit with 0 vulnerabilities.
+- Review closure: Critical 0, High 0, and benchmark-credibility-relevant Medium 0 after fixing strict
+  JSON serialization, prompt Ground Truth leakage, expected REPLAN handling, confirmation-bypass
+  attribution, required-Tool execution, forbidden-execution, and duplicate-side-effect semantics.
+- Engineering Gate **PASS**; Quality Targets **4/10 HIT**. Phase 14 was not started and `main` was
+  not merged.
+
+## Phase 13.1 — Evaluation Calibration & Scorer V2
+
+- Status: COMPLETE; Stage Gate **PASS**.
+- Scope: Ground Truth V2, deterministic Scorer V2, trace sufficiency/offline rescore, CAR-bench
+  validity taxonomy, isolated Native concurrency, and independent reporting only. Agent prompt,
+  Tool descriptions/routing, Policy rules, production confirmation/execution semantics, and Phase
+  13.2 optimization were not changed.
+- Verification date: 2026-09-02 (Asia/Shanghai).
+
+### Implemented modules
+
+- `evals/native/v2-types.ts`, `evals/native/datasets/v2.ts`, and `v2-validator.ts`: 600 Task
+  Contracts with conditional Tool use, typed arguments, action Policy, lifecycle, outcome, recovery,
+  and final-response requirements.
+- `evals/scorers/argument-matchers.ts` and `evals/scorers/v2.ts`: deterministic action/channel-level
+  scoring and Agent/Evaluation/Infrastructure attribution.
+- `evals/runner/native-v2-runner.ts`, `v2-cli.ts`, and live trace extensions: ordered output,
+  configurable concurrency, five-part identity, independent per-case Simulator, and isolated retry
+  semantics.
+- `evals/reports/offline-rescore.ts` and CAR-bench classification: explicit legacy trace
+  insufficiency, OLD/NEW transition buckets, audit manifests, and independent external validity.
+- `13.1-evaluation-calibration-scorer-v2`: design, V1/V2 comparison, baseline status, required
+  regression matrix, and frozen generated reports.
+
+### Current measured verification
+
+| Check                       | Current result                                                                        |
+| --------------------------- | ------------------------------------------------------------------------------------- |
+| V1 preservation             | 600 cases; SHA-256 `3429011c3ed86889812ffcdd66d1c1cc3d1b26bf4bc2eb615381524adcae51a8` |
+| V2 schema                   | 600/600 PASS                                                                          |
+| Required scorer regressions | 15/15 PASS                                                                            |
+| Focused Phase 13.1 suite    | 33/33 PASS across 5 files                                                             |
+| Full local regression       | 2,183 PASS across 71 files; 43 existing Phase 9 DB cases environment-gated            |
+| Engineering checks          | format, lint, typecheck, build, diff check PASS; npm audit 0 vulnerabilities          |
+| Deterministic V2            | 600/600 PASS, concurrency 4; explicitly non-live                                      |
+| Live offline rescore        | PASS/PASS 220; PASS/FAIL 84; FAIL/PASS 32; FAIL/FAIL 264; 600/600 scorable            |
+| Trace-sufficiency audit     | Critical 199/199; confirmation 151/151; fault 45/45; urgent 35/35                     |
+| CAR-bench reclassification  | VALID 48; AGENT 26; INFRA 51; EVALUATOR 0; no rerun/reward change                     |
+| Live Native quality         | 600 VALID; case pass 42.00%; concurrency 4; Agent/Eval/Infra errors 869/0/0           |
+| Live serial latency         | 600 VALID; concurrency 1; Simple P50/P95 2571.21/6750.62 ms; Multi 3389.41/5635.76 ms |
+
+### Gate and limitations
+
+- Known last-Policy, strict free-text equality, urgent REPLAN execution, fake-verbal-confirmation,
+  stale-final-response, and Boolean fault-recovery scorer defects have direct regression coverage.
+- Confirmation Bypass, Duplicate Side Effect, and Forbidden Action Executed remain independent hard
+  zero counters; classification failure cannot be hidden by downstream safety enforcement.
+- Historical V1-only traces remain insufficient, but the frozen 600-case live V2 trace supports the
+  complete delta without guessed fields. All Critical, Confirmation, Fault, Urgent, PASS-to-FAIL,
+  and scorer-bug FAIL-to-PASS populations were audited at 100% coverage.
+- Both credential-backed Native runs completed with benchmark retries 0. Provider-internal retries
+  remain unobserved rather than guessed. The three hard safety counters remained zero.
+- The phase-level Stage Gate is **PASS**. The frozen baseline identifies real Agent weaknesses for a
+  separately authorized Phase 13.2; no optimization was performed here.
+- The temporary live credential was injected through no-echo stdin into child-process memory only
+  and expired with the process. `api_key.md` was not read or used; no key was persisted or committed.
+- `main` remains unchanged and Phase 13.2 was not started.
+
+## Phase 13.2 — Agent Quality Remediation & Reliability Hardening
+
+- Status: IMPLEMENTED LOCALLY; final Stage Gate **FAIL**.
+- Scope: recovery, confirmation completion, critical-Policy reachability, goal routing, argument
+  binding, final-response synchronization, endpoint configuration, deterministic dev/holdout
+  selection, and latency reduction only. Phase 14 was not started.
+- Verification date: 2026-09-04 (Asia/Shanghai).
+
+### Implemented modules
+
+- `packages/executor/src/recovery.ts` plus executor/client integration: bounded reads, explicit
+  timeout/503/connection/ambiguous/duplicate taxonomy, receipts, reconciliation, and safe stop.
+- `packages/agent-runtime/src/goal-router.ts`, `argument-binder.ts`, and `final-response.ts`:
+  minimal Tool shortlist, explicit-value canonicalization, frozen confirmation completion, state
+  refresh, and response/receipt consistency.
+- `evals/native/split.ts` and Phase 13.2 runner commands: deterministic stratified 420/180 split and
+  separate development, holdout, and serial-latency output paths.
+- `evals/runner/live-provider.ts`: provider availability failures have explicit validity taxonomy;
+  Native faults are armed after initial Context loading; formal Tool evidence retains validated
+  arguments independently of downstream execution outcome. Scorer V2 and Ground Truth V2 remain
+  unchanged.
+- `docs/adr/0016-phase-13.2-provider-endpoint-and-recovery.md`: verified installed model/endpoint
+  and deterministic recovery decisions.
+
+### Current measured verification
+
+| Check                     | Current result                                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Latest focused regression | 116/116 PASS across 6 files; Tool evidence, confirmation dedup, routing, runner timing and provider validity                                |
+| Stage A                   | 840/840 recoverable outcomes; 160/160 safe degradations; blind retry/duplicate effect/empty response 0                                      |
+| Stage B                   | 1,000/1,000 ordered confirmation completions; stale and empty response 0; replay effect count 1                                             |
+| Critical Policy           | 10,000 cases, 20,000 evaluations, 7,335/7,335 critical correct, mismatch 0                                                                  |
+| Goal routing              | 565/565 Agent cases exact; Tool recall/precision 100%/100%; Urgent 35 remains separate                                                      |
+| Argument binding          | 548/548 explicit contracts correct                                                                                                          |
+| Local planning latency    | 10,000 serial; P50/P95/P99 0.0032/0.0059/0.0151 ms; not end-to-end provider latency                                                         |
+| Local hard safety         | 10,000 adversarial Executor runs; all five unsafe counters 0                                                                                |
+| Deterministic split       | development 420/420 and holdout 180/180 oracle PASS; explicitly non-live                                                                    |
+| Frozen evaluation         | dataset hash unchanged; Scorer V2, GT V2, regression set and hard criteria diff clean                                                       |
+| Official live dev round 2 | 420/420 VALID; case 87.38%; normal 93.96%; Tool recall/precision 100%/100%; arguments 95.48%; critical/safety 100%/100%; hard counters 0    |
+| Official live dev round 3 | 420/420 VALID; case 89.76%; normal 92.58%; arguments 99.76%; Critical Policy Recall 99.23%; frozen Safe Degradation 83.87%; hard counters 0 |
+| Attribution regression    | Post-fix live request 1/1 `INFRA_FAILURE`; quota failure no longer represented as valid Agent data                                          |
+| Live holdout/latency/CAR  | NOT RUN: development minimum gate was not met                                                                                               |
+| Full regression           | 2,220 PASS across 79 files; 43 existing Phase 9 database cases environment-gated                                                            |
+
+### Gate and limitations
+
+- Format, lint, typecheck, and build pass. One initial full-suite attempt hit the existing 5-second
+  timeout on the 600-reset Simulator test; the test passed alone in 2.12 seconds and the complete
+  rerun passed it in 4.83 seconds. PostgreSQL/Redis cases remain environment-gated when services are
+  absent.
+- The deterministic 420/180 runs verify only selection/scorer/report plumbing; they do not measure
+  Agent quality or provider latency.
+- Official DeepSeek development runs used `https://api.deepseek.com` with model
+  `deepseek-v4-flash`; all three complete runs had 420 VALID observations and zero evaluation or
+  infrastructure errors.
+- Round 2 met every directly comparable minimum quality threshold except the frozen
+  `Safe Degradation` aggregate. It reports 25/31 because six applied write timeouts were safely
+  reconciled to real success; degradation among cases that actually degraded was 25/25.
+- Round 3 corrected failed-Tool schema evidence, but stochastic omission in
+  `EXECUTOR_FAULT_RECOVERY-004` reduced Critical Policy Recall to 99.23%, below the exact 100%
+  minimum. Per-case benchmark retry or result splicing was not used.
+- Frozen evaluation inconsistencies are retained in `evaluation-change-review.md`: blanket failed
+  outcomes for successfully reconciled writes, successful `EXECUTED` lifecycle requirements for
+  failed fault cases, an all-fault Safe Degradation denominator, and lexical response false
+  positives. No Scorer/GT relaxation was made.
+- The invalid 420-case attempt is retained in a clearly labelled audit directory. Its pre-fix
+  metrics are inadmissible; a live post-fix regression and direct unit tests verify the corrected
+  infrastructure attribution.
+- Final code-diff review found Critical 0 and High 0; no unresolved safety-boundary issue was found.
+- Final Stage Gate is **FAIL**. Holdout, serial latency, and CAR-bench stayed sealed; no Phase 13.2
+  commit or merge to `main` was made. Phase 14 was not started.
+
+## Phase 13.2.1 — Gate Stabilization & Reliability Closure
+
+- Status: COMPLETE; final Stage Gate **PASS**.
+- Scope: Scorer V2.1 fault semantics, Critical Path Guard, constrained one-to-one plan repair,
+  evaluation clock/fault stabilization, three-round Critical and Fault gates, official Development,
+  sealed Holdout, serial latency, and external CAR-bench only. Phase 14 was not started.
+- Verification date: 2026-09-04 (Asia/Shanghai).
+
+### Implemented modules
+
+- `evals/scorers/v2.1.ts` and reporting: terminal fault states, applicability-specific recovery and
+  degradation denominators, and explicit audit counters without Ground Truth weakening.
+- Agent Runtime Critical Path Guard and precheck: records mandatory critical capabilities before
+  planning and permits one constrained repair of an already resolved one-to-one capability mapping.
+- Native runner/evaluator: duplicate-request fault lifetime, provider-latency-safe evaluation clock,
+  execution-event recapture, and response-staleness applicability corrections.
+- `13.2.1-gate-stabilization`: root-cause evidence, ADR, regression reports, official gate reports,
+  CAR-bench raw/aggregate evidence, and final report.
+
+### Measured verification
+
+| Check                | Result                                                                                                               |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| Critical stability   | 3/3 rounds; 130 cases each; Critical Policy 100%, Safety 100%, hard/audit counters 0                                 |
+| Fault V2.1 stability | 3/3 rounds; 31/31 handling, 10/10 recovery, 21/21 safe degradation each round                                        |
+| Development          | 420/420; case 90.00%; normal 92.03%; Tool/argument/Policy/Critical/Safety 100%; confirmation 94.59%; hard counters 0 |
+| Holdout              | 180/180; case 92.22%; normal 91.03%; all named quality/safety gates 100%; hard counters 0                            |
+| Serial latency       | 180/180, concurrency 1; Simple P50/P95 1689.12/3220.14 ms; Multi 2109.48/2564.85 ms                                  |
+| External CAR-bench   | 125/125; Raw/Valid Pass@1 41.60%/66.67%; VALID/AGENT/INFRA/EVALUATOR 52/26/47/0                                      |
+| Focused regression   | 80/80 PASS across 13 files                                                                                           |
+| Full regression      | 2,252 PASS across 83 files; 43 existing environment-gated tests skipped                                              |
+| Engineering checks   | format, lint, typecheck, build, diff check, frozen hashes, and secret scan PASS                                      |
+
+### Gate, integrity, and limitations
+
+- Agent code was frozen at `9a62b7df9a114c0dcb5965977b034ad2b90f64da`; later changes were
+  limited to evaluation correctness and evidence. The final evaluator correction is
+  `49ad013e5a4ed0e75f8cc327cdada7762d1a6f68`.
+- The frozen dataset and Scorer V2 hashes remain
+  `70ef4ea213bd0d46674b70a4d99334d11e2ec16644777fe5054a6a52278d601f` and
+  `d185ee551dcafaef3a87a160f99073c646b2b10f89bc4db3a1b8314093524d4f`.
+- CAR-bench remains an independent external track. It used official commit
+  `54990894241f2c07e9b523928c2a29e9b693d313`, one trial, no task/evaluator-semantic
+  modifications, and no post-result cherry-picking. Its 47 infrastructure failures, dominated by
+  upstream user-simulator invalid JSON/`UnboundLocalError` and bridge timeouts, remain raw failures.
+- Development retains 51 Agent failures and Holdout 14. Passing the phase gates is not a claim of
+  perfect general quality. PostgreSQL/Redis cases remain environment-gated when unavailable.
+- Review closure: Critical 0, High 0, unresolved safety-boundary issues 0. The temporary credential
+  existed only in the no-echo child process and expired with it; no secret was persisted.
+- Final Stage Gate **PASS**. `main` was not merged and Phase 14 was not started.

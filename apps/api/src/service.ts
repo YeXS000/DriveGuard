@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { ActionLifecycleEventSink, PendingAction } from "@driveguard/action-lifecycle";
 import {
   AgentRuntimeError,
+  type ConfirmedActionCompletion,
   type ProductionDriveGuardRuntime,
   type RuntimeEventSink,
 } from "@driveguard/agent-runtime";
@@ -315,7 +316,11 @@ export class DriveGuardApiService {
     readonly sessionId: string;
     readonly confirmationCredential: string;
     readonly identity: DevelopmentIdentity;
-  }): Promise<{ readonly action: ApiActionView; readonly execution: ExecutionResult }> {
+  }): Promise<{
+    readonly action: ApiActionView;
+    readonly execution: ExecutionResult;
+    readonly completion: ConfirmedActionCompletion;
+  }> {
     const action = await this.#requireBoundAction(input.actionId, input.sessionId, input.identity);
     if (
       action.state === "AWAITING_CONFIRMATION" &&
@@ -325,7 +330,7 @@ export class DriveGuardApiService {
     }
     const runtime = this.#runtimeFactory.create({ identity: input.identity });
     try {
-      const execution = await runtime.confirmAndExecute({
+      const completion = await runtime.confirmAndComplete({
         actionId: input.actionId,
         confirmationToken: input.confirmationCredential,
         sessionId: input.sessionId,
@@ -333,7 +338,11 @@ export class DriveGuardApiService {
       });
       const updated = await runtime.confirmationService.get(input.actionId);
       if (updated === undefined) throw new Error("Action disappeared after confirmation");
-      return Object.freeze({ action: actionView(updated), execution });
+      return Object.freeze({
+        action: actionView(updated),
+        execution: completion.execution,
+        completion,
+      });
     } catch (error) {
       if (error instanceof ApiError) throw error;
       if (error instanceof AgentRuntimeError) throw runtimeApiError(error.code);

@@ -6,5 +6,6 @@ export * from "./executor.js";
 export * from "./idempotency.js";
 export * from "./lifecycle.js";
 export * from "./retry.js";
+export * from "./recovery.js";
 export * from "./timeout.js";
 export * from "./types.js";

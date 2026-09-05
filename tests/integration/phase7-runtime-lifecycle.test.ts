@@ -146,6 +146,48 @@ describe("Phase 7 Runtime confirmation lifecycle integration", () => {
     ]);
   });
 
+  it("deduplicates identical confirmation intents within one Agent run", async () => {
+    await reset();
+    const instance = runtime([
+      fauxAssistantMessage(
+        [
+          fauxToolCall(
+            "reserve_charging_slot",
+            { stationId: "station-pudong-001" },
+            { id: "duplicate-confirmation-1" },
+          ),
+          fauxToolCall(
+            "reserve_charging_slot",
+            { stationId: "station-pudong-001" },
+            { id: "duplicate-confirmation-2" },
+          ),
+        ],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage("Confirmation is pending."),
+    ]);
+
+    const result = await instance.run({
+      sessionId: "phase7-duplicate-confirmation",
+      prompt: "Reserve the charging slot",
+    });
+
+    expect(result.confirmationRequired).toHaveLength(1);
+    expect(result.toolExecutions).toHaveLength(2);
+    const actionId = result.confirmationRequired[0]?.actionId ?? "missing";
+    const challenge = instance.trustedConfirmationChallengeChannel.take(actionId);
+    expect(challenge).toBeDefined();
+    const completion = await instance.confirmAndComplete({
+      actionId: challenge?.actionId ?? "missing",
+      confirmationToken: challenge?.confirmationToken ?? "missing",
+      sessionId: challenge?.sessionId ?? "missing",
+      userId: challenge?.userId ?? "missing",
+    });
+
+    expect(completion.execution.status).toBe("SUCCEEDED");
+    expect((await state()).charging.reservations).toHaveLength(1);
+  });
+
   it("Case B: relevant Simulator Context change produces REPLAN_REQUIRED and no authorization", async () => {
     await reset();
     const { instance, trustedChallenge: challenge } = await pendingRuntime("phase7-case-b");
