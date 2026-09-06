@@ -18,6 +18,8 @@ import {
 } from "@driveguard/context";
 import type { DrivingUser, WeatherState } from "@driveguard/domain";
 import {
+  type CircuitBreaker,
+  type ExecutionConcurrencyController,
   ReliableToolExecutor,
   type DurableExecutionCoordinator,
   type ExecutionEventSink,
@@ -42,6 +44,8 @@ export interface CreateUrgentActionSystemOptions {
   readonly pendingActionRepository: PendingActionRepository;
   readonly durableExecutionCoordinator: DurableExecutionCoordinator;
   readonly executionEventSink: ExecutionEventSink;
+  readonly circuitBreaker?: CircuitBreaker;
+  readonly executionConcurrencyController?: ExecutionConcurrencyController;
   readonly sessionRepository: SessionRepository;
   readonly sessionCoordinator: SessionCoordinator;
   readonly executionRecovery: UrgentExecutionRecovery;
@@ -111,6 +115,10 @@ export function createUrgentActionSystem(options: CreateUrgentActionSystemOption
     clock,
     durableCoordinator: options.durableExecutionCoordinator,
     eventSink: options.executionEventSink,
+    ...(options.circuitBreaker === undefined ? {} : { circuitBreaker: options.circuitBreaker }),
+    ...(options.executionConcurrencyController === undefined
+      ? {}
+      : { concurrencyController: options.executionConcurrencyController }),
   });
   return Object.freeze({
     contextLoader,

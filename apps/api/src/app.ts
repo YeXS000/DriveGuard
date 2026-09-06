@@ -11,6 +11,7 @@ import {
   setRequestErrorCode,
   setRequestObservation,
 } from "./request-observability.js";
+import type { RequestAdmissionController, RequestAdmissionPermit } from "./admission-control.js";
 
 export interface BuildApiOptions {
   readonly dependencies?: readonly DependencyProbe[];
@@ -19,6 +20,8 @@ export interface BuildApiOptions {
   readonly service?: DriveGuardApiService;
   readonly observability?: DriveGuardObservability;
   readonly urgentService?: UrgentApiService;
+  readonly admissionController?: RequestAdmissionController;
+  readonly resourceSampler?: () => void | Promise<void>;
   readonly onClose?: () => void | Promise<void>;
 }
 
@@ -64,8 +67,14 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
       },
     },
   });
+  const admissionPermits = new WeakMap<object, RequestAdmissionPermit>();
 
-  app.addHook("onRequest", (request, reply, done) => {
+  const releaseAdmission = (request: object): void => {
+    admissionPermits.get(request)?.release();
+    admissionPermits.delete(request);
+  };
+
+  app.addHook("onRequest", async (request, reply) => {
     if (options.observability !== undefined && request.url !== "/metrics") {
       setRequestObservation(
         request,
@@ -75,20 +84,37 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
         }),
       );
       reply.raw.once("close", () => {
+        releaseAdmission(request);
         if (reply.raw.writableEnded) return;
         setRequestErrorCode(request, "REQUEST_ABORTED");
         finishRequestObservation(request, 499);
       });
     }
-    done();
+    if (options.admissionController !== undefined && request.url.startsWith("/v1/")) {
+      const admission = await options.admissionController.acquire();
+      if (!admission.admitted) {
+        void reply.header("retry-after", "1");
+        throw new ApiError(
+          "SERVICE_BUSY",
+          admission.reason === "SHUTTING_DOWN"
+            ? "Service is shutting down"
+            : "Service capacity is temporarily unavailable",
+          503,
+        );
+      }
+      admissionPermits.set(request, admission.permit);
+      reply.raw.once("close", () => releaseAdmission(request));
+    }
   });
 
   app.addHook("onResponse", (request, reply, done) => {
+    releaseAdmission(request);
     finishRequestObservation(request, reply.statusCode);
     done();
   });
 
   app.addHook("onRequestAbort", (request, done) => {
+    releaseAdmission(request);
     setRequestErrorCode(request, "REQUEST_ABORTED");
     finishRequestObservation(request, 499);
     done();
@@ -106,6 +132,7 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
 
   if (options.observability !== undefined) {
     app.get("/metrics", async (_request, reply) => {
+      await options.resourceSampler?.();
       const metrics = await options.observability?.metricsText();
       return reply.type(options.observability?.metrics.contentType ?? "text/plain").send(metrics);
     });
@@ -134,6 +161,7 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
   );
 
   app.addHook("onClose", async () => {
+    options.admissionController?.beginShutdown();
     await Promise.allSettled(
       dependencies.map(async (dependency) => {
         await dependency.close?.();

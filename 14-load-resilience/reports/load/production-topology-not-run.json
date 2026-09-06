@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "environment": "Docker Compose production dependency topology",
+  "configuration": "MIXED_WORKLOAD at 1, 5, 10, 20, and 50 VUs with faux provider",
+  "duration": "5 minutes per level",
+  "concurrency": [1, 5, 10, 20, 50],
+  "requestCount": 0,
+  "result": "NOT_RUN",
+  "metrics": null,
+  "failure": "Docker daemon unavailable; production PostgreSQL, Redis, NATS, and Simulator topology could not start.",
+  "conclusion": "No production sustainable throughput is claimed."
+}

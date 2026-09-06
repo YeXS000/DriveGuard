@@ -33,6 +33,7 @@ export function safeExecutionError(
     IDEMPOTENCY_CONFLICT: "Idempotency key conflicts with another action",
     DEPENDENCY_TIMEOUT: "Tool dependency timed out",
     DEPENDENCY_UNAVAILABLE: "Tool dependency is unavailable",
+    EXECUTOR_BUSY: "Executor capacity is temporarily unavailable",
     CIRCUIT_OPEN: "Tool dependency circuit is open",
     RETRY_EXHAUSTED: "Retry attempts were exhausted",
     OUTCOME_UNKNOWN: "The side-effect outcome is unknown",

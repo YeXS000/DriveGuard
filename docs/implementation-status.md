@@ -1597,3 +1597,49 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - Review closure: Critical 0, High 0, unresolved safety-boundary issues 0. The temporary credential
   existed only in the no-echo child process and expired with it; no secret was persisted.
 - Final Stage Gate **PASS**. `main` was not merged and Phase 14 was not started.
+
+## Phase 14 — Load, Resilience & Production Readiness
+
+- Status: IMPLEMENTED LOCALLY; final Stage Gate **FAIL**.
+- Scope: backend/Agent/external latency separation, bounded API and Executor concurrency,
+  backpressure, fault-under-load, recovery, isolation, timeout budgets, graceful shutdown, k6 load
+  harness, and Toxiproxy topology. No Agent quality optimization and no later Docker/CI/CD phase.
+- Verification date: 2026-09-06 (Asia/Shanghai).
+
+### Implemented modules
+
+- `apps/api`: bounded stateful-route admission, controlled `SERVICE_BUSY`, explicit pool/timeout
+  configuration, shared circuit/Executor capacity, resource sampling, and finite shutdown drain.
+- `packages/executor`: process-wide read/write limits, bounded queue, same-vehicle side-effect
+  serialization, and immediate idempotency conflict/single-flight handling before capacity wait.
+- `packages/agent-runtime` and `packages/observability`: provider-only stream duration separated from
+  Tool/Executor duration; capacity, PostgreSQL pool, Redis, and NATS metrics.
+- `14-load-resilience`: k6 scenarios/matrices, local capacity probe, Toxiproxy topology and fault
+  controller, automated tests, raw reports, architecture/fault/load/bottleneck/final documentation.
+- ADR 0018 records the bounded-capacity and fault-topology decision.
+
+### Measured verification
+
+| Check                    | Result                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------- |
+| k6 backend-only baseline | 5 min, 1 VU, 589,039 requests, 100% success; P50/P95/P99 0.424/0.530/0.617 ms                      |
+| Local capacity curve     | 1-100 concurrency: 0 controlled busy; 200: 963 success + 37 controlled 503, 0 other errors         |
+| Fault-under-load         | 50/50 retry-safe reads recovered at max 4 active; 50 duplicate writes -> 1 effect, 49 deduplicated |
+| Recovery regression      | 840/840 recovered; 160/160 safe-degraded; blind retries/duplicate effects 0                        |
+| Safety matrices          | Critical Policy 7,335/7,335; Confirmation bypass/forbidden action/duplicate side effect 0          |
+| Isolation / shutdown     | 100/100 identities isolated; accepted request drained; finite deadline detected                    |
+| Phase 13.2.1 regression  | 80/80 PASS; frozen dataset/scorer hashes unchanged                                                 |
+| Phase 14 focused gate    | 292/292 PASS                                                                                       |
+| Engineering              | format, lint, typecheck, build, Compose static config, diff check PASS                             |
+| Full regression          | 2,266/2,266 PASS across 86 files; 43 environment-gated tests skipped                               |
+
+### Gate and limitations
+
+- Docker CLI 28.1.1 was present but the daemon was unavailable. PostgreSQL 17, Redis 8, NATS 2.11,
+  Simulator, and Toxiproxy 2.12.0 could not be run as the complete topology.
+- Production load/stress, 30-minute soak, external dependency fault-under-load, resource exhaustion,
+  and persisted PostgreSQL restart recovery are `NOT RUN`; production sustainable throughput and
+  leak/backlog behavior are not claimed.
+- The backend-only P95 target passes in the measured local scope, but missing required live topology
+  evidence prevents a Phase 14 PASS.
+- Final Stage Gate **FAIL**. No commit or merge to `main` was made, and the next phase was not started.

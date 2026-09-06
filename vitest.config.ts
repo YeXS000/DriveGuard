@@ -49,6 +49,7 @@ export default defineConfig({
       "tests/{unit,contract,integration}/**/*.test.ts",
       "13.1-evaluation-calibration-scorer-v2/tests/scorer-regression/**/*.test.ts",
       "13.2.1-gate-stabilization/tests/**/*.test.ts",
+      "14-load-resilience/tests/**/*.test.ts",
     ],
     passWithNoTests: false,
     coverage: {

@@ -110,6 +110,7 @@ export interface DriveGuardRuntimeOptions {
     readonly outputTokens: number;
     readonly cost: number;
     readonly isError: boolean;
+    readonly providerDurationMs?: number;
   }) => void | Promise<void>;
   readonly goalToolRouter?: GoalToolRouter;
 }
@@ -980,6 +981,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         eventFactory: {
           create: (eventType, _identity, metadata) => createEvent(eventType, metadata),
         },
+        nowMs: () => this.#clock.nowMs(),
         emit: async (event) => {
           this.#throwIfRuntimeBoundaryFailed(runtimeBoundaryFailed);
           await emit(event);

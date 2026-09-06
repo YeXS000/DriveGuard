@@ -1,4 +1,5 @@
 export * from "./circuit-breaker.js";
+export * from "./concurrency.js";
 export * from "./durable.js";
 export * from "./errors.js";
 export * from "./events.js";

@@ -14,6 +14,9 @@ export interface InfrastructureConfig {
     readonly user: string;
     readonly password: string;
     readonly database: string;
+    readonly max: number;
+    readonly connectionTimeoutMillis: number;
+    readonly idleTimeoutMillis: number;
   };
   readonly redisUrl: string;
   readonly natsUrl: string;
@@ -39,6 +42,19 @@ function requiredValue(environment: NodeJS.ProcessEnv, variableName: string): st
   return value;
 }
 
+function boundedInteger(
+  value: string,
+  variableName: string,
+  minimum: number,
+  maximum: number,
+): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${variableName} must be an integer between ${minimum} and ${maximum}`);
+  }
+  return parsed;
+}
+
 export function readInfrastructureConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): InfrastructureConfig {
@@ -49,6 +65,19 @@ export function readInfrastructureConfig(
       user: environment.PGUSER ?? "driveguard",
       password: requiredValue(environment, "PGPASSWORD"),
       database: environment.PGDATABASE ?? "driveguard",
+      max: boundedInteger(environment.PG_POOL_MAX ?? "20", "PG_POOL_MAX", 1, 200),
+      connectionTimeoutMillis: boundedInteger(
+        environment.PG_CONNECTION_TIMEOUT_MS ?? "1500",
+        "PG_CONNECTION_TIMEOUT_MS",
+        100,
+        60_000,
+      ),
+      idleTimeoutMillis: boundedInteger(
+        environment.PG_IDLE_TIMEOUT_MS ?? "30000",
+        "PG_IDLE_TIMEOUT_MS",
+        1_000,
+        600_000,
+      ),
     },
     redisUrl: environment.REDIS_URL ?? "redis://127.0.0.1:6379",
     natsUrl: environment.NATS_URL ?? "nats://127.0.0.1:4222",
@@ -60,12 +89,12 @@ export function createInfrastructureProbes(
 ): readonly DependencyProbe[] {
   const postgresPool = new Pool({
     ...config.postgres,
-    connectionTimeoutMillis: 1_500,
-    max: 2,
+    max: Math.min(2, config.postgres.max),
   });
 
   const redisClient = createClient({
     url: config.redisUrl,
+    disableOfflineQueue: true,
     socket: {
       connectTimeout: 1_500,
       reconnectStrategy: false,

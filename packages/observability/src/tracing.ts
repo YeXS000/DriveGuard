@@ -281,6 +281,7 @@ export class DriveGuardTracing {
       "gen_ai.usage.input_tokens": event.inputTokens,
       "gen_ai.usage.output_tokens": event.outputTokens,
       "driveguard.llm.cost": event.cost,
+      "driveguard.llm.provider_duration_ms": event.providerDurationMs ?? 0,
     });
     endSpan(llm, event.isError ? "MODEL_ERROR" : undefined);
     this.#llmRequests.delete(event.runId);

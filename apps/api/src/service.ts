@@ -120,17 +120,23 @@ export class DriveGuardApiService {
   readonly #executions: ExecutionRepository;
   readonly #runtimeFactory: Phase10RuntimeFactory;
   readonly #active = new Map<string, ProductionDriveGuardRuntime>();
+  readonly #agentTimeoutMs: number;
 
   constructor(options: {
     readonly sessions: SessionRepository;
     readonly conversation: ConversationMemory;
     readonly executions: ExecutionRepository;
     readonly runtimeFactory: Phase10RuntimeFactory;
+    readonly agentTimeoutMs?: number;
   }) {
     this.#sessions = options.sessions;
     this.#conversation = options.conversation;
     this.#executions = options.executions;
     this.#runtimeFactory = options.runtimeFactory;
+    this.#agentTimeoutMs = options.agentTimeoutMs ?? 15_000;
+    if (!Number.isSafeInteger(this.#agentTimeoutMs) || this.#agentTimeoutMs < 100) {
+      throw new TypeError("agentTimeoutMs must be an integer of at least 100ms");
+    }
   }
 
   get activeRequestCount(): number {
@@ -139,6 +145,14 @@ export class DriveGuardApiService {
 
   cancelSession(sessionId: string): boolean {
     return this.#active.get(sessionId)?.cancel(sessionId) ?? false;
+  }
+
+  cancelAll(): number {
+    let cancelled = 0;
+    for (const [sessionId, runtime] of this.#active) {
+      if (runtime.cancel(sessionId)) cancelled += 1;
+    }
+    return cancelled;
   }
 
   async createSession(
@@ -207,6 +221,8 @@ export class DriveGuardApiService {
       },
     });
     this.#active.set(input.sessionId, runtime);
+    const budgetTimer = setTimeout(() => runtime.cancel(input.sessionId), this.#agentTimeoutMs);
+    budgetTimer.unref?.();
     try {
       const result = await runtime.run({
         sessionId: input.sessionId,
@@ -289,6 +305,7 @@ export class DriveGuardApiService {
         ...(result.error === undefined ? {} : { errorCode: result.error.code }),
       });
     } finally {
+      clearTimeout(budgetTimer);
       if (this.#active.get(input.sessionId) === runtime) this.#active.delete(input.sessionId);
     }
   }

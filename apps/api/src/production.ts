@@ -19,6 +19,7 @@ import type { Phase9RuntimeBindings } from "@driveguard/persistence";
 import type { DriveGuardObservability } from "@driveguard/observability";
 import type { ActionLifecycleEventSink } from "@driveguard/action-lifecycle";
 import type { RuntimeEventSink } from "@driveguard/agent-runtime";
+import type { CircuitBreaker, ExecutionConcurrencyController } from "@driveguard/executor";
 
 import { ApiError } from "./errors.js";
 import type { Phase10RuntimeFactory, Phase10RuntimeFactoryInput } from "./service.js";
@@ -38,7 +39,18 @@ function fauxSelection(prompt: string | undefined): RuntimeSelection {
   const models = createModels();
   models.setProvider(faux.provider);
   const normalized = prompt?.toLowerCase() ?? "";
-  if (/(reserve|charging|charge)/u.test(normalized)) {
+  if (normalized.includes("phase14:multi_tool")) {
+    faux.setResponses([
+      fauxAssistantMessage(
+        [
+          fauxToolCall("get_vehicle_state", {}, { id: `tool:${randomUUID()}` }),
+          fauxToolCall("get_trip_state", {}, { id: `tool:${randomUUID()}` }),
+        ],
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage("The vehicle and trip state were retrieved safely."),
+    ]);
+  } else if (/(reserve|charging|charge|phase14:protected_action)/u.test(normalized)) {
     faux.setResponses([
       fauxAssistantMessage(
         fauxToolCall(
@@ -143,6 +155,8 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
   readonly #provider: string;
   readonly #trustedSimulatorOrigins: readonly string[];
   readonly #observability: DriveGuardObservability | undefined;
+  readonly #circuitBreaker: CircuitBreaker | undefined;
+  readonly #executionConcurrencyController: ExecutionConcurrencyController | undefined;
 
   constructor(options: {
     readonly bindings: Phase9RuntimeBindings;
@@ -150,12 +164,16 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
     readonly provider: string;
     readonly trustedSimulatorOrigins?: readonly string[];
     readonly observability?: DriveGuardObservability;
+    readonly circuitBreaker?: CircuitBreaker;
+    readonly executionConcurrencyController?: ExecutionConcurrencyController;
   }) {
     this.#bindings = options.bindings;
     this.#simulatorBaseUrl = options.simulatorBaseUrl;
     this.#provider = options.provider;
     this.#trustedSimulatorOrigins = Object.freeze([...(options.trustedSimulatorOrigins ?? [])]);
     this.#observability = options.observability;
+    this.#circuitBreaker = options.circuitBreaker;
+    this.#executionConcurrencyController = options.executionConcurrencyController;
   }
 
   create(input: Phase10RuntimeFactoryInput) {
@@ -187,6 +205,10 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
           mode === "development" && process.env.PHASE_5_DEVELOPMENT_OPT_IN === "NON_PRODUCTION",
         developmentTrustedSimulatorOrigins: this.#trustedSimulatorOrigins,
         sensitiveValues: selected.sensitiveValues,
+        ...(this.#circuitBreaker === undefined ? {} : { circuitBreaker: this.#circuitBreaker }),
+        ...(this.#executionConcurrencyController === undefined
+          ? {}
+          : { executionConcurrencyController: this.#executionConcurrencyController }),
         ...(actionLifecycleEventSink === undefined ? {} : { actionLifecycleEventSink }),
         runtimeOverrides:
           runtimeEventSink === undefined &&

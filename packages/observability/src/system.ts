@@ -7,7 +7,13 @@ import type { UrgentEventObservation, UrgentEventObserver } from "@driveguard/ur
 import type { DestinationStream } from "pino";
 
 import { DriveGuardLogger } from "./logger.js";
-import { DriveGuardMetrics, type ModelUsageObservation } from "./metrics.js";
+import {
+  DriveGuardMetrics,
+  type AdmissionMetricObservation,
+  type InfrastructureMetricObservation,
+  type ModelUsageObservation,
+} from "./metrics.js";
+import type { ExecutionConcurrencySnapshot } from "@driveguard/executor";
 import { DriveGuardTracing } from "./tracing.js";
 
 export interface HttpRequestObservation {
@@ -285,6 +291,18 @@ export class DriveGuardObservability {
     dependencies: readonly { readonly name: string; readonly status: "up" | "down" }[],
   ): void {
     this.#bestEffort(() => this.metrics.observeDependencies(dependencies));
+  }
+
+  observeAdmission(observation: AdmissionMetricObservation): void {
+    this.#bestEffort(() => this.metrics.observeAdmission(observation));
+  }
+
+  observeExecutionCapacity(observation: ExecutionConcurrencySnapshot): void {
+    this.#bestEffort(() => this.metrics.observeExecutionCapacity(observation));
+  }
+
+  observeInfrastructure(observation: InfrastructureMetricObservation): void {
+    this.#bestEffort(() => this.metrics.observeInfrastructure(observation));
   }
 
   metricsText(): Promise<string> {

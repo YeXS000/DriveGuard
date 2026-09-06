@@ -9,7 +9,7 @@ import {
 } from "@prometheus-io/client";
 import type { ActionLifecycleEvent } from "@driveguard/action-lifecycle";
 import type { RuntimeEvent } from "@driveguard/agent-runtime";
-import type { ExecutionEvent } from "@driveguard/executor";
+import type { ExecutionConcurrencySnapshot, ExecutionEvent } from "@driveguard/executor";
 import type { UrgentEventObservation } from "@driveguard/urgent-events";
 
 const DURATION_BUCKETS = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10];
@@ -56,6 +56,23 @@ export interface ModelUsageObservation {
   readonly outputTokens: number;
   readonly cost: number;
   readonly isError: boolean;
+  readonly providerDurationMs?: number;
+}
+
+export interface AdmissionMetricObservation {
+  readonly accepting: boolean;
+  readonly active: number;
+  readonly queued: number;
+  readonly rejected: number;
+}
+
+export interface InfrastructureMetricObservation {
+  readonly postgresTotal: number;
+  readonly postgresIdle: number;
+  readonly postgresWaiting: number;
+  readonly redisReady: boolean;
+  readonly natsPending: number;
+  readonly natsAckPending: number;
 }
 
 export class DriveGuardMetrics {
@@ -77,17 +94,30 @@ export class DriveGuardMetrics {
   readonly #circuitState: Gauge<"tool_name">;
   readonly #llmTokens: Counter<"direction" | "model">;
   readonly #llmCost: Counter<"model">;
+  readonly #llmDuration: Histogram<"model" | "status">;
   readonly #contextConflicts: Counter<"decision">;
   readonly #dependencyUp: Gauge<"dependency">;
   readonly #urgentEvents: Counter<"event_type" | "severity" | "status">;
   readonly #urgentDuration: Histogram<"event_type" | "severity" | "status">;
   readonly #urgentDuplicates: Counter<"event_type" | "severity">;
+  readonly #admissionActive: Gauge;
+  readonly #admissionQueued: Gauge;
+  readonly #admissionAccepting: Gauge;
+  readonly #admissionRejected: Counter;
+  readonly #executorActive: Gauge<"kind">;
+  readonly #executorQueued: Gauge;
+  readonly #executorRejected: Counter;
+  readonly #postgresPool: Gauge<"state">;
+  readonly #redisReady: Gauge;
+  readonly #natsConsumer: Gauge<"state">;
   readonly #agentStarted = new Map<string, number>();
   readonly #toolStarted = new Map<string, number>();
   readonly #policyStarted = new Map<string, number>();
   readonly #executionStarted = new Map<string, number>();
   readonly #pendingActions = new Set<string>();
   readonly #urgentStarted = new Map<string, number>();
+  #lastAdmissionRejected = 0;
+  #lastExecutorRejected = 0;
 
   constructor(options: { readonly collectProcessMetrics?: boolean } = {}) {
     this.registry = new Registry(prometheusContentType);
@@ -198,6 +228,13 @@ export class DriveGuardMetrics {
       labelNames: ["model"] as const,
       registers,
     });
+    this.#llmDuration = new Histogram({
+      name: "driveguard_llm_provider_duration_seconds",
+      help: "LLM provider stream duration excluding Tool execution.",
+      labelNames: ["model", "status"] as const,
+      buckets: DURATION_BUCKETS,
+      registers,
+    });
     this.#contextConflicts = new Counter({
       name: "driveguard_context_conflicts_total",
       help: "Context conflict decisions detected by Policy.",
@@ -229,6 +266,59 @@ export class DriveGuardMetrics {
       labelNames: ["event_type", "severity"] as const,
       registers,
     });
+    this.#admissionActive = new Gauge({
+      name: "driveguard_admission_active",
+      help: "Current admitted stateful API requests.",
+      registers,
+    });
+    this.#admissionQueued = new Gauge({
+      name: "driveguard_admission_queued",
+      help: "Current bounded API admission queue depth.",
+      registers,
+    });
+    this.#admissionAccepting = new Gauge({
+      name: "driveguard_admission_accepting",
+      help: "Whether stateful API admission is accepting new requests.",
+      registers,
+    });
+    this.#admissionRejected = new Counter({
+      name: "driveguard_admission_rejected_total",
+      help: "Total API requests rejected by bounded admission.",
+      registers,
+    });
+    this.#executorActive = new Gauge({
+      name: "driveguard_executor_active",
+      help: "Current admitted Executor operations by read or write class.",
+      labelNames: ["kind"] as const,
+      registers,
+    });
+    this.#executorQueued = new Gauge({
+      name: "driveguard_executor_queued",
+      help: "Current bounded Executor queue depth.",
+      registers,
+    });
+    this.#executorRejected = new Counter({
+      name: "driveguard_executor_rejected_total",
+      help: "Total Executor operations rejected by bounded capacity.",
+      registers,
+    });
+    this.#postgresPool = new Gauge({
+      name: "driveguard_postgres_pool_connections",
+      help: "PostgreSQL pool connections by bounded state.",
+      labelNames: ["state"] as const,
+      registers,
+    });
+    this.#redisReady = new Gauge({
+      name: "driveguard_redis_connection_ready",
+      help: "Whether the runtime Redis connection is ready.",
+      registers,
+    });
+    this.#natsConsumer = new Gauge({
+      name: "driveguard_nats_consumer_messages",
+      help: "JetStream durable consumer messages by bounded state.",
+      labelNames: ["state"] as const,
+      registers,
+    });
     for (const status of ["succeeded", "failed", "cancelled"]) {
       this.#agentRuns.labels({ status }).inc(0);
       this.#agentDuration.zero({ status });
@@ -238,6 +328,18 @@ export class DriveGuardMetrics {
       this.#policyDuration.zero({ decision });
     }
     this.#confirmationPending.set(0);
+    this.#admissionActive.set(0);
+    this.#admissionQueued.set(0);
+    this.#admissionAccepting.set(1);
+    this.#admissionRejected.inc(0);
+    this.#executorActive.set({ kind: "read" }, 0);
+    this.#executorActive.set({ kind: "write" }, 0);
+    this.#executorQueued.set(0);
+    this.#executorRejected.inc(0);
+    for (const state of ["total", "idle", "waiting"]) this.#postgresPool.set({ state }, 0);
+    this.#redisReady.set(0);
+    this.#natsConsumer.set({ state: "pending" }, 0);
+    this.#natsConsumer.set({ state: "ack_pending" }, 0);
     if (options.collectProcessMetrics !== false) {
       collectDefaultMetrics({ register: this.registry, prefix: "driveguard_process_" });
     }
@@ -314,6 +416,10 @@ export class DriveGuardMetrics {
     this.#llmTokens.inc({ direction: "input", model: event.modelName }, event.inputTokens);
     this.#llmTokens.inc({ direction: "output", model: event.modelName }, event.outputTokens);
     this.#llmCost.inc({ model: event.modelName }, event.cost);
+    this.#llmDuration.observe(
+      { model: event.modelName, status: event.isError ? "error" : "success" },
+      (event.providerDurationMs ?? 0) / 1_000,
+    );
   }
 
   observeDependencies(
@@ -322,6 +428,33 @@ export class DriveGuardMetrics {
     for (const dependency of dependencies) {
       this.#dependencyUp.set({ dependency: dependency.name }, dependency.status === "up" ? 1 : 0);
     }
+  }
+
+  observeAdmission(observation: AdmissionMetricObservation): void {
+    this.#admissionActive.set(observation.active);
+    this.#admissionQueued.set(observation.queued);
+    this.#admissionAccepting.set(observation.accepting ? 1 : 0);
+    const delta = Math.max(0, observation.rejected - this.#lastAdmissionRejected);
+    if (delta > 0) this.#admissionRejected.inc(delta);
+    this.#lastAdmissionRejected = Math.max(this.#lastAdmissionRejected, observation.rejected);
+  }
+
+  observeExecutionCapacity(observation: ExecutionConcurrencySnapshot): void {
+    this.#executorActive.set({ kind: "read" }, observation.readActive);
+    this.#executorActive.set({ kind: "write" }, observation.writeActive);
+    this.#executorQueued.set(observation.queued);
+    const delta = Math.max(0, observation.rejected - this.#lastExecutorRejected);
+    if (delta > 0) this.#executorRejected.inc(delta);
+    this.#lastExecutorRejected = Math.max(this.#lastExecutorRejected, observation.rejected);
+  }
+
+  observeInfrastructure(observation: InfrastructureMetricObservation): void {
+    this.#postgresPool.set({ state: "total" }, observation.postgresTotal);
+    this.#postgresPool.set({ state: "idle" }, observation.postgresIdle);
+    this.#postgresPool.set({ state: "waiting" }, observation.postgresWaiting);
+    this.#redisReady.set(observation.redisReady ? 1 : 0);
+    this.#natsConsumer.set({ state: "pending" }, observation.natsPending);
+    this.#natsConsumer.set({ state: "ack_pending" }, observation.natsAckPending);
   }
 
   observeAction(event: ActionLifecycleEvent): void {
