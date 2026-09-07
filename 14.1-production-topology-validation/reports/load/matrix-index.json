@@ -1,0 +1,48 @@
+{
+  "profile": "load",
+  "providerMode": "faux",
+  "baseUrl": "http://127.0.0.1:3400",
+  "generatedAt": "2026-09-06T08:22:11.324Z",
+  "matrix": [
+    {
+      "scenario": "MIXED_WORKLOAD",
+      "vus": 1,
+      "duration": "5m",
+      "startedAt": "2026-09-06T08:01:58.780Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/load/mixed_workload-vu1.json",
+      "resourcePath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/load/mixed_workload-vu1-resources.json"
+    },
+    {
+      "scenario": "MIXED_WORKLOAD",
+      "vus": 5,
+      "duration": "5m",
+      "startedAt": "2026-09-06T08:06:59.446Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/load/mixed_workload-vu5.json",
+      "resourcePath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/load/mixed_workload-vu5-resources.json"
+    },
+    {
+      "scenario": "MIXED_WORKLOAD",
+      "vus": 10,
+      "duration": "5m",
+      "startedAt": "2026-09-06T08:12:01.037Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/load/mixed_workload-vu10.json",
+      "resourcePath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/load/mixed_workload-vu10-resources.json"
+    },
+    {
+      "scenario": "MIXED_WORKLOAD",
+      "vus": 20,
+      "duration": "5m",
+      "startedAt": "2026-09-06T08:17:04.397Z",
+      "code": 99,
+      "signal": null,
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/load/mixed_workload-vu20.json",
+      "resourcePath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/load/mixed_workload-vu20-resources.json"
+    }
+  ]
+}

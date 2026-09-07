@@ -1,13 +1,51 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { buildApi } from "../../apps/api/src/app.js";
 import { RequestAdmissionController } from "../../apps/api/src/admission-control.js";
 import { ExecutionConcurrencyController } from "../../packages/executor/src/concurrency.js";
 
 const apps: ReturnType<typeof buildApi>[] = [];
+const k6Source = readFileSync(new URL("../scripts/k6-load.js", import.meta.url), "utf8");
 
 afterEach(async () => {
   await Promise.all(apps.splice(0).map((app) => app.close()));
+});
+
+describe("Phase 14 production load identity", () => {
+  it("uses the configured production Simulator identity for every VU", () => {
+    expect(k6Source).toContain(
+      'const simulatorVehicleId = __ENV.SIMULATOR_VEHICLE_ID || "simulator-vehicle-001";',
+    );
+    expect(k6Source).toContain('"x-driveguard-vehicle-id": simulatorVehicleId');
+    expect(k6Source).not.toContain("phase14-vehicle:");
+  });
+
+  it("passes setup-created session identity into each isolated k6 VU", () => {
+    expect(k6Source).toContain("sessions.push({ id, userId })");
+    expect(k6Source).toContain("export default function (data)");
+    expect(k6Source).toContain("const context = sessionContext(data, index)");
+    expect(k6Source).toContain("`${baseUrl}/v1/sessions/${context.id}/messages`");
+    expect(k6Source).toContain("identity(index, context.userId)");
+  });
+
+  it("classifies controlled overload responses as valid load contracts", () => {
+    expect(k6Source).toContain(
+      "function sendMessage(data, prompt, acceptedStatuses = [200, 429, 503])",
+    );
+  });
+
+  it("routes the multi-Tool fixture to both trusted read tools", () => {
+    expect(k6Source).toContain(
+      "Get current vehicle state and current trip state. phase14:multi_tool",
+    );
+  });
+
+  it("records stale-context replanning as a safe protected-action outcome", () => {
+    expect(k6Source).toContain('const safeReplan = new Counter("safe_replan")');
+    expect(k6Source).toContain("[200, 409, 429, 503]");
+    expect(k6Source).toContain("safeReplan.add(1)");
+  });
 });
 
 async function eventually(predicate: () => boolean): Promise<void> {

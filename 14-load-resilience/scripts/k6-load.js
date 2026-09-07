@@ -7,9 +7,13 @@ const scenarioName = __ENV.SCENARIO || "MIXED_WORKLOAD";
 const virtualUsers = Number(__ENV.VUS || "1");
 const duration = __ENV.DURATION || "30s";
 const runId = (__ENV.RUN_ID || `${Date.now()}`).replace(/[^A-Za-z0-9._:-]/g, "-");
+const simulatorVehicleId = __ENV.SIMULATOR_VEHICLE_ID || "simulator-vehicle-001";
 
 if (!Number.isInteger(virtualUsers) || virtualUsers < 1 || virtualUsers > 1000) {
   throw new Error("VUS must be an integer between 1 and 1000");
+}
+if (!/^[A-Za-z0-9._:-]{1,128}$/.test(simulatorVehicleId)) {
+  throw new Error("SIMULATOR_VEHICLE_ID must be a valid DriveGuard identity");
 }
 
 export const options = {
@@ -31,13 +35,15 @@ const agentEndToEnd = new Trend("agent_end_to_end_ms", true);
 const expectedSuccess = new Rate("expected_success");
 const controlledBusy = new Counter("controlled_busy");
 const timeouts = new Counter("request_timeouts");
+const safeReplan = new Counter("safe_replan");
+const safeDegraded = new Counter("safe_degraded");
 
-function identity(index) {
+function identity(index, userId = `phase14-user:${runId}:${index}`) {
   return {
     headers: {
       "content-type": "application/json",
-      "x-driveguard-user-id": `phase14-user:${runId}:${index}`,
-      "x-driveguard-vehicle-id": `phase14-vehicle:${runId}:${index}`,
+      "x-driveguard-user-id": userId,
+      "x-driveguard-vehicle-id": simulatorVehicleId,
     },
   };
 }
@@ -51,17 +57,24 @@ export function setup() {
   const sessions = [];
   for (let index = 1; index <= virtualUsers; index += 1) {
     const id = sessionId(index);
+    const userId = `phase14-user:${runId}:${index}`;
     const response = http.post(
       `${baseUrl}/v1/sessions`,
       JSON.stringify({ sessionId: id }),
-      identity(index),
+      identity(index, userId),
     );
     if (response.status !== 200) {
       throw new Error(`Session setup failed with HTTP ${response.status}`);
     }
-    sessions.push(id);
+    sessions.push({ id, userId });
   }
   return { sessions };
+}
+
+function sessionContext(data, index) {
+  const context = data && data.sessions && data.sessions[index - 1];
+  if (!context) throw new Error(`Session setup data is missing for VU ${index}`);
+  return context;
 }
 
 function record(response, trend, acceptedStatuses = [200]) {
@@ -80,19 +93,28 @@ function readOnly() {
   record(response, backendOverhead);
 }
 
-function sendMessage(prompt, acceptedStatuses = [200]) {
+function sendMessage(data, prompt, acceptedStatuses = [200, 429, 503]) {
   const index = __VU;
+  const context = sessionContext(data, index);
   const response = http.post(
-    `${baseUrl}/v1/sessions/${sessionId(index)}/messages`,
+    `${baseUrl}/v1/sessions/${context.id}/messages`,
     JSON.stringify({ prompt }),
-    identity(index),
+    identity(index, context.userId),
   );
   record(response, agentEndToEnd, acceptedStatuses);
   return response;
 }
 
-function protectedAction() {
-  const response = sendMessage("Reserve station-pudong-001 for charging. phase14:protected_action");
+function protectedAction(data) {
+  const response = sendMessage(
+    data,
+    "Reserve station-pudong-001 for charging. phase14:protected_action",
+    [200, 409, 429, 503],
+  );
+  if (response.status === 409) {
+    safeReplan.add(1);
+    return;
+  }
   if (response.status !== 200) return;
   const body = response.json();
   const action = body && body.data && body.data.actions && body.data.actions[0];
@@ -102,51 +124,60 @@ function protectedAction() {
   }
   const rejected = http.post(
     `${baseUrl}/v1/actions/${action.actionId}/reject`,
-    JSON.stringify({ sessionId: sessionId(__VU) }),
-    identity(__VU),
+    JSON.stringify({ sessionId: sessionContext(data, __VU).id }),
+    identity(__VU, sessionContext(data, __VU).userId),
   );
   record(rejected, backendOverhead);
 }
 
-function mixed() {
+function mixed(data) {
   const bucket = __ITER % 100;
   if (bucket < 35) return readOnly();
-  if (bucket < 55) return sendMessage("DriveGuard status check. phase14:no_tool");
-  if (bucket < 80) return sendMessage("Get the current vehicle battery state. phase14:simple_tool");
+  if (bucket < 55) return sendMessage(data, "DriveGuard status check. phase14:no_tool");
+  if (bucket < 80)
+    return sendMessage(data, "Get the current vehicle battery state. phase14:simple_tool");
   if (bucket < 90)
-    return sendMessage("Get current vehicle state and trip state. phase14:multi_tool");
-  if (bucket < 98) return protectedAction();
+    return sendMessage(
+      data,
+      "Get current vehicle state and current trip state. phase14:multi_tool",
+    );
+  if (bucket < 98) return protectedAction(data);
   return sendMessage(
+    data,
     "Get current vehicle state during injected fault. phase14:fault_recovery",
     [200, 503],
   );
 }
 
-export default function () {
+export default function (data) {
   switch (scenarioName) {
     case "READ_ONLY":
       readOnly();
       break;
     case "NO_TOOL":
-      sendMessage("DriveGuard status check. phase14:no_tool");
+      sendMessage(data, "DriveGuard status check. phase14:no_tool");
       break;
     case "SIMPLE_TOOL":
-      sendMessage("Get the current vehicle battery state. phase14:simple_tool");
+      sendMessage(data, "Get the current vehicle battery state. phase14:simple_tool");
       break;
     case "MULTI_TOOL":
-      sendMessage("Get current vehicle state and trip state. phase14:multi_tool");
+      sendMessage(data, "Get current vehicle state and current trip state. phase14:multi_tool");
       break;
     case "PROTECTED_ACTION":
-      protectedAction();
+      protectedAction(data);
       break;
     case "FAULT_RECOVERY":
-      sendMessage(
-        "Get current vehicle state during injected fault. phase14:fault_recovery",
-        [200, 503],
-      );
+      if (
+        sendMessage(
+          data,
+          "Get current vehicle state during injected fault. phase14:fault_recovery",
+          [200, 409, 429, 503],
+        ).status === 409
+      )
+        safeDegraded.add(1);
       break;
     case "MIXED_WORKLOAD":
-      mixed();
+      mixed(data);
       break;
     default:
       throw new Error(`Unsupported SCENARIO: ${scenarioName}`);

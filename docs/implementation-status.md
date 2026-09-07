@@ -1643,3 +1643,56 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - The backend-only P95 target passes in the measured local scope, but missing required live topology
   evidence prevents a Phase 14 PASS.
 - Final Stage Gate **FAIL**. No commit or merge to `main` was made, and the next phase was not started.
+
+## Phase 14.1 — Production Topology Validation & Gate Closure
+
+- Status: VALIDATION COMPLETE; final Stage Gate **FAIL**.
+- Scope: full Compose boot/smoke, production baseline, ascending load to measured saturation,
+  fault-under-load, 30-minute soak, restart/persistence, cross-session isolation, safety, and
+  regression closure only. No Agent redesign and no later Docker/CI/CD phase.
+- Verification date: 2026-09-07 (Asia/Shanghai).
+
+### Production fixes and evidence
+
+- Corrected k6 session/VU identity and production Simulator identity, preserving distinct sessions
+  and valid multi-tool/protected-action contracts.
+- Serialized same-session durable execution acquisition with a PostgreSQL row update lock, removing
+  the live parallel-Tool lock-promotion deadlock; post-fix multi-tool probe completed 160/160.
+- Guarded PostgreSQL Pool and checked-out Client error events and mapped session persistence outages
+  to controlled dependency-unavailable responses. Final nine-case fault matrix completed in one run
+  with recovery 9/9, API restart 0, OOM 0, false success 0, and duplicate side effect 0.
+- Added repeatable topology smoke, fault-under-load, and restart/persistence validation scripts.
+  Scorer, Ground Truth, Policy, confirmation semantics, and safety boundaries were unchanged.
+
+### Measured verification
+
+| Check                   | Result                                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Final topology smoke    | 10/10 PASS across API, PostgreSQL, Redis, NATS, Simulator, Toxiproxy, durable session, Agent/Simulator, and metrics                                    |
+| Backend-only baseline   | 5 min, 1 VU, 115,094 requests, 383.68 req/s, 100% success, P50/P95/P99 2.26/3.28/7.17 ms; P95 target PASS                                              |
+| Agent baseline          | No Tool P95 88.10 ms; Simple 184.15 ms; Multi 299.54 ms; Protected 200.06 ms; provider-only latency reported separately                                |
+| Ascending load          | 1 VU 8.98 req/s PASS; 5 and 10 VU contract PASS with throughput/latency collapse; 20 VU 78.16% expected success and P95 11.34 s                        |
+| Saturation/backpressure | 20 VU: 105 HTTP 500, 329 unexpected `SESSION_BUSY`, one controlled 503; no crash/OOM/backlog, but controlled degradation FAIL                          |
+| Fault under load        | PostgreSQL/Redis latency+disconnect, NATS interruption+slow, Simulator timeout/503/abort: 9/9 recovered, all case exits 0                              |
+| 30-minute soak          | 6,895/6,895 contract PASS and no timeout/queue/connection leak; Agent mean 182 -> 550 ms and message throughput 4.27 -> 1.44 req/s, so drift gate FAIL |
+| Restart/persistence     | Two API restarts; pending state and receipt persisted; ambiguous write `EXECUTED`; duplicate side effect 0; durable NATS consumer recovered            |
+| Cross-session isolation | 20 identities; confirmation/state/receipt/idempotency contamination counters all 0                                                                     |
+| Safety                  | Critical Policy 7,335/7,335; Safety 100%; confirmation bypass/forbidden action/duplicate side effect 0                                                 |
+| Focused regression      | Phase 14 297/297 PASS; Phase 13.2.1 80/80 PASS                                                                                                         |
+| Full regression         | 2,272/2,272 PASS across 86 files; 45 external-environment cases skipped by their existing gates                                                        |
+| Engineering             | format, lint, typecheck, build, and diff check PASS                                                                                                    |
+
+### Gate and limitations
+
+- The short-window maximum passing level is 1 VU at 8.98 req/s. Five and ten VU preserved response
+  classification but were not sustainable because throughput fell and latency rose sharply.
+- Saturation occurred at 20 VU before the planned 50/100/200 and dedicated 250/300/400 levels.
+  Higher levels were not run after the first unsafe failure mode; they are not represented as PASS.
+- The first bottleneck is the single-process API/Agent session path: average API CPU plateaued near
+  1.13 cores, event-loop P99 reached 496 ms, and RSS reached 1,241 MiB while PostgreSQL waiting,
+  NATS pending, and admission/Executor queues remained zero.
+- The soak does not prove a memory leak because heap was non-monotonic and handles/connections were
+  stable. It does prove latency and throughput drift, consistent with growing per-session
+  conversation history, and therefore does not satisfy the no-drift requirement.
+- Final Stage Gate **FAIL** due the 20-VU unexpected failures, incomplete controlled backpressure,
+  and soak drift. No commit or merge to `main` was made, and no later phase was started.

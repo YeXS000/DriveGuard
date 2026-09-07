@@ -1,5 +1,6 @@
 import { jetstreamManager } from "@nats-io/jetstream";
 import { connect, type NatsConnection } from "@nats-io/transport-node";
+import { guardPostgresPoolErrors } from "@driveguard/persistence";
 import pg from "pg";
 import { createClient } from "redis";
 
@@ -91,6 +92,7 @@ export function createInfrastructureProbes(
     ...config.postgres,
     max: Math.min(2, config.postgres.max),
   });
+  guardPostgresPoolErrors(postgresPool);
 
   const redisClient = createClient({
     url: config.redisUrl,

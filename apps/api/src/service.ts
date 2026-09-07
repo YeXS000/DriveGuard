@@ -171,25 +171,34 @@ export class DriveGuardApiService {
   }
 
   async getSession(sessionId: string, identity: DevelopmentIdentity): Promise<ApiSessionView> {
-    const record = await this.#sessions.get(sessionId);
-    if (record === undefined || !sameIdentity(record, identity)) {
-      throw new ApiError("SESSION_NOT_FOUND", "Session was not found", 404);
+    try {
+      const record = await this.#sessions.get(sessionId);
+      if (record === undefined || !sameIdentity(record, identity)) {
+        throw new ApiError("SESSION_NOT_FOUND", "Session was not found", 404);
+      }
+      const messages = await this.#conversation.restore({
+        sessionId,
+        userId: identity.userId,
+        vehicleId: identity.vehicleId,
+        updatedAt: record.updatedAt,
+      });
+      return Object.freeze({
+        sessionId,
+        userId: identity.userId,
+        vehicleId: identity.vehicleId,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+        messages,
+        identityBoundary: DEVELOPMENT_IDENTITY_BOUNDARY,
+      });
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(
+        "DEPENDENCY_UNAVAILABLE",
+        "Session persistence is temporarily unavailable",
+        503,
+      );
     }
-    const messages = await this.#conversation.restore({
-      sessionId,
-      userId: identity.userId,
-      vehicleId: identity.vehicleId,
-      updatedAt: record.updatedAt,
-    });
-    return Object.freeze({
-      sessionId,
-      userId: identity.userId,
-      vehicleId: identity.vehicleId,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-      messages,
-      identityBoundary: DEVELOPMENT_IDENTITY_BOUNDARY,
-    });
   }
 
   async sendMessage(input: {

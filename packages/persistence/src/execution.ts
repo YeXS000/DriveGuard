@@ -462,7 +462,7 @@ export class PostgresDurableExecutionCoordinator implements DurableExecutionCoor
         const sessionLease = await client.query(
           `select session_id from agent_sessions
            where session_id=$1 and busy_owner=$2 and busy_expires_at > clock_timestamp()
-           for share`,
+           for update`,
           [request.sessionId, request.runId],
         );
         if (sessionLease.rowCount !== 1) {
