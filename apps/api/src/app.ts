@@ -180,6 +180,7 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ApiError) {
       setRequestErrorCode(request, error.code);
+      if (error.code === "SERVICE_BUSY") void reply.header("retry-after", "1");
       return reply.code(error.statusCode).send({
         error: { code: error.code, message: error.message },
       });

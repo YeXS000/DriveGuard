@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, isNull, lt, max, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, isNull, lt, max, or, sql } from "drizzle-orm";
 import type {
   AgentSessionRecord,
   ConversationMessage,
@@ -121,6 +121,19 @@ export class PostgresConversationRepository implements ConversationRepository {
       .where(eq(conversationMessages.sessionId, sessionId))
       .orderBy(asc(conversationMessages.sequence));
     return Object.freeze(rows.map(messageRecord));
+  }
+
+  async listRecent(sessionId: string, limit: number): Promise<readonly ConversationMessage[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      throw new TypeError("Conversation history limit must be a positive integer");
+    }
+    const rows = await this.#db
+      .select()
+      .from(conversationMessages)
+      .where(eq(conversationMessages.sessionId, sessionId))
+      .orderBy(desc(conversationMessages.sequence))
+      .limit(limit);
+    return Object.freeze(rows.reverse().map(messageRecord));
   }
 
   async appendTurn(input: {

@@ -69,8 +69,14 @@ async function main(): Promise<void> {
   await redis.connect();
   const bindings = createPhase9RuntimeBindings({ postgres: config.postgres, redis });
   const clock = new SystemClock();
+  const maxConcurrentRequests = readBoundedInteger(
+    "DRIVEGUARD_MAX_CONCURRENT_REQUESTS",
+    32,
+    1,
+    1_000,
+  );
   const admissionController = new RequestAdmissionController({
-    maxConcurrent: readBoundedInteger("DRIVEGUARD_MAX_CONCURRENT_REQUESTS", 32, 1, 1_000),
+    maxConcurrent: maxConcurrentRequests,
     maxQueue: readBoundedInteger("DRIVEGUARD_MAX_REQUEST_QUEUE", 64, 1, 10_000),
     queueTimeoutMs: readBoundedInteger("DRIVEGUARD_REQUEST_QUEUE_TIMEOUT_MS", 500, 1, 60_000),
     observer: (snapshot) => observability.observeAdmission(snapshot),
@@ -95,6 +101,13 @@ async function main(): Promise<void> {
     observability,
     circuitBreaker,
     executionConcurrencyController,
+    runtimeCacheLimit: maxConcurrentRequests,
+    conversationHistoryLimit: readBoundedInteger(
+      "DRIVEGUARD_CONVERSATION_HISTORY_LIMIT",
+      40,
+      1,
+      1_000,
+    ),
   });
   const service = new DriveGuardApiService({
     sessions: bindings.sessionRepository,

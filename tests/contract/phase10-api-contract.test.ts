@@ -197,7 +197,7 @@ describe("Phase 10 HTTP API contract", () => {
   });
 
   it.each([
-    ["SESSION_BUSY", 409, "SESSION_BUSY"],
+    ["SESSION_BUSY", 503, "SERVICE_BUSY"],
     ["POLICY_DENIED", 403, "POLICY_DENIED"],
     ["POLICY_REPLAN_REQUIRED", 409, "REPLAN_REQUIRED"],
     ["TOOL_ERROR", 503, "DEPENDENCY_UNAVAILABLE"],

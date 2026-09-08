@@ -61,7 +61,7 @@ describe("Phase 10 API branch and failure behavior", () => {
 
   it.each([
     [undefined, "INTERNAL_ERROR", 500],
-    ["SESSION_BUSY", "SESSION_BUSY", 409],
+    ["SESSION_BUSY", "SERVICE_BUSY", 503],
     ["POLICY_DENIED", "POLICY_DENIED", 403],
     ["POLICY_REPLAN_REQUIRED", "REPLAN_REQUIRED", 409],
     ["TOOL_ERROR", "DEPENDENCY_UNAVAILABLE", 503],
@@ -203,7 +203,7 @@ describe("Phase 10 API branch and failure behavior", () => {
   });
 
   it.each([
-    ["SESSION_BUSY", "SESSION_BUSY"],
+    ["SESSION_BUSY", "SERVICE_BUSY"],
     ["POLICY_REPLAN_REQUIRED", "REPLAN_REQUIRED"],
   ] as const)("maps confirm Runtime error %s", async (runtimeCode, apiCode) => {
     const harness = createFakeApiHarness();

@@ -83,6 +83,11 @@ export class InMemoryConversationRepository implements ConversationRepository {
     return Promise.resolve(Object.freeze((this.#messages.get(sessionId) ?? []).map(cloneMessage)));
   }
 
+  listRecent(sessionId: string, limit: number): Promise<readonly ConversationMessage[]> {
+    const messages = this.#messages.get(sessionId) ?? [];
+    return Promise.resolve(Object.freeze(messages.slice(-limit).map(cloneMessage)));
+  }
+
   async appendTurn(input: {
     readonly session: AgentSessionRecord;
     readonly ownerId?: string;

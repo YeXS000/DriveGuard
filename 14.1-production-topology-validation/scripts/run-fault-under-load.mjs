@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
-import { mkdir, open, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { copyFile, mkdir, mkdtemp, open, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import process from "node:process";
 import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
@@ -12,6 +13,16 @@ const outputRoot = resolve(
   process.env.PHASE14_FAULT_REPORT_ROOT || "14.1-production-topology-validation/reports/fault",
 );
 const controller = resolve("14-load-resilience/scripts/toxiproxy-fault.mjs");
+const k6Binary = process.env.K6_BIN || "k6";
+
+async function k6ScriptPath() {
+  const source = resolve("14-load-resilience/scripts/k6-load.js");
+  if (process.platform !== "win32") return { path: source };
+  const temporaryDirectory = await mkdtemp(join(tmpdir(), "driveguard-phase14-fault-k6-"));
+  const destination = join(temporaryDirectory, "k6-load.js");
+  await copyFile(source, destination);
+  return { path: destination, temporaryDirectory };
+}
 
 const allCases = [
   { name: "postgres-latency", proxy: "postgres", operation: "latency", value: "2000" },
@@ -148,6 +159,7 @@ async function recoveryProbe(name) {
 }
 
 await mkdir(outputRoot, { recursive: true });
+const k6Script = await k6ScriptPath();
 const matrix = [];
 for (const testCase of cases) {
   for (const proxy of ["postgres", "redis", "nats", "simulator"]) await tox("clear", proxy);
@@ -156,7 +168,7 @@ for (const testCase of cases) {
   const consoleHandle = await open(resolve(outputRoot, `${testCase.name}.log`), "w");
   const samples = [await metrics("before")];
   const startedAt = new Date().toISOString();
-  const k6 = run("k6", ["run", "--quiet", "14-load-resilience/scripts/k6-load.js"], {
+  const k6 = run(k6Binary, ["run", "--quiet", k6Script.path], {
     cwd: process.cwd(),
     env: {
       ...process.env,
@@ -192,6 +204,9 @@ for (const testCase of cases) {
 
 for (const proxy of ["postgres", "redis", "nats", "simulator"]) await tox("clear", proxy);
 await clearSimulatorFaults();
+if (k6Script.temporaryDirectory !== undefined) {
+  await rm(k6Script.temporaryDirectory, { recursive: true, force: true });
+}
 await writeFile(
   resolve(outputRoot, "fault-matrix.json"),
   `${JSON.stringify({ generatedAt: new Date().toISOString(), baseUrl, cases: matrix }, null, 2)}\n`,

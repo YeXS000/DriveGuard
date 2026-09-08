@@ -1696,3 +1696,52 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
   conversation history, and therefore does not satisfy the no-drift requirement.
 - Final Stage Gate **FAIL** due the 20-VU unexpected failures, incomplete controlled backpressure,
   and soak drift. No commit or merge to `main` was made, and no later phase was started.
+
+## Phase 14.2 — Load Path Stabilization & Soak Closure
+
+- Status: IMPLEMENTED AND VALIDATED LOCALLY; final Stage Gate **PASS**.
+- Scope: close only the Phase 14.1 load/backpressure and 30-minute soak-drift blockers while
+  preserving Policy, Confirmation, Reliable Executor, Ground Truth, Scorer, and safety boundaries.
+- Verification date: 2026-09-08 (Asia/Shanghai).
+
+### Implemented modules
+
+- `14-load-resilience`: unique per-VU/per-iteration identities, explicit same/fresh-session modes,
+  response-code counters, selectable load matrix, quiet execution, Windows/UNC k6 support, and
+  30-second resource sampling.
+- `apps/api`: capacity failures normalized to `503 SERVICE_BUSY` with `Retry-After`; direct
+  identity-bound session lookup; per-session Runtime reuse under an admission-sized LRU; dynamic
+  request event sinks; 20 active / 32 queued admission defaults.
+- `packages/agent-runtime`, `packages/memory`, and `packages/persistence`: recent-history restore and
+  user-boundary trimming at 40 model messages, bounded issued IDs, and precise persistence/lease
+  error classification. The complete durable transcript is preserved.
+- `packages/observability`: bounded pending trace-parent retention and retained-state gauges.
+- `docker-compose.yml`: 160 MiB V8 old-space guardrail plus the measured bounded admission defaults.
+- ADR 0019 records bounded Runtime reuse and model-context decisions.
+
+### Measured verification
+
+| Check                    | Result                                                                                                                                                               |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Maximum sustainable load | 20 VU; 11,653 iterations, 96.53/s, Agent P50/P95/P99 315.67/517.60/624.26 ms, controlled 503/500/external busy 0/0/0                                                 |
+| Saturation               | 50 VU; 9,893 iterations, 80.06/s, 3,975 controlled 503, 500/external busy 0/0, API restart 0, OOM false                                                              |
+| 30-minute soak           | 48,583/48,583 checks PASS; Agent mean 52.551 -> 51.604 ms; throughput 15.234 -> 15.508/s; ratios 0.982/1.018                                                         |
+| Soak resources           | RSS peak 235.2 MiB, heap-used peak 129.0 MiB, handles max 14, active resources max 26, metric series 424 at 10/20/30 min, queues/backlogs 0                          |
+| Fault under load         | Nine production-topology faults, 9/9 exits/recovery PASS; unexpected 500/external busy 0/0                                                                           |
+| Restart/persistence      | Two restarts; pending state and receipt preserved; ambiguous write reconciled `EXECUTED`; duplicate side effect 0                                                    |
+| Cross-session isolation  | 20 identities; confirmation/state/receipt/idempotency contamination all 0                                                                                            |
+| Safety                   | Critical Policy 7,335/7,335; Safety Enforcement 100%; confirmation bypass/forbidden action/duplicate side effect 0                                                   |
+| Regression               | Full 2,275/2,275 PASS across 86 files; Phase 14 selection 298/298 and Phase 13.2.1 selection 80/80 included in that run; 45 existing environment-gated cases skipped |
+| Engineering              | format, lint, typecheck, build, and diff whitespace check PASS                                                                                                       |
+
+### Gate and limitations
+
+- Final production-topology load used the deterministic faux provider; external-provider latency is
+  kept separate and is not represented by these capacity numbers.
+- Failed heap/admission tuning and invalid harness attempts remain in explicitly named report
+  archives and are excluded from the final decision.
+- The final 1-VU soak used cache/admission ceilings of 16. The later measured load boundary raised
+  both to 20; at one VU the effective occupancy and executed soak path remain unchanged.
+- Review closure: unresolved critical safety-boundary issues 0. No secret was read from
+  `api_key.md`, persisted, printed, or committed.
+- Final Stage Gate **PASS**. No commit or merge to `main` was made, and no later phase was started.

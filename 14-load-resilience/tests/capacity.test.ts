@@ -24,15 +24,25 @@ describe("Phase 14 production load identity", () => {
   it("passes setup-created session identity into each isolated k6 VU", () => {
     expect(k6Source).toContain("sessions.push({ id, userId })");
     expect(k6Source).toContain("export default function (data)");
-    expect(k6Source).toContain("const context = sessionContext(data, index)");
+    expect(k6Source).toContain(
+      "const context = suppliedContext || requestSessionContext(data, index)",
+    );
     expect(k6Source).toContain("`${baseUrl}/v1/sessions/${context.id}/messages`");
     expect(k6Source).toContain("identity(index, context.userId)");
   });
 
   it("classifies controlled overload responses as valid load contracts", () => {
     expect(k6Source).toContain(
-      "function sendMessage(data, prompt, acceptedStatuses = [200, 429, 503])",
+      "function sendMessage(data, prompt, acceptedStatuses = [200, 429, 503], suppliedContext)",
     );
+  });
+
+  it("supports isolated fresh-session and same-session diagnosis with explicit error counters", () => {
+    expect(k6Source).toContain('const sessionMode = __ENV.SESSION_MODE || "per_vu"');
+    expect(k6Source).toContain('const unexpectedHttp500 = new Counter("unexpected_http_500")');
+    expect(k6Source).toContain('const externalSessionBusy = new Counter("external_session_busy")');
+    expect(k6Source).toContain('sessionMode === "per_iteration"');
+    expect(k6Source).toContain("requestSessionContext(data, index)");
   });
 
   it("routes the multi-Tool fixture to both trusted read tools", () => {

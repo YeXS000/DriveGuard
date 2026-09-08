@@ -28,19 +28,13 @@ type RuntimeSelection = Readonly<{
   model: ReturnType<typeof fauxProvider>["models"][number];
   streamFn: ReturnType<typeof createModels>["streamSimple"];
   sensitiveValues: readonly string[];
+  prepare?: (prompt: string | undefined) => void;
 }>;
 
-function fauxSelection(prompt: string | undefined): RuntimeSelection {
-  const faux = fauxProvider({
-    provider: `driveguard-phase10-faux-${randomUUID()}`,
-    api: `phase10-faux-${randomUUID()}`,
-    tokensPerSecond: 2_000,
-  });
-  const models = createModels();
-  models.setProvider(faux.provider);
+function fauxResponses(prompt: string | undefined) {
   const normalized = prompt?.toLowerCase() ?? "";
   if (normalized.includes("phase14:multi_tool")) {
-    faux.setResponses([
+    return [
       fauxAssistantMessage(
         [
           fauxToolCall("get_vehicle_state", {}, { id: `tool:${randomUUID()}` }),
@@ -49,9 +43,10 @@ function fauxSelection(prompt: string | undefined): RuntimeSelection {
         { stopReason: "toolUse" },
       ),
       fauxAssistantMessage("The vehicle and trip state were retrieved safely."),
-    ]);
-  } else if (/(reserve|charging|charge|phase14:protected_action)/u.test(normalized)) {
-    faux.setResponses([
+    ];
+  }
+  if (/(reserve|charging|charge|phase14:protected_action)/u.test(normalized)) {
+    return [
       fauxAssistantMessage(
         fauxToolCall(
           "reserve_charging_slot",
@@ -61,21 +56,34 @@ function fauxSelection(prompt: string | undefined): RuntimeSelection {
         { stopReason: "toolUse" },
       ),
       fauxAssistantMessage("Confirmation is required before reserving the charging slot."),
-    ]);
-  } else if (/(vehicle|state|battery|soc)/u.test(normalized)) {
-    faux.setResponses([
+    ];
+  }
+  if (/(vehicle|state|battery|soc)/u.test(normalized)) {
+    return [
       fauxAssistantMessage(fauxToolCall("get_vehicle_state", {}, { id: `tool:${randomUUID()}` }), {
         stopReason: "toolUse",
       }),
       fauxAssistantMessage("The current vehicle state has been retrieved safely."),
-    ]);
-  } else {
-    faux.setResponses([fauxAssistantMessage("DriveGuard is ready for your request.")]);
+    ];
   }
+  return [fauxAssistantMessage("DriveGuard is ready for your request.")];
+}
+
+function fauxSelection(prompt: string | undefined): RuntimeSelection {
+  const faux = fauxProvider({
+    provider: `driveguard-phase10-faux-${randomUUID()}`,
+    api: `phase10-faux-${randomUUID()}`,
+    tokensPerSecond: 2_000,
+  });
+  const models = createModels();
+  models.setProvider(faux.provider);
+  const prepare = (nextPrompt: string | undefined) => faux.setResponses(fauxResponses(nextPrompt));
+  prepare(prompt);
   return Object.freeze({
     model: faux.getModel(),
     streamFn: models.streamSimple.bind(models),
     sensitiveValues: Object.freeze([]),
+    prepare,
   });
 }
 
@@ -157,6 +165,17 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
   readonly #observability: DriveGuardObservability | undefined;
   readonly #circuitBreaker: CircuitBreaker | undefined;
   readonly #executionConcurrencyController: ExecutionConcurrencyController | undefined;
+  readonly #conversationHistoryLimit: number | undefined;
+  readonly #runtimeCacheLimit: number;
+  readonly #runtimeCache = new Map<
+    string,
+    {
+      readonly runtime: ReturnType<typeof createPhase9ProductionDriveGuardRuntime>;
+      readonly slot: { current: Phase10RuntimeFactoryInput };
+      readonly prepare?: (prompt: string | undefined) => void;
+      readonly identity: Phase10RuntimeFactoryInput["identity"];
+    }
+  >();
 
   constructor(options: {
     readonly bindings: Phase9RuntimeBindings;
@@ -166,6 +185,8 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
     readonly observability?: DriveGuardObservability;
     readonly circuitBreaker?: CircuitBreaker;
     readonly executionConcurrencyController?: ExecutionConcurrencyController;
+    readonly conversationHistoryLimit?: number;
+    readonly runtimeCacheLimit?: number;
   }) {
     this.#bindings = options.bindings;
     this.#simulatorBaseUrl = options.simulatorBaseUrl;
@@ -174,25 +195,43 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
     this.#observability = options.observability;
     this.#circuitBreaker = options.circuitBreaker;
     this.#executionConcurrencyController = options.executionConcurrencyController;
+    this.#conversationHistoryLimit = options.conversationHistoryLimit;
+    this.#runtimeCacheLimit = options.runtimeCacheLimit ?? 32;
   }
 
   create(input: Phase10RuntimeFactoryInput) {
+    const cacheKey = input.sessionId;
+    const cached = cacheKey === undefined ? undefined : this.#runtimeCache.get(cacheKey);
+    if (cacheKey !== undefined && cached !== undefined) {
+      if (
+        cached.identity.userId !== input.identity.userId ||
+        cached.identity.vehicleId !== input.identity.vehicleId
+      ) {
+        throw new ApiError("INTERNAL_ERROR", "Session identity boundary failed safely", 500);
+      }
+      cached.slot.current = input;
+      cached.prepare?.(input.prompt);
+      this.#runtimeCache.delete(cacheKey);
+      this.#runtimeCache.set(cacheKey, cached);
+      return cached.runtime;
+    }
     const selected = selection(this.#provider, input.prompt);
+    const slot = { current: input };
     const executionEventSink = combinedExecutionSink(
       this.#bindings.executionEventSink,
-      input.executionEventSink,
+      { emit: (event) => slot.current.executionEventSink?.emit(event) },
       this.#observability?.executionEventSink,
     );
     const runtimeEventSink = combinedRuntimeSink(
-      input.runtimeEventSink,
+      { emit: (event) => slot.current.runtimeEventSink?.emit(event) },
       this.#observability?.runtimeEventSink,
     );
     const actionLifecycleEventSink = combinedActionSink(
-      input.actionLifecycleEventSink,
+      { emit: (event) => slot.current.actionLifecycleEventSink?.emit(event) },
       this.#observability?.actionLifecycleEventSink,
     );
     const mode = parsePhase5RuntimeMode(process.env.PHASE_5_RUNTIME_MODE);
-    return createPhase9ProductionDriveGuardRuntime(
+    const runtime = createPhase9ProductionDriveGuardRuntime(
       {
         model: selected.model,
         streamFn: selected.streamFn,
@@ -213,13 +252,12 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
         runtimeOverrides:
           runtimeEventSink === undefined &&
           input.assistantTextDeltaSink === undefined &&
-          this.#observability === undefined
+          this.#observability === undefined &&
+          this.#conversationHistoryLimit === undefined
             ? {}
             : {
                 ...(runtimeEventSink === undefined ? {} : { eventSink: runtimeEventSink }),
-                ...(input.assistantTextDeltaSink === undefined
-                  ? {}
-                  : { assistantTextDeltaSink: input.assistantTextDeltaSink }),
+                assistantTextDeltaSink: (event) => slot.current.assistantTextDeltaSink?.(event),
                 ...(this.#observability === undefined
                   ? {}
                   : {
@@ -227,9 +265,26 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
                         usage: Parameters<DriveGuardObservability["observeModelUsage"]>[0],
                       ) => this.#observability?.observeModelUsage(usage),
                     }),
+                ...(this.#conversationHistoryLimit === undefined
+                  ? {}
+                  : { conversationHistoryLimit: this.#conversationHistoryLimit }),
               },
       },
       { ...this.#bindings, executionEventSink },
     );
+    if (cacheKey !== undefined) {
+      this.#runtimeCache.set(cacheKey, {
+        runtime,
+        slot,
+        ...(selected.prepare === undefined ? {} : { prepare: selected.prepare }),
+        identity: Object.freeze({ ...input.identity }),
+      });
+      while (this.#runtimeCache.size > this.#runtimeCacheLimit) {
+        const oldest = this.#runtimeCache.keys().next().value;
+        if (oldest === undefined) break;
+        this.#runtimeCache.delete(oldest);
+      }
+    }
+    return runtime;
   }
 }

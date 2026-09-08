@@ -1,0 +1,18 @@
+{
+  "profile": "isolation",
+  "providerMode": "faux",
+  "baseUrl": "http://127.0.0.1:3400",
+  "generatedAt": "2026-09-07T10:00:26.913Z",
+  "matrix": [
+    {
+      "scenario": "SIMPLE_TOOL",
+      "vus": 1,
+      "duration": "30s",
+      "startedAt": "2026-09-07T09:59:56.102Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\retained-map-probe\\simple-tool-same-session.json",
+      "resourcePath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\retained-map-probe\\simple-tool-same-session-resources.json"
+    }
+  ]
+}

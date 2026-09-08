@@ -81,6 +81,7 @@ export interface CreateProductionRuntimeOptions {
     | "eventSink"
     | "assistantTextDeltaSink"
     | "modelUsageSink"
+    | "conversationHistoryLimit"
   >;
   readonly actionLifecycleEventSink?: ActionLifecycleEventSink;
   readonly executionEventSink?: ExecutionEventSink;

@@ -142,6 +142,17 @@ export class AgentSession {
     return this.#agent.state.messages.length;
   }
 
+  trimHistory(maxMessages: number): void {
+    if (!Number.isSafeInteger(maxMessages) || maxMessages < 1) {
+      throw new TypeError("Agent session history limit must be a positive integer");
+    }
+    if (this.#agent.state.messages.length <= maxMessages) return;
+    const recent = this.#agent.state.messages.slice(-maxMessages);
+    const firstUserIndex = recent.findIndex((message) => message.role === "user");
+    this.#agent.state.messages = firstUserIndex < 0 ? [] : recent.slice(firstUserIndex);
+    this.#touch();
+  }
+
   rollback(checkpoint: number): void {
     this.#agent.state.messages = this.#agent.state.messages.slice(0, checkpoint);
     this.#agent.clearAllQueues();

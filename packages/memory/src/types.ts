@@ -39,6 +39,8 @@ export interface SessionIdentityBinding {
 
 export interface ConversationRepository {
   list(sessionId: string): Promise<readonly ConversationMessage[]>;
+  /** Efficient bounded suffix for runtime prompt construction; durable history is unchanged. */
+  listRecent?(sessionId: string, limit: number): Promise<readonly ConversationMessage[]>;
   appendTurn(input: {
     readonly session: AgentSessionRecord;
     readonly ownerId?: string;
@@ -49,6 +51,11 @@ export interface ConversationRepository {
 
 export interface ConversationMemory {
   restore(input: SessionIdentityBinding): Promise<readonly ConversationMessage[]>;
+  /** Restore only the bounded suffix used by the Agent runtime. */
+  restoreRecent?(
+    input: SessionIdentityBinding,
+    limit: number,
+  ): Promise<readonly ConversationMessage[]>;
   bindIdentity(input: SessionIdentityBinding): Promise<void>;
   appendTurn(input: {
     readonly sessionId: string;

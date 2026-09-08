@@ -214,4 +214,17 @@ describe("Phase 5 process-local AgentSession", () => {
     expect(store.snapshots().map((snapshot) => snapshot.sessionId)).toEqual(["alpha", "beta"]);
     expect(Object.isFrozen(store.snapshots())).toBe(true);
   });
+
+  it("bounds retained model history on a complete user-message boundary", async () => {
+    const current = session("bounded-history");
+
+    await current.prompt("first");
+    await current.prompt("second");
+    await current.prompt("third");
+    expect(current.snapshot().messageCount).toBe(6);
+
+    current.trimHistory(3);
+
+    expect(current.snapshot()).toMatchObject({ messageCount: 2, userMessageCount: 1 });
+  });
 });

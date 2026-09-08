@@ -306,6 +306,7 @@ export class DriveGuardObservability {
   }
 
   metricsText(): Promise<string> {
+    this.metrics.observeTracing(this.tracing.snapshot());
     return this.metrics.metrics();
   }
 

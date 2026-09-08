@@ -110,6 +110,7 @@ export class DriveGuardMetrics {
   readonly #postgresPool: Gauge<"state">;
   readonly #redisReady: Gauge;
   readonly #natsConsumer: Gauge<"state">;
+  readonly #tracingState: Gauge<"kind">;
   readonly #agentStarted = new Map<string, number>();
   readonly #toolStarted = new Map<string, number>();
   readonly #policyStarted = new Map<string, number>();
@@ -319,6 +320,12 @@ export class DriveGuardMetrics {
       labelNames: ["state"] as const,
       registers,
     });
+    this.#tracingState = new Gauge({
+      name: "driveguard_observability_retained",
+      help: "Current bounded tracing state retained in process memory.",
+      labelNames: ["kind"] as const,
+      registers,
+    });
     for (const status of ["succeeded", "failed", "cancelled"]) {
       this.#agentRuns.labels({ status }).inc(0);
       this.#agentDuration.zero({ status });
@@ -455,6 +462,12 @@ export class DriveGuardMetrics {
     this.#redisReady.set(observation.redisReady ? 1 : 0);
     this.#natsConsumer.set({ state: "pending" }, observation.natsPending);
     this.#natsConsumer.set({ state: "ack_pending" }, observation.natsAckPending);
+  }
+
+  observeTracing(snapshot: Readonly<Record<string, number>>): void {
+    for (const [kind, value] of Object.entries(snapshot)) {
+      this.#tracingState.set({ kind }, value);
+    }
   }
 
   observeAction(event: ActionLifecycleEvent): void {

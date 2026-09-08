@@ -6,3 +6,4 @@ coverage/
 package-lock.json
 13.2.1-gate-stabilization/reports/car-bench/**/car-bench-raw/
 14.1-production-topology-validation/reports/
+14.2-load-path-stabilization/reports/

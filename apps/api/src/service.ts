@@ -28,6 +28,7 @@ export interface DevelopmentIdentity {
 
 export interface Phase10RuntimeFactoryInput {
   readonly identity: DevelopmentIdentity;
+  readonly sessionId?: string;
   readonly prompt?: string;
   readonly runtimeEventSink?: RuntimeEventSink;
   readonly actionLifecycleEventSink?: ActionLifecycleEventSink;
@@ -208,13 +209,26 @@ export class DriveGuardApiService {
     readonly emit?: PublicEventEmitter;
     readonly traceId?: string;
   }): Promise<ApiMessageResult> {
-    await this.getSession(input.sessionId, input.identity);
+    try {
+      const session = await this.#sessions.get(input.sessionId);
+      if (session === undefined || !sameIdentity(session, input.identity)) {
+        throw new ApiError("SESSION_NOT_FOUND", "Session was not found", 404);
+      }
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(
+        "DEPENDENCY_UNAVAILABLE",
+        "Session persistence is temporarily unavailable",
+        503,
+      );
+    }
     if (this.#active.has(input.sessionId)) {
-      throw new ApiError("SESSION_BUSY", "Session already has an active request", 409);
+      throw new ApiError("SERVICE_BUSY", "Session already has an active request", 503);
     }
     const emit = input.emit ?? (() => undefined);
     const runtime = this.#runtimeFactory.create({
       identity: input.identity,
+      sessionId: input.sessionId,
       prompt: input.prompt,
       runtimeEventSink: createRuntimePublicEventSink(emit),
       assistantTextDeltaSink: async (event) => {
