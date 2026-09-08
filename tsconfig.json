@@ -11,6 +11,7 @@
     "tests/**/*.ts",
     "13.1-evaluation-calibration-scorer-v2/tests/**/*.ts",
     "13.2.1-gate-stabilization/tests/**/*.ts",
+    "14-load-resilience/tests/**/*.ts",
     "vitest.config.ts"
   ]
 }

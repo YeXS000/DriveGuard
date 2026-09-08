@@ -1,0 +1,370 @@
+{
+  "schemaVersion": 1,
+  "scenario": "MIXED_WORKLOAD",
+  "virtualUsers": 20,
+  "duration": "5m",
+  "providerMode": "faux",
+  "generatedAt": "2026-09-06T08:22:10.725Z",
+  "k6": {
+    "root_group": {
+      "name": "",
+      "path": "",
+      "id": "d41d8cd98f00b204e9800998ecf8427e",
+      "groups": [],
+      "checks": [
+          {
+            "name": "response follows scenario contract",
+            "path": "::response follows scenario contract",
+            "id": "5f2d3df364c3706bf09f788f993343d2",
+            "passes": 1553,
+            "fails": 434
+          }
+        ]
+    },
+    "options": {
+      "summaryTrendStats": [
+        "avg",
+        "min",
+        "med",
+        "p(90)",
+        "p(95)",
+        "p(99)",
+        "max"
+      ],
+      "summaryTimeUnit": "",
+      "noColor": false
+    },
+    "state": {
+      "isStdOutTTY": false,
+      "isStdErrTTY": false,
+      "testRunDurationMs": 306256.593053
+    },
+    "metrics": {
+      "agent_end_to_end_ms": {
+        "type": "trend",
+        "contains": "time",
+        "values": {
+          "med": 5733.33959,
+          "p(90)": 11313.7204228,
+          "p(95)": 11625.3435088,
+          "p(99)": 12099.86877364,
+          "max": 12599.548656,
+          "avg": 5539.268295313831,
+          "min": 877.900363
+        }
+      },
+      "vus": {
+        "type": "gauge",
+        "contains": "default",
+        "values": {
+          "value": 6,
+          "min": 0,
+          "max": 20
+        }
+      },
+      "data_sent": {
+        "type": "counter",
+        "contains": "data",
+        "values": {
+          "count": 488758,
+          "rate": 1595.9101325058389
+        }
+      },
+      "http_req_duration": {
+        "type": "trend",
+        "contains": "time",
+        "values": {
+          "avg": 3021.948506613351,
+          "min": 6.377121,
+          "med": 1296.105696,
+          "p(90)": 10933.2057752,
+          "p(95)": 11336.724386099999,
+          "p(99)": 11994.11749206,
+          "max": 12599.548656
+        }
+      },
+      "http_req_tls_handshaking": {
+        "type": "trend",
+        "contains": "time",
+        "values": {
+          "p(95)": 0,
+          "p(99)": 0,
+          "max": 0,
+          "avg": 0,
+          "min": 0,
+          "med": 0,
+          "p(90)": 0
+        }
+      },
+      "checks": {
+        "type": "rate",
+        "contains": "default",
+        "values": {
+          "rate": 0.7815802717664821,
+          "passes": 1553,
+          "fails": 434
+        }
+      },
+      "vus_max": {
+        "type": "gauge",
+        "contains": "default",
+        "values": {
+          "value": 20,
+          "min": 20,
+          "max": 20
+        }
+      },
+      "http_reqs": {
+        "type": "counter",
+        "contains": "default",
+        "values": {
+          "count": 2007,
+          "rate": 6.553328305499282
+        }
+      },
+      "http_req_blocked": {
+        "type": "trend",
+        "contains": "time",
+        "values": {
+          "med": 0.003543,
+          "p(90)": 0.0048774000000000005,
+          "p(95)": 0.006073299999999997,
+          "p(99)": 0.5131532600000166,
+          "max": 2.109383,
+          "avg": 0.01828060538116596,
+          "min": 0.001292
+        }
+      },
+      "backend_overhead_ms": {
+        "type": "trend",
+        "contains": "time",
+        "values": {
+          "p(99)": 385.48827761999985,
+          "max": 883.890541,
+          "avg": 107.43322567802205,
+          "min": 6.377121,
+          "med": 82.00395,
+          "p(90)": 183.82104700000002,
+          "p(95)": 244.60791139999992
+        }
+      },
+      "http_req_connecting": {
+        "contains": "time",
+        "values": {
+          "med": 0,
+          "p(90)": 0,
+          "p(95)": 0,
+          "p(99)": 0.15968814000000928,
+          "max": 2.072256,
+          "avg": 0.01354794818136522,
+          "min": 0
+        },
+        "type": "trend"
+      },
+      "http_req_duration{expected_response:true}": {
+        "type": "trend",
+        "contains": "time",
+        "values": {
+          "avg": 3337.4567269370928,
+          "min": 6.377121,
+          "med": 148.3257055,
+          "p(90)": 11141.682345,
+          "p(95)": 11480.9735645,
+          "p(99)": 12065.994092249999,
+          "max": 12599.548656
+        }
+      },
+      "iterations": {
+        "values": {
+          "count": 1987,
+          "rate": 6.488023588952204
+        },
+        "type": "counter",
+        "contains": "default"
+      },
+      "safe_replan": {
+        "type": "counter",
+        "contains": "default",
+        "values": {
+          "count": 46,
+          "rate": 0.15020084805827952
+        }
+      },
+      "controlled_busy": {
+        "values": {
+          "rate": 0.003265235827353903,
+          "count": 1
+        },
+        "type": "counter",
+        "contains": "default"
+      },
+      "http_req_failed": {
+        "type": "rate",
+        "contains": "default",
+        "values": {
+          "rate": 0.23966118584952667,
+          "passes": 481,
+          "fails": 1526
+        }
+      },
+      "http_req_sending": {
+        "type": "trend",
+        "contains": "time",
+        "values": {
+          "avg": 0.023702148978575015,
+          "min": 0.005102,
+          "med": 0.019767,
+          "p(90)": 0.036244,
+          "p(95)": 0.041646699999999995,
+          "p(99)": 0.07054478000000013,
+          "max": 0.443528
+        }
+      },
+      "data_received": {
+        "type": "counter",
+        "contains": "data",
+        "values": {
+          "count": 864046,
+          "rate": 2821.31395568183
+        }
+      },
+      "iteration_duration": {
+        "values": {
+          "avg": 3052.052124937089,
+          "min": 6.582207,
+          "med": 1313.680337,
+          "p(90)": 10941.221315,
+          "p(95)": 11339.1629154,
+          "p(99)": 11998.322800839998,
+          "max": 12602.400561
+        },
+        "type": "trend",
+        "contains": "time"
+      },
+      "http_req_receiving": {
+        "contains": "time",
+        "values": {
+          "med": 0.097582,
+          "p(90)": 0.128413,
+          "p(95)": 0.14692569999999988,
+          "p(99)": 0.24880100000000152,
+          "max": 0.801658,
+          "avg": 0.1010105176880916,
+          "min": 0.016292
+        },
+        "type": "trend"
+      },
+      "http_req_waiting": {
+        "type": "trend",
+        "contains": "time",
+        "values": {
+          "med": 1296.002696,
+          "p(90)": 10933.0888622,
+          "p(95)": 11336.5793585,
+          "p(99)": 11993.99480008,
+          "max": 12599.399231,
+          "avg": 3021.823793946687,
+          "min": 6.209202
+        }
+      },
+      "expected_success": {
+        "type": "rate",
+        "contains": "default",
+        "values": {
+          "passes": 1553,
+          "fails": 434,
+          "rate": 0.7815802717664821
+        },
+        "thresholds": {
+          "rate>0.995": {
+            "ok": false
+          }
+        }
+      }
+    },
+    "setup_data": {
+      "sessions": [
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:1",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:1"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:2",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:2"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:3",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:3"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:4",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:4"
+        },
+        {
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:5",
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:5"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:6",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:6"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:7",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:7"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:8",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:8"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:9",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:9"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:10",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:10"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:11",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:11"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:12",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:12"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:13",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:13"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:14",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:14"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:15",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:15"
+        },
+        {
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:16",
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:16"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:17",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:17"
+        },
+        {
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:18",
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:18"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:19",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:19"
+        },
+        {
+          "id": "phase14-session:1788682624397:mixed_workload-vu20:20",
+          "userId": "phase14-user:1788682624397:mixed_workload-vu20:20"
+        }
+      ]
+    }
+  }
+}

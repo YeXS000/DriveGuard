@@ -1,0 +1,171 @@
+{
+  "generatedAt": "2026-09-08T01:05:53.688Z",
+  "baseUrl": "http://127.0.0.1:3400",
+  "cases": [
+    {
+      "name": "postgres-latency",
+      "proxy": "postgres",
+      "operation": "latency",
+      "value": "2000",
+      "startedAt": "2026-09-08T01:02:56.334Z",
+      "outcome": {
+        "code": 4294967295,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\final\\fault-under-load\\postgres-latency.json"
+    },
+    {
+      "name": "postgres-disconnect",
+      "proxy": "postgres",
+      "operation": "down",
+      "startedAt": "2026-09-08T01:03:16.297Z",
+      "outcome": {
+        "code": 4294967295,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\final\\fault-under-load\\postgres-disconnect.json"
+    },
+    {
+      "name": "redis-latency",
+      "proxy": "redis",
+      "operation": "latency",
+      "value": "1500",
+      "startedAt": "2026-09-08T01:03:36.145Z",
+      "outcome": {
+        "code": 4294967295,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\final\\fault-under-load\\redis-latency.json"
+    },
+    {
+      "name": "redis-disconnect",
+      "proxy": "redis",
+      "operation": "down",
+      "startedAt": "2026-09-08T01:03:55.870Z",
+      "outcome": {
+        "code": 4294967295,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\final\\fault-under-load\\redis-disconnect.json"
+    },
+    {
+      "name": "nats-interruption",
+      "proxy": "nats",
+      "operation": "down",
+      "startedAt": "2026-09-08T01:04:15.686Z",
+      "outcome": {
+        "code": 4294967295,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\final\\fault-under-load\\nats-interruption.json"
+    },
+    {
+      "name": "nats-slow-consumer",
+      "proxy": "nats",
+      "operation": "latency",
+      "value": "1500",
+      "startedAt": "2026-09-08T01:04:35.522Z",
+      "outcome": {
+        "code": 4294967295,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\final\\fault-under-load\\nats-slow-consumer.json"
+    },
+    {
+      "name": "simulator-timeout",
+      "simulatorMode": "timeout",
+      "delayMs": 2500,
+      "startedAt": "2026-09-08T01:04:55.267Z",
+      "outcome": {
+        "code": 4294967295,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\final\\fault-under-load\\simulator-timeout.json"
+    },
+    {
+      "name": "simulator-http-503",
+      "simulatorMode": "http_503",
+      "delayMs": 0,
+      "startedAt": "2026-09-08T01:05:14.584Z",
+      "outcome": {
+        "code": 4294967295,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\final\\fault-under-load\\simulator-http-503.json"
+    },
+    {
+      "name": "simulator-connection-abort",
+      "simulatorMode": "connection_abort",
+      "delayMs": 0,
+      "startedAt": "2026-09-08T01:05:33.952Z",
+      "outcome": {
+        "code": 4294967295,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\final\\fault-under-load\\simulator-connection-abort.json"
+    }
+  ]
+}

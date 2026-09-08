@@ -19,6 +19,7 @@ import {
 import Schema from "typebox/schema";
 
 import { CircuitBreaker } from "./circuit-breaker.js";
+import { ExecutionConcurrencyController } from "./concurrency.js";
 import type { DurableExecutionCoordinator } from "./durable.js";
 import {
   authorizationErrorCode,
@@ -65,6 +66,7 @@ export interface ReliableToolExecutorOptions {
   readonly timeoutController?: TimeoutController;
   readonly idempotencyManager?: IdempotencyManager;
   readonly circuitBreaker?: CircuitBreaker;
+  readonly concurrencyController?: ExecutionConcurrencyController;
   readonly eventSink?: ExecutionEventSink;
   readonly records?: ExecutionRecordStore;
   readonly durableCoordinator?: DurableExecutionCoordinator;
@@ -89,6 +91,7 @@ export class ReliableToolExecutor {
   readonly #timeoutController: TimeoutController;
   readonly #idempotency: IdempotencyManager;
   readonly #circuitBreaker: CircuitBreaker;
+  readonly #concurrencyController: ExecutionConcurrencyController;
   readonly #eventSink: ExecutionEventSink;
   readonly #records: ExecutionRecordStore;
   readonly #durableCoordinator: DurableExecutionCoordinator | undefined;
@@ -105,6 +108,8 @@ export class ReliableToolExecutor {
     this.#timeoutController = options.timeoutController ?? new AbortTimeoutController();
     this.#idempotency = options.idempotencyManager ?? new IdempotencyManager();
     this.#circuitBreaker = options.circuitBreaker ?? new CircuitBreaker({ clock: options.clock });
+    this.#concurrencyController =
+      options.concurrencyController ?? new ExecutionConcurrencyController();
     this.#eventSink = options.eventSink ?? new InMemoryExecutionEventSink();
     this.#records = options.records ?? new ExecutionRecordStore();
     this.#durableCoordinator = options.durableCoordinator;
@@ -239,11 +244,21 @@ export class ReliableToolExecutor {
       return rejected;
     }
 
+    const admission = await this.#concurrencyController.acquire({
+      sideEffect: definition.sideEffect,
+      vehicleId: request.vehicleId,
+    });
     let result: ExecutionResult;
-    try {
-      result = await this.#executeOwner(request, definition);
-    } catch {
-      result = this.#finish(request, "FAILED", 0, safeExecutionError("INTERNAL_EXECUTION_ERROR"));
+    if (!admission.admitted) {
+      result = this.#reject(request, "EXECUTOR_BUSY", true);
+    } else {
+      try {
+        result = await this.#executeOwner(request, definition);
+      } catch {
+        result = this.#finish(request, "FAILED", 0, safeExecutionError("INTERNAL_EXECUTION_ERROR"));
+      } finally {
+        admission.permit.release();
+      }
     }
     acquisition.complete(result);
     return result;
@@ -718,11 +733,11 @@ export class ReliableToolExecutor {
     );
   }
 
-  #reject(request: ExecutionRequest, code: ExecutionErrorCode): ExecutionResult {
+  #reject(request: ExecutionRequest, code: ExecutionErrorCode, retryable = false): ExecutionResult {
     const at = toUtcTimestamp(this.#clock.nowMs());
     const record = this.#records.get(request.executionId);
     if (record?.state === "CREATED") this.#records.transition(request.executionId, "REJECTED", at);
-    return this.#rejectionResult(request, code, record?.createdAt ?? at, at);
+    return this.#rejectionResult(request, code, record?.createdAt ?? at, at, retryable);
   }
 
   #rejectionResult(
@@ -730,6 +745,7 @@ export class ReliableToolExecutor {
     code: ExecutionErrorCode,
     startedAt: ExecutionResult["startedAt"],
     completedAt: ExecutionResult["completedAt"],
+    retryable = false,
   ): ExecutionResult {
     return Object.freeze({
       executionId: request.executionId,
@@ -739,7 +755,7 @@ export class ReliableToolExecutor {
       deduplicated: false,
       startedAt,
       completedAt,
-      error: safeExecutionError(code),
+      error: safeExecutionError(code, retryable),
     });
   }
 

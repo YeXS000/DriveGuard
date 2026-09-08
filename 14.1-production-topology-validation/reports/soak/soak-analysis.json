@@ -1,0 +1,89 @@
+{
+  "generatedAt": "2026-09-07T02:47:36.6108403Z",
+  "durationMinutes": 30,
+  "virtualUsers": 1,
+  "iterations": 6895,
+  "checks": {
+    "passed": 6895,
+    "failed": 0,
+    "expectedSuccessRate": 1
+  },
+  "overall": {
+    "requestRate": 3.829443671084022,
+    "httpP50Ms": 181.1311785,
+    "httpP95Ms": 763.0720215,
+    "httpP99Ms": 933.1981471,
+    "agentP95Ms": 814.4670090000001,
+    "safeReplans": 549,
+    "timeouts": 0
+  },
+  "timepoints": [
+    {
+      "minute": 0,
+      "rssMiB": 171.078125,
+      "heapUsedMiB": 70.55494689941406,
+      "openHandles": 10
+    },
+    {
+      "minute": 10,
+      "rssMiB": 537.75,
+      "heapUsedMiB": 111.88188934326172,
+      "openHandles": 13
+    },
+    {
+      "minute": 20,
+      "rssMiB": 541.015625,
+      "heapUsedMiB": 105.71965789794922,
+      "openHandles": 13
+    },
+    {
+      "minute": 30,
+      "rssMiB": 568.70703125,
+      "heapUsedMiB": 244.8786163330078,
+      "openHandles": 13
+    }
+  ],
+  "tenMinuteIntervals": [
+    {
+      "interval": "0-10m",
+      "agentRuns": 2566,
+      "messageRequestsPerSecond": 4.272735749776872,
+      "averageAgentMs": 182.20927513639896,
+      "agentP95HistogramUpperBoundSeconds": 0.5
+    },
+    {
+      "interval": "10-20m",
+      "agentRuns": 1047,
+      "messageRequestsPerSecond": 1.7438926281811051,
+      "averageAgentMs": 454.2607449856731,
+      "agentP95HistogramUpperBoundSeconds": 1
+    },
+    {
+      "interval": "20-30m",
+      "agentRuns": 867,
+      "messageRequestsPerSecond": 1.4438930153548946,
+      "averageAgentMs": 550.1660899653963,
+      "agentP95HistogramUpperBoundSeconds": 1
+    }
+  ],
+  "resourceBounds": {
+    "rssMaxMiB": 579.84765625,
+    "heapUsedMaxMiB": 297.2451477050781,
+    "postgresWaitingMax": 0,
+    "natsPendingMax": 0,
+    "admissionQueuedMax": 0,
+    "executorQueuedMax": 0,
+    "containerRestartCount": 0,
+    "oomKilled": false
+  },
+  "assessment": {
+    "memoryLeakConfirmed": false,
+    "handleLeak": false,
+    "connectionLeak": false,
+    "queueAccumulation": false,
+    "latencyDrift": true,
+    "throughputDrift": true,
+    "gate": "FAIL",
+    "reason": "The Agent-run average rose from 182.21 ms to 550.17 ms while message throughput fell from 4.27 to 1.44 req/s across the three ten-minute windows. RSS plateaued after warm-up and heap was non-monotonic, so this run does not prove a memory leak, but the latency/throughput drift independently fails the soak gate."
+  }
+}

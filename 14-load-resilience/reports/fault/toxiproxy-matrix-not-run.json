@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "environment": "Docker Compose plus Toxiproxy 2.12.0",
+  "configuration": "PostgreSQL, Redis, NATS, and Simulator down/latency/reset faults under concurrent load",
+  "duration": "per matrix scenario",
+  "concurrency": "planned by fault scenario",
+  "requestCount": 0,
+  "result": "NOT_RUN",
+  "metrics": null,
+  "failure": "Docker daemon unavailable. Compose merge validation passed, but containers and toxics were not executed.",
+  "conclusion": "External dependency fault recovery is not promoted from deterministic fixture evidence."
+}

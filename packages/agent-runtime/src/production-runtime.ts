@@ -94,6 +94,8 @@ export interface DriveGuardRuntimeOptions {
   readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   readonly reliableExecutor: ReliableToolExecutor;
   readonly conversationMemory?: ConversationMemory;
+  /** Maximum durable conversation messages restored into one model invocation. */
+  readonly conversationHistoryLimit?: number;
   readonly sessionCoordinator?: SessionCoordinator;
   readonly assistantTextDeltaSink?: (event: {
     readonly delta: string;
@@ -110,6 +112,7 @@ export interface DriveGuardRuntimeOptions {
     readonly outputTokens: number;
     readonly cost: number;
     readonly isError: boolean;
+    readonly providerDurationMs?: number;
   }) => void | Promise<void>;
   readonly goalToolRouter?: GoalToolRouter;
 }
@@ -197,6 +200,34 @@ function validateRequest(request: AgentRunRequest): void {
   }
 }
 
+function sessionPersistenceRuntimeError(error: unknown): AgentRuntimeError {
+  if (error instanceof AgentRuntimeError) return error;
+  const message = error instanceof Error ? error.message : "";
+  if (/identity mismatch/iu.test(message)) {
+    return new AgentRuntimeError("INTERNAL_ERROR", "Session identity boundary failed safely");
+  }
+  if (/session lease (?:was )?lost/iu.test(message)) {
+    return new AgentRuntimeError("SESSION_BUSY", "Durable session lease was lost", true);
+  }
+  return new AgentRuntimeError(
+    "CONTEXT_LOAD_FAILED",
+    "Session persistence is temporarily unavailable",
+    true,
+  );
+}
+
+const ISSUED_RUN_ID_RETENTION = 4_096;
+const ISSUED_EVENT_ID_RETENTION = 16_384;
+
+function rememberIssuedId(issued: Set<string>, id: string, retention: number): void {
+  issued.add(id);
+  while (issued.size > retention) {
+    const oldest = issued.values().next().value;
+    if (oldest === undefined) return;
+    issued.delete(oldest);
+  }
+}
+
 /** @internal Construct only through createProductionDriveGuardRuntime. */
 export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   readonly mode: Phase5RuntimeMode;
@@ -217,6 +248,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
   readonly #assistantTextDeltaSink: DriveGuardRuntimeOptions["assistantTextDeltaSink"];
   readonly #modelUsageSink: DriveGuardRuntimeOptions["modelUsageSink"];
   readonly #goalToolRouter: GoalToolRouter;
+  readonly #conversationHistoryLimit: number;
   readonly confirmationService: ConfirmationService;
   readonly trustedConfirmationChallengeChannel: TrustedConfirmationChallengeChannel;
   readonly #cancelledRunIds = new Set<string>();
@@ -259,6 +291,14 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
     this.#goalToolRouter = options.goalToolRouter ?? new GoalToolRouter();
     this.confirmationService = options.confirmationService;
     this.trustedConfirmationChallengeChannel = options.trustedConfirmationChallengeChannel;
+    const conversationHistoryLimit = options.conversationHistoryLimit ?? 40;
+    if (!Number.isSafeInteger(conversationHistoryLimit) || conversationHistoryLimit < 1) {
+      throw new AgentRuntimeError(
+        "CONFIGURATION_ERROR",
+        "Conversation history limit must be a positive integer",
+      );
+    }
+    this.#conversationHistoryLimit = conversationHistoryLimit;
     this.#sessions = new AgentSessionStore(async (sessionId, identity) => {
       if (options.conversationMemory !== undefined && identity === undefined) {
         throw new AgentRuntimeError(
@@ -274,7 +314,11 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         history:
           options.conversationMemory === undefined || identity === undefined
             ? []
-            : await options.conversationMemory.restore(identity),
+            : options.conversationMemory.restoreRecent === undefined
+              ? (await options.conversationMemory.restore(identity)).slice(
+                  -conversationHistoryLimit,
+                )
+              : await options.conversationMemory.restoreRecent(identity, conversationHistoryLimit),
       });
     });
   }
@@ -433,12 +477,12 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         ) {
           throw new AgentRuntimeError("INTERNAL_ERROR", "Runtime Event ID is invalid or duplicate");
         }
-        this.#issuedEventIds.add(event.eventId);
+        rememberIssuedId(this.#issuedEventIds, event.eventId, ISSUED_EVENT_ID_RETENTION);
         return event;
       } catch {
         runtimeBoundaryFailed = true;
         const fallback = fallbackEventFactory.create(eventType, run, metadata);
-        this.#issuedEventIds.add(fallback.eventId);
+        rememberIssuedId(this.#issuedEventIds, fallback.eventId, ISSUED_EVENT_ID_RETENTION);
         return fallback;
       }
     };
@@ -568,11 +612,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       await this.#sessionCoordinator?.release(request.sessionId, run.runId);
       const failure = sessionLeaseLost
         ? new AgentRuntimeError("SESSION_BUSY", "Durable session lease was lost")
-        : safeRuntimeError(
-            error,
-            new AgentRuntimeError("INTERNAL_ERROR", "Context or session restore failed safely"),
-            this.#sensitiveValues,
-          );
+        : sessionPersistenceRuntimeError(error);
       if (!run.isTerminal) run.transition("RUN_FAILED");
       await emit(
         createEvent("agent.run.failed", {
@@ -980,6 +1020,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
         eventFactory: {
           create: (eventType, _identity, metadata) => createEvent(eventType, metadata),
         },
+        nowMs: () => this.#clock.nowMs(),
         emit: async (event) => {
           this.#throwIfRuntimeBoundaryFailed(runtimeBoundaryFailed);
           await emit(event);
@@ -1115,15 +1156,19 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       }
       if (!reliableExecutionCommitted) throwIfSessionLeaseLost();
       if (!(reliableExecutionCommitted && sessionLeaseLost)) {
-        await this.#conversationMemory?.appendTurn({
-          sessionId: request.sessionId,
-          ownerId: run.runId,
-          userMessageId: `message:${randomUUID()}`,
-          userContent: sanitizeRuntimeText(request.prompt, this.#sensitiveValues),
-          assistantMessageId: `message:${randomUUID()}`,
-          assistantContent: response,
-          createdAt: toUtcTimestamp(this.#clock.nowMs()),
-        });
+        try {
+          await this.#conversationMemory?.appendTurn({
+            sessionId: request.sessionId,
+            ownerId: run.runId,
+            userMessageId: `message:${randomUUID()}`,
+            userContent: sanitizeRuntimeText(request.prompt, this.#sensitiveValues),
+            assistantMessageId: `message:${randomUUID()}`,
+            assistantContent: response,
+            createdAt: toUtcTimestamp(this.#clock.nowMs()),
+          });
+        } catch (error) {
+          throw sessionPersistenceRuntimeError(error);
+        }
       }
       if (!reliableExecutionCommitted) throwIfSessionLeaseLost();
       const completedEvent = createEvent("agent.run.completed", {
@@ -1173,6 +1218,7 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       );
     } finally {
       this.#cancelledRunIds.delete(run.runId);
+      session.trimHistory(this.#conversationHistoryLimit);
       session.release(run.runId);
       await Promise.allSettled([
         leaseHeartbeat.stop(),
@@ -1291,12 +1337,12 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       if (typeof id !== "string" || !safeIdPattern.test(id) || issued.has(id)) {
         throw new AgentRuntimeError("INTERNAL_ERROR", "Runtime ID is invalid or duplicate");
       }
-      issued.add(id);
+      rememberIssuedId(issued, id, ISSUED_RUN_ID_RETENTION);
       return { id, failed: false };
     } catch {
       let fallback = `${prefix}-fallback:${randomUUID()}`;
       while (issued.has(fallback)) fallback = `${prefix}-fallback:${randomUUID()}`;
-      issued.add(fallback);
+      rememberIssuedId(issued, fallback, ISSUED_RUN_ID_RETENTION);
       return { id: fallback, failed: true };
     }
   }

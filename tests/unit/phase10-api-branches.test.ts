@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ActionLifecycleError } from "@driveguard/action-lifecycle";
 import { AgentRuntimeError } from "@driveguard/agent-runtime";
@@ -61,7 +61,7 @@ describe("Phase 10 API branch and failure behavior", () => {
 
   it.each([
     [undefined, "INTERNAL_ERROR", 500],
-    ["SESSION_BUSY", "SESSION_BUSY", 409],
+    ["SESSION_BUSY", "SERVICE_BUSY", 503],
     ["POLICY_DENIED", "POLICY_DENIED", 403],
     ["POLICY_REPLAN_REQUIRED", "REPLAN_REQUIRED", 409],
     ["TOOL_ERROR", "DEPENDENCY_UNAVAILABLE", 503],
@@ -203,7 +203,7 @@ describe("Phase 10 API branch and failure behavior", () => {
   });
 
   it.each([
-    ["SESSION_BUSY", "SESSION_BUSY"],
+    ["SESSION_BUSY", "SERVICE_BUSY"],
     ["POLICY_REPLAN_REQUIRED", "REPLAN_REQUIRED"],
   ] as const)("maps confirm Runtime error %s", async (runtimeCode, apiCode) => {
     const harness = createFakeApiHarness();
@@ -299,5 +299,16 @@ describe("Phase 10 API branch and failure behavior", () => {
     expect(
       harness.service.failureFor({ ...base, status: "failed", errorCode: "TOOL_ERROR" }),
     ).toMatchObject({ code: "DEPENDENCY_UNAVAILABLE" });
+  });
+
+  it("maps session persistence failures to a controlled dependency response", async () => {
+    const harness = createFakeApiHarness();
+    vi.spyOn(harness.sessions, "get").mockRejectedValueOnce(new Error("private database detail"));
+
+    await expect(harness.service.getSession("session:test", identity)).rejects.toMatchObject({
+      code: "DEPENDENCY_UNAVAILABLE",
+      statusCode: 503,
+      message: "Session persistence is temporarily unavailable",
+    });
   });
 });

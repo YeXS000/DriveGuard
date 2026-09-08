@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-08T01:31:50Z",
+  "phase": "14.2-load-path-stabilization",
+  "branch": "phase/14.2-load-path-stabilization",
+  "baseCommit": "e24d912854996d771c49e94a9ad95180da97ce55",
+  "load": {
+    "image": "sha256:89083cf0abdb689a65eab77580f160ba2af03020ffa8bc26829c790d29a51cd0",
+    "maximumSustainableVirtualUsers": 20,
+    "saturationVirtualUsers": 50,
+    "unexpectedHttp500": 0,
+    "externalSessionBusy": 0,
+    "processCrash": 0,
+    "oom": 0,
+    "controlled503AtSaturation": 3975,
+    "result": "PASS"
+  },
+  "soak": {
+    "sourceImage": "sha256:1bec0a9384409ffb0293c5e0b873150c08c11f05b6b950f645a6b7d84de75751",
+    "durationSeconds": 1800.172,
+    "iterations": 48583,
+    "checksPassed": 48583,
+    "checksFailed": 0,
+    "agentP50Ms": 61.882,
+    "agentP95Ms": 83.924,
+    "agentP99Ms": 106.444,
+    "firstWindow": {
+      "successfulRuns": 9144,
+      "safeReplans": 1280,
+      "meanAgentLatencyMs": 52.551,
+      "successfulThroughputPerSecond": 15.234
+    },
+    "lastWindow": {
+      "successfulRuns": 9313,
+      "safeReplans": 1304,
+      "meanAgentLatencyMs": 51.604,
+      "successfulThroughputPerSecond": 15.508
+    },
+    "latencyRatio": 0.982,
+    "throughputRatio": 1.018,
+    "rssPeakMiB": 235.2,
+    "heapUsedPeakMiB": 129.0,
+    "metricSeriesPeak": 426,
+    "queueOrBacklogGrowth": false,
+    "processCrash": 0,
+    "oom": 0,
+    "result": "PASS"
+  },
+  "faultUnderLoad": {
+    "casesPassed": 9,
+    "casesTotal": 9,
+    "unexpectedHttp500": 0,
+    "externalSessionBusy": 0,
+    "result": "PASS"
+  },
+  "restartPersistence": {
+    "pendingStatePreserved": true,
+    "executionReceiptPreserved": true,
+    "duplicateSideEffect": 0,
+    "result": "PASS"
+  },
+  "crossSessionIsolation": {
+    "identities": 20,
+    "confirmationLeakage": 0,
+    "stateLeakage": 0,
+    "receiptMismatch": 0,
+    "idempotencyCollision": 0,
+    "result": "PASS"
+  },
+  "safety": {
+    "criticalPolicyRecall": "7335/7335",
+    "safetyEnforcement": 1,
+    "confirmationBypass": 0,
+    "forbiddenActionExecuted": 0,
+    "duplicateSideEffect": 0,
+    "result": "PASS"
+  },
+  "regression": {
+    "format": "PASS",
+    "lint": "PASS",
+    "typecheck": "PASS",
+    "build": "PASS",
+    "phase14WithinFullRun": "298/298 PASS",
+    "phase13_2_1WithinFullRun": "80/80 PASS",
+    "full": "2275/2275 PASS",
+    "environmentGatedSkipped": 45,
+    "result": "PASS"
+  },
+  "finalGate": "PASS"
+}

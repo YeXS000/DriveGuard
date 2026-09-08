@@ -1,0 +1,59 @@
+{
+  "generatedAt": "2026-09-08T01:12:38.163Z",
+  "apiContainer": "driveguard141-api-1",
+  "pendingAction": {
+    "created": true,
+    "restoredAfterRestart": true,
+    "postRestartConfirmationStatus": 409,
+    "postRestartConfirmationOutcome": "REPLAN_REQUIRED",
+    "confirmationCredentialPersisted": false
+  },
+  "restart": {
+    "firstReadyAttempts": 4,
+    "secondReadyAttempts": 3,
+    "pendingStatePreserved": true,
+    "executionReceiptPreserved": true
+  },
+  "ambiguousWrite": {
+    "status": "SUCCEEDED",
+    "attemptCount": 1,
+    "reconciliationStatus": "EXECUTED",
+    "reservations": 1,
+    "duplicateConfirmationStatus": 200,
+    "duplicateSideEffect": 0
+  },
+  "isolation": {
+    "sessions": 20,
+    "uniqueSessionIds": 20,
+    "uniqueUserIds": 20,
+    "uniqueVehicleIds": 20,
+    "confirmationLeakage": 0,
+    "stateLeakage": 0,
+    "receiptMismatch": 0,
+    "idempotencyCollision": 0
+  },
+  "nats": {
+    "beforeRestart": {
+      "stream": "DRIVEGUARD_URGENT_EVENTS",
+      "consumer": "driveguard-urgent-v1",
+      "pending": 0,
+      "ackPending": 0,
+      "delivered": 0
+    },
+    "afterFirstRestart": {
+      "stream": "DRIVEGUARD_URGENT_EVENTS",
+      "consumer": "driveguard-urgent-v1",
+      "pending": 0,
+      "ackPending": 0,
+      "delivered": 0
+    },
+    "afterSecondRestart": {
+      "stream": "DRIVEGUARD_URGENT_EVENTS",
+      "consumer": "driveguard-urgent-v1",
+      "pending": 0,
+      "ackPending": 0,
+      "delivered": 0
+    },
+    "durableConsumerRecovered": true
+  }
+}

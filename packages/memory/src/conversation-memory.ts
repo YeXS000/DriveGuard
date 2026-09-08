@@ -86,6 +86,21 @@ export class RepositoryConversationMemory implements ConversationMemory {
     return messages;
   }
 
+  async restoreRecent(
+    input: SessionIdentityBinding,
+    limit: number,
+  ): Promise<readonly ConversationMessage[]> {
+    if (!Number.isSafeInteger(limit) || limit < 1) {
+      throw new TypeError("Conversation history limit must be a positive integer");
+    }
+    await this.#sessions.bindIdentity(input);
+    const messages =
+      this.#conversation.listRecent === undefined
+        ? (await this.#conversation.list(input.sessionId)).slice(-limit)
+        : await this.#conversation.listRecent(input.sessionId, limit);
+    return Object.freeze([...messages]);
+  }
+
   async bindIdentity(input: {
     readonly sessionId: string;
     readonly userId: string;

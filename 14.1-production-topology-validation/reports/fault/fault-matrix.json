@@ -1,0 +1,171 @@
+{
+  "generatedAt": "2026-09-06T08:31:21.537Z",
+  "baseUrl": "http://127.0.0.1:3400",
+  "cases": [
+    {
+      "name": "postgres-latency",
+      "proxy": "postgres",
+      "operation": "latency",
+      "value": "2000",
+      "startedAt": "2026-09-06T08:27:24.653Z",
+      "outcome": {
+        "code": 0,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/fault/postgres-latency.json"
+    },
+    {
+      "name": "postgres-disconnect",
+      "proxy": "postgres",
+      "operation": "down",
+      "startedAt": "2026-09-06T08:27:50.741Z",
+      "outcome": {
+        "code": 99,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/fault/postgres-disconnect.json"
+    },
+    {
+      "name": "redis-latency",
+      "proxy": "redis",
+      "operation": "latency",
+      "value": "1500",
+      "startedAt": "2026-09-06T08:28:16.682Z",
+      "outcome": {
+        "code": 0,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/fault/redis-latency.json"
+    },
+    {
+      "name": "redis-disconnect",
+      "proxy": "redis",
+      "operation": "down",
+      "startedAt": "2026-09-06T08:28:42.657Z",
+      "outcome": {
+        "code": 0,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/fault/redis-disconnect.json"
+    },
+    {
+      "name": "nats-interruption",
+      "proxy": "nats",
+      "operation": "down",
+      "startedAt": "2026-09-06T08:29:08.894Z",
+      "outcome": {
+        "code": 0,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/fault/nats-interruption.json"
+    },
+    {
+      "name": "nats-slow-consumer",
+      "proxy": "nats",
+      "operation": "latency",
+      "value": "1500",
+      "startedAt": "2026-09-06T08:29:35.112Z",
+      "outcome": {
+        "code": 0,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/fault/nats-slow-consumer.json"
+    },
+    {
+      "name": "simulator-timeout",
+      "simulatorMode": "timeout",
+      "delayMs": 2500,
+      "startedAt": "2026-09-06T08:30:01.689Z",
+      "outcome": {
+        "code": 0,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/fault/simulator-timeout.json"
+    },
+    {
+      "name": "simulator-http-503",
+      "simulatorMode": "http_503",
+      "delayMs": 0,
+      "startedAt": "2026-09-06T08:30:28.154Z",
+      "outcome": {
+        "code": 0,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 1,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/fault/simulator-http-503.json"
+    },
+    {
+      "name": "simulator-connection-abort",
+      "simulatorMode": "connection_abort",
+      "delayMs": 0,
+      "startedAt": "2026-09-06T08:30:54.963Z",
+      "outcome": {
+        "code": 0,
+        "signal": null
+      },
+      "recovery": {
+        "recovered": true,
+        "attempts": 3,
+        "sessionStatus": 200,
+        "messageStatus": 200,
+        "errorCode": null
+      },
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/fault/simulator-connection-abort.json"
+    }
+  ]
+}

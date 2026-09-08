@@ -18,6 +18,8 @@ import {
 } from "@driveguard/context";
 import type { DrivingUser, VehicleCapabilities, WeatherState } from "@driveguard/domain";
 import {
+  CircuitBreaker,
+  ExecutionConcurrencyController,
   RecoveryManager,
   ReliableToolExecutor,
   type DurableExecutionCoordinator,
@@ -79,9 +81,12 @@ export interface CreateProductionRuntimeOptions {
     | "eventSink"
     | "assistantTextDeltaSink"
     | "modelUsageSink"
+    | "conversationHistoryLimit"
   >;
   readonly actionLifecycleEventSink?: ActionLifecycleEventSink;
   readonly executionEventSink?: ExecutionEventSink;
+  readonly circuitBreaker?: CircuitBreaker;
+  readonly executionConcurrencyController?: ExecutionConcurrencyController;
   readonly trustedConfirmationChallengeChannel?: TrustedConfirmationChallengeChannel;
   readonly pendingActionRepository?: PendingActionRepository;
   readonly durableExecutionCoordinator?: DurableExecutionCoordinator;
@@ -369,6 +374,10 @@ export function createProductionDriveGuardRuntime(
       },
     },
     ...(options.executionEventSink === undefined ? {} : { eventSink: options.executionEventSink }),
+    ...(options.circuitBreaker === undefined ? {} : { circuitBreaker: options.circuitBreaker }),
+    ...(options.executionConcurrencyController === undefined
+      ? {}
+      : { concurrencyController: options.executionConcurrencyController }),
     ...(options.durableExecutionCoordinator === undefined
       ? {}
       : { durableCoordinator: options.durableExecutionCoordinator }),

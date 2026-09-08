@@ -1,0 +1,18 @@
+{
+  "profile": "soak",
+  "providerMode": "faux",
+  "baseUrl": "http://127.0.0.1:3400",
+  "generatedAt": "2026-09-07T23:46:13.057Z",
+  "matrix": [
+    {
+      "scenario": "MIXED_WORKLOAD",
+      "vus": 1,
+      "duration": "30m",
+      "startedAt": "2026-09-07T23:16:11.339Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\soak\\final\\mixed_workload-vu1.json",
+      "resourcePath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\soak\\final\\mixed_workload-vu1-resources.json"
+    }
+  ]
+}

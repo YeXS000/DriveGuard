@@ -1597,3 +1597,151 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - Review closure: Critical 0, High 0, unresolved safety-boundary issues 0. The temporary credential
   existed only in the no-echo child process and expired with it; no secret was persisted.
 - Final Stage Gate **PASS**. `main` was not merged and Phase 14 was not started.
+
+## Phase 14 — Load, Resilience & Production Readiness
+
+- Status: IMPLEMENTED LOCALLY; final Stage Gate **FAIL**.
+- Scope: backend/Agent/external latency separation, bounded API and Executor concurrency,
+  backpressure, fault-under-load, recovery, isolation, timeout budgets, graceful shutdown, k6 load
+  harness, and Toxiproxy topology. No Agent quality optimization and no later Docker/CI/CD phase.
+- Verification date: 2026-09-06 (Asia/Shanghai).
+
+### Implemented modules
+
+- `apps/api`: bounded stateful-route admission, controlled `SERVICE_BUSY`, explicit pool/timeout
+  configuration, shared circuit/Executor capacity, resource sampling, and finite shutdown drain.
+- `packages/executor`: process-wide read/write limits, bounded queue, same-vehicle side-effect
+  serialization, and immediate idempotency conflict/single-flight handling before capacity wait.
+- `packages/agent-runtime` and `packages/observability`: provider-only stream duration separated from
+  Tool/Executor duration; capacity, PostgreSQL pool, Redis, and NATS metrics.
+- `14-load-resilience`: k6 scenarios/matrices, local capacity probe, Toxiproxy topology and fault
+  controller, automated tests, raw reports, architecture/fault/load/bottleneck/final documentation.
+- ADR 0018 records the bounded-capacity and fault-topology decision.
+
+### Measured verification
+
+| Check                    | Result                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------- |
+| k6 backend-only baseline | 5 min, 1 VU, 589,039 requests, 100% success; P50/P95/P99 0.424/0.530/0.617 ms                      |
+| Local capacity curve     | 1-100 concurrency: 0 controlled busy; 200: 963 success + 37 controlled 503, 0 other errors         |
+| Fault-under-load         | 50/50 retry-safe reads recovered at max 4 active; 50 duplicate writes -> 1 effect, 49 deduplicated |
+| Recovery regression      | 840/840 recovered; 160/160 safe-degraded; blind retries/duplicate effects 0                        |
+| Safety matrices          | Critical Policy 7,335/7,335; Confirmation bypass/forbidden action/duplicate side effect 0          |
+| Isolation / shutdown     | 100/100 identities isolated; accepted request drained; finite deadline detected                    |
+| Phase 13.2.1 regression  | 80/80 PASS; frozen dataset/scorer hashes unchanged                                                 |
+| Phase 14 focused gate    | 292/292 PASS                                                                                       |
+| Engineering              | format, lint, typecheck, build, Compose static config, diff check PASS                             |
+| Full regression          | 2,266/2,266 PASS across 86 files; 43 environment-gated tests skipped                               |
+
+### Gate and limitations
+
+- Docker CLI 28.1.1 was present but the daemon was unavailable. PostgreSQL 17, Redis 8, NATS 2.11,
+  Simulator, and Toxiproxy 2.12.0 could not be run as the complete topology.
+- Production load/stress, 30-minute soak, external dependency fault-under-load, resource exhaustion,
+  and persisted PostgreSQL restart recovery are `NOT RUN`; production sustainable throughput and
+  leak/backlog behavior are not claimed.
+- The backend-only P95 target passes in the measured local scope, but missing required live topology
+  evidence prevents a Phase 14 PASS.
+- Final Stage Gate **FAIL**. No commit or merge to `main` was made, and the next phase was not started.
+
+## Phase 14.1 — Production Topology Validation & Gate Closure
+
+- Status: VALIDATION COMPLETE; final Stage Gate **FAIL**.
+- Scope: full Compose boot/smoke, production baseline, ascending load to measured saturation,
+  fault-under-load, 30-minute soak, restart/persistence, cross-session isolation, safety, and
+  regression closure only. No Agent redesign and no later Docker/CI/CD phase.
+- Verification date: 2026-09-07 (Asia/Shanghai).
+
+### Production fixes and evidence
+
+- Corrected k6 session/VU identity and production Simulator identity, preserving distinct sessions
+  and valid multi-tool/protected-action contracts.
+- Serialized same-session durable execution acquisition with a PostgreSQL row update lock, removing
+  the live parallel-Tool lock-promotion deadlock; post-fix multi-tool probe completed 160/160.
+- Guarded PostgreSQL Pool and checked-out Client error events and mapped session persistence outages
+  to controlled dependency-unavailable responses. Final nine-case fault matrix completed in one run
+  with recovery 9/9, API restart 0, OOM 0, false success 0, and duplicate side effect 0.
+- Added repeatable topology smoke, fault-under-load, and restart/persistence validation scripts.
+  Scorer, Ground Truth, Policy, confirmation semantics, and safety boundaries were unchanged.
+
+### Measured verification
+
+| Check                   | Result                                                                                                                                                 |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Final topology smoke    | 10/10 PASS across API, PostgreSQL, Redis, NATS, Simulator, Toxiproxy, durable session, Agent/Simulator, and metrics                                    |
+| Backend-only baseline   | 5 min, 1 VU, 115,094 requests, 383.68 req/s, 100% success, P50/P95/P99 2.26/3.28/7.17 ms; P95 target PASS                                              |
+| Agent baseline          | No Tool P95 88.10 ms; Simple 184.15 ms; Multi 299.54 ms; Protected 200.06 ms; provider-only latency reported separately                                |
+| Ascending load          | 1 VU 8.98 req/s PASS; 5 and 10 VU contract PASS with throughput/latency collapse; 20 VU 78.16% expected success and P95 11.34 s                        |
+| Saturation/backpressure | 20 VU: 105 HTTP 500, 329 unexpected `SESSION_BUSY`, one controlled 503; no crash/OOM/backlog, but controlled degradation FAIL                          |
+| Fault under load        | PostgreSQL/Redis latency+disconnect, NATS interruption+slow, Simulator timeout/503/abort: 9/9 recovered, all case exits 0                              |
+| 30-minute soak          | 6,895/6,895 contract PASS and no timeout/queue/connection leak; Agent mean 182 -> 550 ms and message throughput 4.27 -> 1.44 req/s, so drift gate FAIL |
+| Restart/persistence     | Two API restarts; pending state and receipt persisted; ambiguous write `EXECUTED`; duplicate side effect 0; durable NATS consumer recovered            |
+| Cross-session isolation | 20 identities; confirmation/state/receipt/idempotency contamination counters all 0                                                                     |
+| Safety                  | Critical Policy 7,335/7,335; Safety 100%; confirmation bypass/forbidden action/duplicate side effect 0                                                 |
+| Focused regression      | Phase 14 297/297 PASS; Phase 13.2.1 80/80 PASS                                                                                                         |
+| Full regression         | 2,272/2,272 PASS across 86 files; 45 external-environment cases skipped by their existing gates                                                        |
+| Engineering             | format, lint, typecheck, build, and diff check PASS                                                                                                    |
+
+### Gate and limitations
+
+- The short-window maximum passing level is 1 VU at 8.98 req/s. Five and ten VU preserved response
+  classification but were not sustainable because throughput fell and latency rose sharply.
+- Saturation occurred at 20 VU before the planned 50/100/200 and dedicated 250/300/400 levels.
+  Higher levels were not run after the first unsafe failure mode; they are not represented as PASS.
+- The first bottleneck is the single-process API/Agent session path: average API CPU plateaued near
+  1.13 cores, event-loop P99 reached 496 ms, and RSS reached 1,241 MiB while PostgreSQL waiting,
+  NATS pending, and admission/Executor queues remained zero.
+- The soak does not prove a memory leak because heap was non-monotonic and handles/connections were
+  stable. It does prove latency and throughput drift, consistent with growing per-session
+  conversation history, and therefore does not satisfy the no-drift requirement.
+- Final Stage Gate **FAIL** due the 20-VU unexpected failures, incomplete controlled backpressure,
+  and soak drift. No commit or merge to `main` was made, and no later phase was started.
+
+## Phase 14.2 — Load Path Stabilization & Soak Closure
+
+- Status: IMPLEMENTED AND VALIDATED LOCALLY; final Stage Gate **PASS**.
+- Scope: close only the Phase 14.1 load/backpressure and 30-minute soak-drift blockers while
+  preserving Policy, Confirmation, Reliable Executor, Ground Truth, Scorer, and safety boundaries.
+- Verification date: 2026-09-08 (Asia/Shanghai).
+
+### Implemented modules
+
+- `14-load-resilience`: unique per-VU/per-iteration identities, explicit same/fresh-session modes,
+  response-code counters, selectable load matrix, quiet execution, Windows/UNC k6 support, and
+  30-second resource sampling.
+- `apps/api`: capacity failures normalized to `503 SERVICE_BUSY` with `Retry-After`; direct
+  identity-bound session lookup; per-session Runtime reuse under an admission-sized LRU; dynamic
+  request event sinks; 20 active / 32 queued admission defaults.
+- `packages/agent-runtime`, `packages/memory`, and `packages/persistence`: recent-history restore and
+  user-boundary trimming at 40 model messages, bounded issued IDs, and precise persistence/lease
+  error classification. The complete durable transcript is preserved.
+- `packages/observability`: bounded pending trace-parent retention and retained-state gauges.
+- `docker-compose.yml`: 160 MiB V8 old-space guardrail plus the measured bounded admission defaults.
+- ADR 0019 records bounded Runtime reuse and model-context decisions.
+
+### Measured verification
+
+| Check                    | Result                                                                                                                                                               |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Maximum sustainable load | 20 VU; 11,653 iterations, 96.53/s, Agent P50/P95/P99 315.67/517.60/624.26 ms, controlled 503/500/external busy 0/0/0                                                 |
+| Saturation               | 50 VU; 9,893 iterations, 80.06/s, 3,975 controlled 503, 500/external busy 0/0, API restart 0, OOM false                                                              |
+| 30-minute soak           | 48,583/48,583 checks PASS; Agent mean 52.551 -> 51.604 ms; throughput 15.234 -> 15.508/s; ratios 0.982/1.018                                                         |
+| Soak resources           | RSS peak 235.2 MiB, heap-used peak 129.0 MiB, handles max 14, active resources max 26, metric series 424 at 10/20/30 min, queues/backlogs 0                          |
+| Fault under load         | Nine production-topology faults, 9/9 exits/recovery PASS; unexpected 500/external busy 0/0                                                                           |
+| Restart/persistence      | Two restarts; pending state and receipt preserved; ambiguous write reconciled `EXECUTED`; duplicate side effect 0                                                    |
+| Cross-session isolation  | 20 identities; confirmation/state/receipt/idempotency contamination all 0                                                                                            |
+| Safety                   | Critical Policy 7,335/7,335; Safety Enforcement 100%; confirmation bypass/forbidden action/duplicate side effect 0                                                   |
+| Regression               | Full 2,275/2,275 PASS across 86 files; Phase 14 selection 298/298 and Phase 13.2.1 selection 80/80 included in that run; 45 existing environment-gated cases skipped |
+| Engineering              | format, lint, typecheck, build, and diff whitespace check PASS                                                                                                       |
+
+### Gate and limitations
+
+- Final production-topology load used the deterministic faux provider; external-provider latency is
+  kept separate and is not represented by these capacity numbers.
+- Failed heap/admission tuning and invalid harness attempts remain in explicitly named report
+  archives and are excluded from the final decision.
+- The final 1-VU soak used cache/admission ceilings of 16. The later measured load boundary raised
+  both to 20; at one VU the effective occupancy and executed soak path remain unchanged.
+- Review closure: unresolved critical safety-boundary issues 0. No secret was read from
+  `api_key.md`, persisted, printed, or committed.
+- Final Stage Gate **PASS**. No commit or merge to `main` was made, and no later phase was started.

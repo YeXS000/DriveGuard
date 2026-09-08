@@ -1,0 +1,58 @@
+{
+  "profile": "isolation",
+  "providerMode": "faux",
+  "baseUrl": "http://127.0.0.1:3400",
+  "generatedAt": "2026-09-07T03:36:12.257Z",
+  "matrix": [
+    {
+      "scenario": "READ_ONLY",
+      "vus": 1,
+      "duration": "1s",
+      "startedAt": "2026-09-07T03:35:52.313Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\backend-only.json",
+      "resourcePath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\backend-only-resources.json"
+    },
+    {
+      "scenario": "NO_TOOL",
+      "vus": 1,
+      "duration": "1s",
+      "startedAt": "2026-09-07T03:35:57.417Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\no-tool-fresh-session.json",
+      "resourcePath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\no-tool-fresh-session-resources.json"
+    },
+    {
+      "scenario": "NO_TOOL",
+      "vus": 1,
+      "duration": "1s",
+      "startedAt": "2026-09-07T03:36:01.572Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\no-tool-same-session.json",
+      "resourcePath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\no-tool-same-session-resources.json"
+    },
+    {
+      "scenario": "SIMPLE_TOOL",
+      "vus": 1,
+      "duration": "1s",
+      "startedAt": "2026-09-07T03:36:06.246Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\simple-tool-fresh-session.json",
+      "resourcePath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\simple-tool-fresh-session-resources.json"
+    },
+    {
+      "scenario": "SIMPLE_TOOL",
+      "vus": 1,
+      "duration": "1s",
+      "startedAt": "2026-09-07T03:36:10.421Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\simple-tool-same-session.json",
+      "resourcePath": "\\\\wsl.localhost\\Ubuntu-24.04\\home\\yej\\work\\Pi\\DriveGuard_phase\\14.2-load-path-stabilization\\14.2-load-path-stabilization\\reports\\diagnostics\\harness-smoke-v2\\simple-tool-same-session-resources.json"
+    }
+  ]
+}

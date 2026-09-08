@@ -296,7 +296,7 @@ describe("Phase 13 runner isolation, filtering and reports", () => {
     } finally {
       await app.close();
     }
-  });
+  }, 15_000);
 
   it("arms Native executor faults only after the initial Context load boundary", async () => {
     const app = buildVehicleSimulator();

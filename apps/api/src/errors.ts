@@ -9,6 +9,7 @@ export const API_ERROR_CODES = [
   "CONFIRMATION_INVALID",
   "ACTION_EXPIRED",
   "SESSION_BUSY",
+  "SERVICE_BUSY",
   "POLICY_DENIED",
   "REPLAN_REQUIRED",
   "DEPENDENCY_UNAVAILABLE",
@@ -54,7 +55,7 @@ export function actionApiError(error: unknown): ApiError {
 export function runtimeApiError(code: string | undefined): ApiError {
   switch (code) {
     case "SESSION_BUSY":
-      return new ApiError("SESSION_BUSY", "Session already has an active request", 409);
+      return new ApiError("SERVICE_BUSY", "Session already has an active request", 503);
     case "POLICY_DENIED":
       return new ApiError("POLICY_DENIED", "Policy denied the requested action", 403);
     case "POLICY_REPLAN_REQUIRED":

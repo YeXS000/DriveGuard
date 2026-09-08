@@ -159,6 +159,27 @@ export class DriveGuardTracing {
     this.#inMemoryExporter = inMemoryExporter;
   }
 
+  snapshot(): Readonly<Record<string, number>> {
+    return Object.freeze({
+      trace_parents: this.#traceParents.size,
+      agents: this.#agents.size,
+      context_loads: this.#contextLoads.size,
+      capability_resolves: this.#capabilityResolves.size,
+      llm_requests: this.#llmRequests.size,
+      tool_requests: this.#toolRequests.size,
+      policy_evaluations: this.#policyEvaluations.size,
+      confirmation_waits: this.#confirmationWaits.size,
+      confirmation_revalidations: this.#confirmationRevalidations.size,
+      executions: this.#executions.size,
+      attempts: this.#attempts.size,
+      urgent_spans:
+        this.#urgentConsumes.size +
+        this.#urgentProcesses.size +
+        this.#urgentContexts.size +
+        this.#urgentPolicies.size,
+    });
+  }
+
   startHttpRequest(input: {
     readonly method: string;
     readonly route: string;
@@ -196,7 +217,6 @@ export class DriveGuardTracing {
       const parent = this.#http.get(event.traceId)?.context ?? this.#parentFor(event.traceId);
       const agent = this.#start("agent.run", attributes, parent, at);
       this.#agents.set(event.runId, agent);
-      this.#rememberTraceParent(event.traceId, agent.context);
       this.#contextLoads.set(
         event.runId,
         this.#start("context.load", attributes, agent.context, at),
@@ -281,6 +301,7 @@ export class DriveGuardTracing {
       "gen_ai.usage.input_tokens": event.inputTokens,
       "gen_ai.usage.output_tokens": event.outputTokens,
       "driveguard.llm.cost": event.cost,
+      "driveguard.llm.provider_duration_ms": event.providerDurationMs ?? 0,
     });
     endSpan(llm, event.isError ? "MODEL_ERROR" : undefined);
     this.#llmRequests.delete(event.runId);
@@ -288,12 +309,16 @@ export class DriveGuardTracing {
 
   observeAction(event: ActionLifecycleEvent): void {
     const attributes = correlationAttributes(event);
-    const parent = this.#traceParents.get(event.traceId) ?? this.#parentFor(event.traceId);
+    const parent =
+      this.#agents.get(event.runId)?.context ??
+      this.#traceParents.get(event.traceId) ??
+      this.#parentFor(event.traceId);
     const at = Date.parse(event.timestamp);
     this.#instant("persistence.write", attributes, parent, at, {
       "driveguard.persistence.record": "action_lifecycle_event",
     });
     if (event.eventType === "action.pending.created") {
+      this.#rememberTraceParent(event.traceId, parent);
       this.#confirmationWaits.set(
         event.actionId,
         this.#start("confirmation.wait", attributes, parent, at),
@@ -497,8 +522,13 @@ export class DriveGuardTracing {
   }
 
   #rememberTraceParent(traceId: string, parent: Context): void {
+    const parentSpanContext = trace.getSpanContext(parent);
+    if (parentSpanContext === undefined) return;
+    // Never retain an ended recording Span and its child/event graph. A non-recording
+    // SpanContext preserves trace correlation for later confirmation/execution phases.
+    const detachedParent = trace.setSpanContext(ROOT_CONTEXT, parentSpanContext);
     this.#traceParents.delete(traceId);
-    this.#traceParents.set(traceId, parent);
+    this.#traceParents.set(traceId, detachedParent);
     if (this.#traceParents.size <= MAX_RETAINED_TRACE_PARENTS) return;
     const oldestTraceId = this.#traceParents.keys().next().value;
     if (oldestTraceId !== undefined) this.#traceParents.delete(oldestTraceId);

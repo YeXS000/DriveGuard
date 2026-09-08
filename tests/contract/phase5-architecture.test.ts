@@ -120,6 +120,7 @@ describe("Phase 5 architecture and security boundaries", () => {
         .sort(),
     ).toEqual([
       "circuit-breaker.ts",
+      "concurrency.ts",
       "durable.ts",
       "errors.ts",
       "events.ts",

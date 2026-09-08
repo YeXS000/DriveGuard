@@ -1,0 +1,58 @@
+{
+  "profile": "baseline",
+  "providerMode": "faux",
+  "baseUrl": "http://127.0.0.1:3400",
+  "generatedAt": "2026-09-06T08:01:15.684Z",
+  "matrix": [
+    {
+      "scenario": "READ_ONLY",
+      "vus": 1,
+      "duration": "5m",
+      "startedAt": "2026-09-06T07:52:10.812Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/read_only-vu1.json",
+      "resourcePath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/read_only-vu1-resources.json"
+    },
+    {
+      "scenario": "NO_TOOL",
+      "vus": 1,
+      "duration": "1m",
+      "startedAt": "2026-09-06T07:57:11.281Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/no_tool-vu1.json",
+      "resourcePath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/no_tool-vu1-resources.json"
+    },
+    {
+      "scenario": "SIMPLE_TOOL",
+      "vus": 1,
+      "duration": "1m",
+      "startedAt": "2026-09-06T07:58:11.828Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/simple_tool-vu1.json",
+      "resourcePath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/simple_tool-vu1-resources.json"
+    },
+    {
+      "scenario": "MULTI_TOOL",
+      "vus": 1,
+      "duration": "1m",
+      "startedAt": "2026-09-06T07:59:12.407Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/multi_tool-vu1.json",
+      "resourcePath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/multi_tool-vu1-resources.json"
+    },
+    {
+      "scenario": "PROTECTED_ACTION",
+      "vus": 1,
+      "duration": "1m",
+      "startedAt": "2026-09-06T08:00:13.313Z",
+      "code": 0,
+      "signal": null,
+      "summaryPath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/protected_action-vu1.json",
+      "resourcePath": "/home/yej/work/Pi/DriveGuard_phase/14.1-production-topology-validation/14.1-production-topology-validation/reports/baseline/verified/protected_action-vu1-resources.json"
+    }
+  ]
+}

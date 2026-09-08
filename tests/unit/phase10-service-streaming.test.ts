@@ -22,7 +22,7 @@ describe("Phase 10 Service and streaming lifecycle", () => {
     while (harness.service.activeRequestCount === 0) await Promise.resolve();
     await expect(
       harness.service.sendMessage({ sessionId: "session:test", prompt: "second", identity }),
-    ).rejects.toMatchObject({ code: "SESSION_BUSY" });
+    ).rejects.toMatchObject({ code: "SERVICE_BUSY", statusCode: 503 });
     expect(harness.factory.inputs).toHaveLength(1);
     harness.factory.runRelease?.();
     await first;

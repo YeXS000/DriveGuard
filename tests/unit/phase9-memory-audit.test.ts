@@ -201,6 +201,25 @@ describe("Phase 9 in-memory repository and conversation semantics", () => {
     ]);
   });
 
+  it("restores only the recent runtime window without changing durable history", async () => {
+    const sessions = new InMemorySessionRepository();
+    const conversation = new InMemoryConversationRepository();
+    const memory = new RepositoryConversationMemory({ sessions, conversation });
+    for (let index = 0; index < 4; index += 1) {
+      await memory.appendTurn({
+        sessionId: "session:bounded",
+        userMessageId: `message:user:${index}`,
+        userContent: `user-${index}`,
+        assistantMessageId: `message:assistant:${index}`,
+        assistantContent: `assistant-${index}`,
+        createdAt: NOW,
+      });
+    }
+    const recent = await memory.restoreRecent(memoryIdentity("session:bounded"), 4);
+    expect(recent.map((message) => message.sequence)).toEqual([4, 5, 6, 7]);
+    await expect(memory.restore(memoryIdentity("session:bounded"))).resolves.toHaveLength(8);
+  });
+
   it("assigns gap-free unique sequences under concurrent turn appends", async () => {
     const sessions = new InMemorySessionRepository();
     const conversation = new InMemoryConversationRepository();

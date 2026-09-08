@@ -238,6 +238,16 @@ integration("Phase 9 PostgreSQL + Redis integration and restart recovery", () =>
     ]);
   });
 
+  it("guards idle and checked-out PostgreSQL failures from terminating the process", async () => {
+    expect(database.pool.listenerCount("error")).toBeGreaterThan(0);
+    const client = await database.pool.connect();
+    try {
+      expect(client.listenerCount("error")).toBeGreaterThan(0);
+    } finally {
+      client.release();
+    }
+  });
+
   it.each([
     ["missing required request identity", {}],
     [
@@ -1440,6 +1450,48 @@ integration("Phase 9 PostgreSQL + Redis integration and restart recovery", () =>
       error: { code: "OUTCOME_UNKNOWN" },
     });
     await sessions.release(input.sessionId, "run:successor");
+  });
+
+  it("serializes durable acquisition for parallel tools in the same leased run", async () => {
+    const sessionId = "session:phase9:parallel-tools";
+    const runId = "run:phase9:parallel-tools";
+    const sessions = new PostgresSessionCoordinator(database.db, 5_000);
+    await expect(sessions.acquire(sessionId, runId)).resolves.toBe(true);
+
+    const vehicle = request(37, { sessionId, runId });
+    const trip = request(38, {
+      sessionId,
+      runId,
+      toolName: "get_trip_state",
+      policyDecision: policyDecision("get_trip_state", "R0"),
+    });
+    const coordinator = new PostgresDurableExecutionCoordinator(database.pool, 1_000, undefined, {
+      requireSessionLease: true,
+    });
+
+    await expect(
+      Promise.all([
+        coordinator.execute(vehicle, "binding:parallel-vehicle", async () => {
+          await delay(25);
+          return ownerOutcome(vehicle);
+        }),
+        coordinator.execute(trip, "binding:parallel-trip", async () => {
+          await delay(25);
+          return ownerOutcome(trip);
+        }),
+      ]),
+    ).resolves.toEqual([
+      expect.objectContaining({ status: "SUCCEEDED" }),
+      expect.objectContaining({ status: "SUCCEEDED" }),
+    ]);
+
+    const persisted = await database.pool.query<{ readonly count: string }>(
+      `select count(*) as count from execution_records
+       where session_id=$1 and run_id=$2 and state='SUCCEEDED'`,
+      [sessionId, runId],
+    );
+    expect(persisted.rows[0]?.count).toBe("2");
+    await sessions.release(sessionId, runId);
   });
 
   reliabilityMatrix(

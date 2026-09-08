@@ -12,6 +12,7 @@ export interface PiEventAdapterOptions {
   readonly boundary?: "PRE_POLICY" | "POLICY_GUARDED";
   readonly assistantTextDelta?: (delta: string) => void | Promise<void>;
   readonly modelUsage?: (usage: ModelUsageEvent) => void | Promise<void>;
+  readonly nowMs?: () => number;
 }
 
 export interface ModelUsageEvent {
@@ -20,6 +21,8 @@ export interface ModelUsageEvent {
   readonly outputTokens: number;
   readonly cost: number;
   readonly isError: boolean;
+  /** Provider stream time only; excludes Tool execution between assistant turns. */
+  readonly providerDurationMs: number;
 }
 
 export class PiEventAdapter {
@@ -30,11 +33,14 @@ export class PiEventAdapter {
   readonly #boundary: "PRE_POLICY" | "POLICY_GUARDED";
   readonly #assistantTextDelta: ((delta: string) => void | Promise<void>) | undefined;
   readonly #modelUsage: ((usage: ModelUsageEvent) => void | Promise<void>) | undefined;
+  readonly #nowMs: () => number;
   readonly #toolCallIds = new Map<string, string>();
   readonly #activeToolCalls = new Map<string, string>();
   readonly #completedToolCalls = new Set<string>();
   #nextToolCallId = 1;
   #toolErrors = 0;
+  #modelStartedAtMs: number | undefined;
+  #modelDurationMs = 0;
 
   constructor(options: PiEventAdapterOptions) {
     this.#run = options.run;
@@ -44,6 +50,7 @@ export class PiEventAdapter {
     this.#boundary = options.boundary ?? "PRE_POLICY";
     this.#assistantTextDelta = options.assistantTextDelta;
     this.#modelUsage = options.modelUsage;
+    this.#nowMs = options.nowMs ?? Date.now;
   }
 
   get toolErrorCount(): number {
@@ -90,9 +97,16 @@ export class PiEventAdapter {
         }
         return;
       case "turn_start":
+        this.#modelStartedAtMs = this.#nowMs();
         if (this.#run.status === "MODEL_RESUMED") {
           this.#run.transition("MODEL_RUNNING");
           await this.#runtimeEvent("model.started", { boundary: this.#boundary });
+        }
+        return;
+      case "message_end":
+        if (event.message?.role === "assistant" && this.#modelStartedAtMs !== undefined) {
+          this.#modelDurationMs = Math.max(0, this.#nowMs() - this.#modelStartedAtMs);
+          this.#modelStartedAtMs = undefined;
         }
         return;
       case "tool_execution_start": {
@@ -157,6 +171,7 @@ export class PiEventAdapter {
             outputTokens: event.message.usage.output,
             cost: event.message.usage.cost.total,
             isError: event.message.stopReason === "error",
+            providerDurationMs: this.#modelDurationMs,
           });
         }
         if (event.toolResults.length > 0 && this.#run.status !== "TOOL_PROCESSING") {

@@ -28,6 +28,7 @@ export interface DevelopmentIdentity {
 
 export interface Phase10RuntimeFactoryInput {
   readonly identity: DevelopmentIdentity;
+  readonly sessionId?: string;
   readonly prompt?: string;
   readonly runtimeEventSink?: RuntimeEventSink;
   readonly actionLifecycleEventSink?: ActionLifecycleEventSink;
@@ -120,17 +121,23 @@ export class DriveGuardApiService {
   readonly #executions: ExecutionRepository;
   readonly #runtimeFactory: Phase10RuntimeFactory;
   readonly #active = new Map<string, ProductionDriveGuardRuntime>();
+  readonly #agentTimeoutMs: number;
 
   constructor(options: {
     readonly sessions: SessionRepository;
     readonly conversation: ConversationMemory;
     readonly executions: ExecutionRepository;
     readonly runtimeFactory: Phase10RuntimeFactory;
+    readonly agentTimeoutMs?: number;
   }) {
     this.#sessions = options.sessions;
     this.#conversation = options.conversation;
     this.#executions = options.executions;
     this.#runtimeFactory = options.runtimeFactory;
+    this.#agentTimeoutMs = options.agentTimeoutMs ?? 15_000;
+    if (!Number.isSafeInteger(this.#agentTimeoutMs) || this.#agentTimeoutMs < 100) {
+      throw new TypeError("agentTimeoutMs must be an integer of at least 100ms");
+    }
   }
 
   get activeRequestCount(): number {
@@ -139,6 +146,14 @@ export class DriveGuardApiService {
 
   cancelSession(sessionId: string): boolean {
     return this.#active.get(sessionId)?.cancel(sessionId) ?? false;
+  }
+
+  cancelAll(): number {
+    let cancelled = 0;
+    for (const [sessionId, runtime] of this.#active) {
+      if (runtime.cancel(sessionId)) cancelled += 1;
+    }
+    return cancelled;
   }
 
   async createSession(
@@ -157,25 +172,34 @@ export class DriveGuardApiService {
   }
 
   async getSession(sessionId: string, identity: DevelopmentIdentity): Promise<ApiSessionView> {
-    const record = await this.#sessions.get(sessionId);
-    if (record === undefined || !sameIdentity(record, identity)) {
-      throw new ApiError("SESSION_NOT_FOUND", "Session was not found", 404);
+    try {
+      const record = await this.#sessions.get(sessionId);
+      if (record === undefined || !sameIdentity(record, identity)) {
+        throw new ApiError("SESSION_NOT_FOUND", "Session was not found", 404);
+      }
+      const messages = await this.#conversation.restore({
+        sessionId,
+        userId: identity.userId,
+        vehicleId: identity.vehicleId,
+        updatedAt: record.updatedAt,
+      });
+      return Object.freeze({
+        sessionId,
+        userId: identity.userId,
+        vehicleId: identity.vehicleId,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+        messages,
+        identityBoundary: DEVELOPMENT_IDENTITY_BOUNDARY,
+      });
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(
+        "DEPENDENCY_UNAVAILABLE",
+        "Session persistence is temporarily unavailable",
+        503,
+      );
     }
-    const messages = await this.#conversation.restore({
-      sessionId,
-      userId: identity.userId,
-      vehicleId: identity.vehicleId,
-      updatedAt: record.updatedAt,
-    });
-    return Object.freeze({
-      sessionId,
-      userId: identity.userId,
-      vehicleId: identity.vehicleId,
-      createdAt: record.createdAt,
-      updatedAt: record.updatedAt,
-      messages,
-      identityBoundary: DEVELOPMENT_IDENTITY_BOUNDARY,
-    });
   }
 
   async sendMessage(input: {
@@ -185,13 +209,26 @@ export class DriveGuardApiService {
     readonly emit?: PublicEventEmitter;
     readonly traceId?: string;
   }): Promise<ApiMessageResult> {
-    await this.getSession(input.sessionId, input.identity);
+    try {
+      const session = await this.#sessions.get(input.sessionId);
+      if (session === undefined || !sameIdentity(session, input.identity)) {
+        throw new ApiError("SESSION_NOT_FOUND", "Session was not found", 404);
+      }
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(
+        "DEPENDENCY_UNAVAILABLE",
+        "Session persistence is temporarily unavailable",
+        503,
+      );
+    }
     if (this.#active.has(input.sessionId)) {
-      throw new ApiError("SESSION_BUSY", "Session already has an active request", 409);
+      throw new ApiError("SERVICE_BUSY", "Session already has an active request", 503);
     }
     const emit = input.emit ?? (() => undefined);
     const runtime = this.#runtimeFactory.create({
       identity: input.identity,
+      sessionId: input.sessionId,
       prompt: input.prompt,
       runtimeEventSink: createRuntimePublicEventSink(emit),
       assistantTextDeltaSink: async (event) => {
@@ -207,6 +244,8 @@ export class DriveGuardApiService {
       },
     });
     this.#active.set(input.sessionId, runtime);
+    const budgetTimer = setTimeout(() => runtime.cancel(input.sessionId), this.#agentTimeoutMs);
+    budgetTimer.unref?.();
     try {
       const result = await runtime.run({
         sessionId: input.sessionId,
@@ -289,6 +328,7 @@ export class DriveGuardApiService {
         ...(result.error === undefined ? {} : { errorCode: result.error.code }),
       });
     } finally {
+      clearTimeout(budgetTimer);
       if (this.#active.get(input.sessionId) === runtime) this.#active.delete(input.sessionId);
     }
   }
