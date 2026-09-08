@@ -29,3 +29,6 @@ DriveGuard.md
 docs/
 evals/
 tests/
+
+# Generated benchmark outputs are not application source.
+benchmarks/reports/

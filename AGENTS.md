@@ -131,3 +131,13 @@ A phase is complete only when:
 5. implementation-status.md is updated.
 
 Never claim project-level target metrics before they have actually been measured.
+
+## Repository and worktree layout
+
+- Stable checkout: `/home/yej/work/Pi/DriveGuard` on `main`.
+- Stage worktrees: sibling `DriveGuard_phase/<stage-name>`; create with `git worktree add`, never copy a repository folder.
+- Each worktree is a full source checkout. Put stage-only reports and experiments in its `artifacts/` directory; never add numbered stage directories to the application root.
+- Maintain reusable regression tests under `tests/`, reusable load tools under `benchmarks/`, and fault topology under `infra/faults/`.
+- Main must not track stage-only artifacts. Before a phase merge, separate accepted application changes from phase evidence; retain evidence on the phase branch or an archive ref and exclude it from the main merge.
+- A clean commit may preserve failed-stage evidence; it does not mean Stage Gate PASS or authorize merging the failed phase.
+- Historical stage worktrees retain their historical tree and paths for reproducibility. Do not mass-update them to current main or hide tests to create a false clean view.

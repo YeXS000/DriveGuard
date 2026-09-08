@@ -8,7 +8,7 @@ import { createNativeSplitManifest } from "../native/split.js";
 const datasetPath = resolve(process.cwd(), "evals/native/datasets/driveguard-eval-v2.json");
 const outputPath = resolve(
   process.cwd(),
-  "13.2-agent-quality-remediation/reports/split-manifest.json",
+  "benchmarks/reports/evaluation/quality-remediation/split-manifest.json",
 );
 const datasetBytes = await readFile(datasetPath);
 const manifest = createNativeSplitManifest(

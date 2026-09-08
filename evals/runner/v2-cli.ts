@@ -44,7 +44,7 @@ async function main(): Promise<void> {
   const limit = limitText === undefined ? undefined : positiveInteger(limitText, 1);
   const outputDir = resolve(
     process.cwd(),
-    valueAfter(args, "--output-dir") ?? "13.1-evaluation-calibration-scorer-v2/reports/native-v2",
+    valueAfter(args, "--output-dir") ?? "benchmarks/reports/evaluation/scorer-v2/native-v2",
   );
   const source = buildNativeDataset();
   const contracts = buildNativeDatasetV2(source);

@@ -21,8 +21,7 @@ async function main(): Promise<void> {
   );
   const outputDir = resolve(
     root,
-    valueAfter(args, "--output-dir") ??
-      "13.1-evaluation-calibration-scorer-v2/reports/offline-rescore",
+    valueAfter(args, "--output-dir") ?? "benchmarks/reports/evaluation/scorer-v2/offline-rescore",
   );
   const source = JSON.parse(await readFile(sourcePath, "utf8")) as NativeBenchmarkReport;
   const v2ReportPath = valueAfter(args, "--v2-report");

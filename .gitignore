@@ -31,3 +31,6 @@ __pycache__/
 .DS_Store
 .idea/
 .vscode/
+
+# Generated benchmark outputs are not application source.
+benchmarks/reports/

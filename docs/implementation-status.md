@@ -1,5 +1,21 @@
 # DriveGuard implementation status
 
+## Repository layout maintenance — 2026-09-08
+
+- Main source checkout: `/home/yej/work/Pi/DriveGuard`; stage worktrees:
+  `/home/yej/work/Pi/DriveGuard_phase/<stage>`, a real sibling directory.
+- Removed historical stage-only evidence from the current main tree while preserving
+  original commits, archive refs and historical worktrees. Reusable tests, load tools
+  and fault configuration now live in `tests/`, `benchmarks/` and `infra/faults/`.
+- Updated runner output defaults and tooling references; added `check:layout` to
+  reject stage-only directories in a main integration tree.
+- Validation: regression 2,275 passed, 45 skipped, zero failed; lint, typecheck,
+  build and layout check passed. Frozen scorers and native datasets are unchanged.
+- This is repository maintenance, not a new phase gate. Phase 15 remains FAIL on
+  its own branch; its evidence is not integrated into main. Phase 16 was not started.
+- Historical worktrees intentionally retain their historical internal layouts.
+  See `docs/repository-layout.md` and ADR 0020 for the source-only integration rule.
+
 ## Phase 0 — Engineering Bootstrap
 
 - Status: COMPLETE
