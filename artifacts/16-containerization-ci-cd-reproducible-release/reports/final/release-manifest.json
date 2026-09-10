@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "gitSha": "a44a3bc5db62afc0df4793625180ffc69225a26d",
+  "gitSha": "d382186c8017b50d68b54050b7772c78e1d40f3e",
   "branch": "codex/16-containerization-ci-cd-reproducible-release",
-  "buildTimestamp": "2026-09-10T00:55:39.337Z",
+  "buildTimestamp": "2026-09-10T02:15:21.981Z",
   "nodeVersion": "v22.22.1",
   "packageManager": "npm@10.9.4",
   "docker": {
@@ -17,19 +17,19 @@
   "images": [
     {
       "name": "driveguard-api",
-      "tag": "a44a3bc5db62afc0df4793625180ffc69225a26d"
+      "tag": "d382186c8017b50d68b54050b7772c78e1d40f3e"
     },
     {
       "name": "driveguard-vehicle-simulator",
-      "tag": "a44a3bc5db62afc0df4793625180ffc69225a26d"
+      "tag": "d382186c8017b50d68b54050b7772c78e1d40f3e"
     },
     {
       "name": "driveguard-hmi",
-      "tag": "a44a3bc5db62afc0df4793625180ffc69225a26d"
+      "tag": "d382186c8017b50d68b54050b7772c78e1d40f3e"
     }
   ],
   "validation": {
-    "tests": "full=2290-pass, targeted-safety=469-pass",
+    "tests": "hosted-ci=PASS; targeted-safety=472/472; full=2290/2290; opt-in-skips=45",
     "dockerBuild": "PASS",
     "releaseSmoke": "PASS"
   }
