@@ -11,9 +11,9 @@ description = "Synthetic API-key-shaped values required by legacy unit and integ
 condition = "AND"
 regexTarget = "line"
 paths = [
-  '''^tests/integration/phase7-runtime-lifecycle\.test\.ts$''',
-  '''^tests/unit/phase15\.1-runtime-retention\.test\.ts$''',
-  '''^tests/integration/phase9-postgres-redis-recovery\.test\.ts$''',
+  '''(^|.*/)tests/integration/phase7-runtime-lifecycle\.test\.ts$''',
+  '''(^|.*/)tests/unit/phase15\.1-runtime-retention\.test\.ts$''',
+  '''(^|.*/)tests/integration/phase9-postgres-redis-recovery\.test\.ts$''',
 ]
 regexes = [
   '''^\s*const faux = fauxProvider\(\{ provider: "phase7-default", api: ".*" \}\);$''',
