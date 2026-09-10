@@ -3,9 +3,11 @@ title = "DriveGuard Gitleaks configuration"
 [extend]
 useDefault = true
 
-[[allowlists]]
+[[rules]]
+id = "generic-api-key"
+
+  [[rules.allowlists]]
 description = "Synthetic API-key-shaped values required by legacy unit and integration fixtures"
-targetRules = ["generic-api-key"]
 condition = "AND"
 regexTarget = "line"
 paths = [
