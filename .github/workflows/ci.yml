@@ -60,4 +60,4 @@ jobs:
       - name: Gitleaks source scan
         uses: docker://zricethezav/gitleaks:v8.24.3
         with:
-          args: detect --source=/github/workspace --no-git --redact --exit-code=2
+          args: detect --source=/github/workspace --no-git --redact --verbose --exit-code=2
