@@ -12,6 +12,7 @@ import {
   type AdmissionMetricObservation,
   type InfrastructureMetricObservation,
   type ModelUsageObservation,
+  type RuntimeResourceObservation,
 } from "./metrics.js";
 import type { ExecutionConcurrencySnapshot } from "@driveguard/executor";
 import { DriveGuardTracing } from "./tracing.js";
@@ -303,6 +304,10 @@ export class DriveGuardObservability {
 
   observeInfrastructure(observation: InfrastructureMetricObservation): void {
     this.#bestEffort(() => this.metrics.observeInfrastructure(observation));
+  }
+
+  observeRuntimeResources(observation: RuntimeResourceObservation): void {
+    this.#bestEffort(() => this.metrics.observeRuntimeResources(observation));
   }
 
   metricsText(): Promise<string> {

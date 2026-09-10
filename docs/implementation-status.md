@@ -1,5 +1,29 @@
 # DriveGuard implementation status
 
+## Phase 15.3 -- Context Race & Evidence Closure
+
+- Status: COMPLETE; final Stage Gate **PASS**. Phase 16 was not started.
+- Scope: the A--E HTTP context-race matrix, prospective frozen Native quality
+  qualification at concurrency 10, and durable per-mismatch evidence only.
+  No Agent planning, routing, Policy, Confirmation, Recovery Manager,
+  Ground Truth, Scorer, heap, vehicle-routing, or backpressure production code
+  changed.
+- Measured: A--E PASS with unexpected HTTP 500 = 0 and escaped
+  `CONTEXT_INVALID` = 0; prospective run 30/30 accepted, semantic mismatch =
+  0, Critical Policy Recall = 100%, Safety Enforcement = 100%, Confirmation
+  Bypass / Forbidden Action / Duplicate Side Effect / False Success = 0.
+- Harness: synthetic negative artifact and immutable write behavior verified.
+  The six retained preliminary mismatch artifacts exposed an evaluator rule
+  error (correct DENY evidence was not a tool call); they do not count against
+  the final prospective Agent result.
+- Historical limitation retained: Phase 15.1 mismatch count = 3; per-case
+  evidence is irrecoverable and root-cause classification unavailable.
+- Phase 15.2 formal 30-minute soak remains applicable at ancestor
+  `27635dd`: 140,297/140,297 accepted, 77.936/s, zero unexpected 500 or
+  semantic mismatch, latency ratio 0.983, throughput ratio 1.019, heap slope
+  -0.021 MiB/min, and full regression 2,288 passed / 45 skipped / 0 failed.
+- Evidence: `artifacts/15.3-context-race-evidence-closure/`.
+
 ## Repository layout maintenance — 2026-09-08
 
 - Main source checkout: `/home/yej/work/Pi/DriveGuard`; stage worktrees:
@@ -15,6 +39,48 @@
   its own branch; its evidence is not integrated into main. Phase 16 was not started.
 - Historical worktrees intentionally retain their historical internal layouts.
   See `docs/repository-layout.md` and ADR 0020 for the source-only integration rule.
+
+## Phase 15.1 — Performance Qualification Closure
+
+- Status: IMPLEMENTED; final Stage Gate **FAIL**.
+- Scope: Phase 15 heap retention, independent vehicle routing, protected-action
+  lifecycle baseline, capacity qualification, representative soak, and their
+  directly affected regressions only. Phase 16 was not started.
+- Implemented modules: bounded vehicle fleet and trusted vehicle propagation;
+  runtime diagnostic bounds; durable-executor local retention release; bounded
+  fail-closed future-timestamp source reread; Phase 15.1 qualification tooling.
+- Measured passes: 20-vehicle routing and shared-vehicle serialization; 30/30
+  protected actions completed without bypass/duplicate effect; candidate-10
+  quality 30/30; V8 fatal errors 0 and restart delta 0 in the latest 30-minute
+  soak; heap slope -0.182 MiB/min with queues 0.
+- Gate blockers: latest formal 10-VU soak recorded two real
+  `CONTEXT_INVALID -> HTTP 500` responses, three accepted-task semantic errors,
+  and last/first throughput ratio 0.848. Full repository regression after the
+  final source change is **NOT RUN** because the mandatory soak gate failed.
+- Evidence: `artifacts/15.1-performance-qualification-closure/reports/soak/`
+  retains every formal attempt; no failure report was deleted or relabeled.
+
+## Phase 15.2 — Context Consistency & Semantic Stability Closure
+
+- Status: IMPLEMENTED; final Stage Gate **FAIL (evidence closure incomplete)**.
+- Scope: atomic Simulator context sampling; bounded stale-context replan;
+  preservation of structured context errors at the production runtime boundary;
+  mismatch-payload capture; directly affected tests only. Phase 16 was not
+  started.
+- Measured passes: short 10-VU run 23,347/23,347 accepted with zero unexpected
+  500, semantic errors, restarts, or V8 fatals. The sole permitted formal
+  30-minute 10-VU run passed: 140,297/140,297 accepted (77.936/s), unexpected
+  500 = 0, semantic errors = 0, restart delta = 0, V8 fatal = 0, latency ratio
+  0.983, throughput ratio 1.019, and heap slope -0.021 MiB/min. Focused
+  context/routing/lifecycle/critical/concurrency tests 81/81 passed; Phase
+  13.2 safety/policy tests 61/61 passed; full repository regression 2,288
+  passed and 45 opt-in integration tests skipped.
+- Gate blockers: the required direct A--E context-race reproducer matrix was
+  not completed before the formal run. The three Phase 15.1 semantic mismatches
+  retained only aggregate counters, so their individual categories cannot be
+  reconstructed. The new capture path recorded zero mismatches in the formal
+  run but cannot recover absent historic evidence.
+- Evidence: `artifacts/15.2-context-consistency-semantic-stability-closure/`.
 
 ## Phase 0 — Engineering Bootstrap
 

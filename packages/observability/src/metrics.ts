@@ -75,6 +75,19 @@ export interface InfrastructureMetricObservation {
   readonly natsAckPending: number;
 }
 
+export interface RuntimeResourceObservation {
+  readonly activeRequests: number;
+  readonly runtimes: number;
+  readonly sessions: number;
+  readonly contextBytes: number;
+  readonly issuedRunIds: number;
+  readonly issuedTraceIds: number;
+  readonly issuedEventIds: number;
+  readonly cancelledRunIds: number;
+  readonly executionRecords: number;
+  readonly idempotencyEntries: number;
+}
+
 export class DriveGuardMetrics {
   readonly registry: Registry<PrometheusContentType>;
   readonly #httpRequests: Counter<"method" | "route" | "status_code">;
@@ -111,6 +124,7 @@ export class DriveGuardMetrics {
   readonly #redisReady: Gauge;
   readonly #natsConsumer: Gauge<"state">;
   readonly #tracingState: Gauge<"kind">;
+  readonly #runtimeResources: Gauge<"kind">;
   readonly #agentStarted = new Map<string, number>();
   readonly #toolStarted = new Map<string, number>();
   readonly #policyStarted = new Map<string, number>();
@@ -326,6 +340,12 @@ export class DriveGuardMetrics {
       labelNames: ["kind"] as const,
       registers,
     });
+    this.#runtimeResources = new Gauge({
+      name: "driveguard_runtime_retained",
+      help: "Current bounded Agent Runtime state retained in process memory.",
+      labelNames: ["kind"] as const,
+      registers,
+    });
     for (const status of ["succeeded", "failed", "cancelled"]) {
       this.#agentRuns.labels({ status }).inc(0);
       this.#agentDuration.zero({ status });
@@ -467,6 +487,14 @@ export class DriveGuardMetrics {
   observeTracing(snapshot: Readonly<Record<string, number>>): void {
     for (const [kind, value] of Object.entries(snapshot)) {
       this.#tracingState.set({ kind }, value);
+    }
+  }
+
+  observeRuntimeResources(observation: RuntimeResourceObservation): void {
+    for (const [kind, value] of Object.entries(observation) as Array<
+      [keyof RuntimeResourceObservation, number]
+    >) {
+      this.#runtimeResources.set({ kind }, value);
     }
   }
 

@@ -28,6 +28,10 @@ function freeze(record: ExecutionRecord): ExecutionRecord {
 export class ExecutionRecordStore {
   readonly #records = new Map<string, ExecutionRecord>();
 
+  get size(): number {
+    return this.#records.size;
+  }
+
   create(request: ExecutionRequest, createdAt: UtcTimestamp): ExecutionRecord {
     if (this.#records.has(request.executionId)) {
       throw new ExecutorFault("EXECUTION_VALIDATION_ERROR", "Duplicate executionId");
@@ -51,6 +55,10 @@ export class ExecutionRecordStore {
 
   get(executionId: string): ExecutionRecord | undefined {
     return this.#records.get(executionId);
+  }
+
+  delete(executionId: string): boolean {
+    return this.#records.delete(executionId);
   }
 
   transition(executionId: string, next: ExecutionState, at: UtcTimestamp): ExecutionRecord {

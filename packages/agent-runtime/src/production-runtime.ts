@@ -165,9 +165,21 @@ export interface ProductionDriveGuardRuntime {
   cancel(sessionId: string): boolean;
   sessionSnapshot(sessionId: string): AgentSessionSnapshot | undefined;
   sessionSnapshots(): readonly AgentSessionSnapshot[];
+  retentionSnapshot(): RuntimeRetentionSnapshot;
   confirmAndExecute(command: ConfirmActionCommand): Promise<ExecutionResult>;
   confirmAndComplete(command: ConfirmActionCommand): Promise<ConfirmedActionCompletion>;
   run(request: AgentRunRequest): Promise<AgentRunResult>;
+}
+
+export interface RuntimeRetentionSnapshot {
+  readonly sessions: number;
+  readonly contextBytes: number;
+  readonly issuedRunIds: number;
+  readonly issuedTraceIds: number;
+  readonly issuedEventIds: number;
+  readonly cancelledRunIds: number;
+  readonly executionRecords: number;
+  readonly idempotencyEntries: number;
 }
 
 const forbiddenNames = new Set<string>(FORBIDDEN_TOOL_NAMES);
@@ -216,8 +228,8 @@ function sessionPersistenceRuntimeError(error: unknown): AgentRuntimeError {
   );
 }
 
-const ISSUED_RUN_ID_RETENTION = 4_096;
-const ISSUED_EVENT_ID_RETENTION = 16_384;
+const ISSUED_RUN_ID_RETENTION = 256;
+const ISSUED_EVENT_ID_RETENTION = 2_048;
 
 function rememberIssuedId(issued: Set<string>, id: string, retention: number): void {
   issued.add(id);
@@ -338,6 +350,21 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
 
   sessionSnapshots(): readonly AgentSessionSnapshot[] {
     return this.#sessions.snapshots();
+  }
+
+  retentionSnapshot(): RuntimeRetentionSnapshot {
+    const sessions = this.#sessions.snapshots();
+    const executor = this.#reliableExecutor.retentionSnapshot();
+    return Object.freeze({
+      sessions: sessions.length,
+      contextBytes: sessions.reduce((total, session) => total + session.contextBytes, 0),
+      issuedRunIds: this.#issuedRunIds.size,
+      issuedTraceIds: this.#issuedTraceIds.size,
+      issuedEventIds: this.#issuedEventIds.size,
+      cancelledRunIds: this.#cancelledRunIds.size,
+      executionRecords: executor.executionRecords,
+      idempotencyEntries: executor.idempotencyEntries,
+    });
   }
 
   get sessionCount(): number {
@@ -612,7 +639,9 @@ export class DriveGuardAgentRuntime implements ProductionDriveGuardRuntime {
       await this.#sessionCoordinator?.release(request.sessionId, run.runId);
       const failure = sessionLeaseLost
         ? new AgentRuntimeError("SESSION_BUSY", "Durable session lease was lost")
-        : sessionPersistenceRuntimeError(error);
+        : error instanceof AgentRuntimeError
+          ? error
+          : sessionPersistenceRuntimeError(error);
       if (!run.isTerminal) run.transition("RUN_FAILED");
       await emit(
         createEvent("agent.run.failed", {

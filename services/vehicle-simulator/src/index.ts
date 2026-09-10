@@ -1,5 +1,6 @@
 export * from "./determinism.js";
 export * from "./errors.js";
+export * from "./fleet.js";
 export * from "./faults.js";
 export * from "./http.js";
 export * from "./scenarios.js";

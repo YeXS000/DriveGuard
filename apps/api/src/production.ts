@@ -24,6 +24,18 @@ import type { CircuitBreaker, ExecutionConcurrencyController } from "@driveguard
 import { ApiError } from "./errors.js";
 import type { Phase10RuntimeFactory, Phase10RuntimeFactoryInput } from "./service.js";
 
+export interface RuntimeFactoryResourceSnapshot {
+  readonly runtimes: number;
+  readonly sessions: number;
+  readonly contextBytes: number;
+  readonly issuedRunIds: number;
+  readonly issuedTraceIds: number;
+  readonly issuedEventIds: number;
+  readonly cancelledRunIds: number;
+  readonly executionRecords: number;
+  readonly idempotencyEntries: number;
+}
+
 type RuntimeSelection = Readonly<{
   model: ReturnType<typeof fauxProvider>["models"][number];
   streamFn: ReturnType<typeof createModels>["streamSimple"];
@@ -33,7 +45,19 @@ type RuntimeSelection = Readonly<{
 
 function fauxResponses(prompt: string | undefined) {
   const normalized = prompt?.toLowerCase() ?? "";
-  if (normalized.includes("phase14:multi_tool")) {
+  if (normalized.includes("phase15:r1_write")) {
+    return [
+      fauxAssistantMessage(
+        fauxToolCall("set_media_volume", { volume: 41 }, { id: `tool:${randomUUID()}` }),
+        { stopReason: "toolUse" },
+      ),
+      fauxAssistantMessage("The media volume was updated safely."),
+    ];
+  }
+  if (
+    normalized.includes("phase14:multi_tool") ||
+    (/(?:电量|车速|车辆状态)/u.test(normalized) && /(?:导航|路线|目的地)/u.test(normalized))
+  ) {
     return [
       fauxAssistantMessage(
         [
@@ -45,7 +69,7 @@ function fauxResponses(prompt: string | undefined) {
       fauxAssistantMessage("The vehicle and trip state were retrieved safely."),
     ];
   }
-  if (/(reserve|charging|charge|phase14:protected_action)/u.test(normalized)) {
+  if (/(reserve|charging|charge|预约|预订|phase14:protected_action)/u.test(normalized)) {
     return [
       fauxAssistantMessage(
         fauxToolCall(
@@ -58,7 +82,7 @@ function fauxResponses(prompt: string | undefined) {
       fauxAssistantMessage("Confirmation is required before reserving the charging slot."),
     ];
   }
-  if (/(vehicle|state|battery|soc)/u.test(normalized)) {
+  if (/(vehicle|state|battery|soc|电量|车速|车辆状态)/u.test(normalized)) {
     return [
       fauxAssistantMessage(fauxToolCall("get_vehicle_state", {}, { id: `tool:${randomUUID()}` }), {
         stopReason: "toolUse",
@@ -236,6 +260,7 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
         model: selected.model,
         streamFn: selected.streamFn,
         simulatorBaseUrl: this.#simulatorBaseUrl,
+        vehicleId: input.identity.vehicleId,
         capabilities: DEFAULT_PHASE_5_CAPABILITIES,
         serviceAvailability: DEFAULT_PHASE_5_SERVICES,
         user: { userId: input.identity.userId as UserId, role: "driver" },
@@ -286,5 +311,25 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
       }
     }
     return runtime;
+  }
+
+  resourceSnapshot(): RuntimeFactoryResourceSnapshot {
+    const snapshots = [...this.#runtimeCache.values()].map(({ runtime }) =>
+      runtime.retentionSnapshot(),
+    );
+    return Object.freeze({
+      runtimes: this.#runtimeCache.size,
+      sessions: snapshots.reduce((total, snapshot) => total + snapshot.sessions, 0),
+      contextBytes: snapshots.reduce((total, snapshot) => total + snapshot.contextBytes, 0),
+      issuedRunIds: snapshots.reduce((total, snapshot) => total + snapshot.issuedRunIds, 0),
+      issuedTraceIds: snapshots.reduce((total, snapshot) => total + snapshot.issuedTraceIds, 0),
+      issuedEventIds: snapshots.reduce((total, snapshot) => total + snapshot.issuedEventIds, 0),
+      cancelledRunIds: snapshots.reduce((total, snapshot) => total + snapshot.cancelledRunIds, 0),
+      executionRecords: snapshots.reduce((total, snapshot) => total + snapshot.executionRecords, 0),
+      idempotencyEntries: snapshots.reduce(
+        (total, snapshot) => total + snapshot.idempotencyEntries,
+        0,
+      ),
+    });
   }
 }

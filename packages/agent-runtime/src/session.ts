@@ -28,6 +28,7 @@ export interface AgentSessionSnapshot {
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;
   readonly messageCount: number;
+  readonly contextBytes: number;
   readonly userMessageCount: number;
   readonly toolNames: readonly string[];
 }
@@ -184,6 +185,7 @@ export class AgentSession {
       createdAt: this.createdAt,
       updatedAt: this.#updatedAt,
       messageCount: this.#agent.state.messages.length,
+      contextBytes: Buffer.byteLength(JSON.stringify(this.#agent.state.messages), "utf8"),
       userMessageCount: this.#agent.state.messages.filter((message) => message.role === "user")
         .length,
       toolNames: Object.freeze(this.#agent.state.tools.map((tool) => tool.name)),

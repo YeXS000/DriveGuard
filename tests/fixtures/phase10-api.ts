@@ -155,6 +155,17 @@ export class FakePhase10RuntimeFactory implements Phase10RuntimeFactory {
       },
       sessionSnapshot: () => undefined,
       sessionSnapshots: () => Object.freeze([]),
+      retentionSnapshot: () =>
+        Object.freeze({
+          sessions: 0,
+          contextBytes: 0,
+          issuedRunIds: 0,
+          issuedTraceIds: 0,
+          issuedEventIds: 0,
+          cancelledRunIds: 0,
+          executionRecords: 0,
+          idempotencyEntries: 0,
+        }),
       confirmAndExecute: (command) => {
         this.confirmCalls += 1;
         if (this.confirmError !== undefined) return Promise.reject(this.confirmError);

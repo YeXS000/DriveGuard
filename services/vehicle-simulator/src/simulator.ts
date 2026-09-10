@@ -1,4 +1,4 @@
-import { DomainValidationError, toUtcTimestamp } from "@driveguard/domain";
+import { DomainValidationError, toUtcTimestamp, type VehicleId } from "@driveguard/domain";
 import { SystemClock, type Clock } from "@driveguard/shared";
 
 import { DeterministicIdAllocator, deterministicUnit } from "./determinism.js";
@@ -32,12 +32,14 @@ export interface VehicleSimulatorOptions {
   readonly clock?: Clock;
   readonly scenario?: ScenarioId;
   readonly seed?: number;
+  readonly vehicleId?: string;
 }
 
 export class VehicleSimulator {
   readonly clock: Clock;
   readonly scenarios: ScenarioRegistry;
   readonly faults: FaultManager;
+  readonly #vehicleId: string;
   #state: SimulatorState;
   #history: SimulatorState[];
   #ids: DeterministicIdAllocator;
@@ -49,7 +51,13 @@ export class VehicleSimulator {
     this.scenarios = new ScenarioRegistry(this.clock);
     const scenario = options.scenario ?? "city_idle";
     const seed = options.seed ?? 1;
-    this.#state = this.scenarios.load(scenario, seed);
+    const initial = this.scenarios.load(scenario, seed);
+    const vehicleId = options.vehicleId ?? initial.vehicle.vehicleId;
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(vehicleId)) {
+      throw new SimulatorError("VALIDATION_ERROR", "Vehicle identity is invalid", 400);
+    }
+    this.#vehicleId = vehicleId;
+    this.#state = this.#bindVehicle(initial);
     this.#history = [this.#state];
     this.#ids = new DeterministicIdAllocator(seed);
     this.faults = new FaultManager(seed);
@@ -125,7 +133,7 @@ export class VehicleSimulator {
 
   async reset(scenario: string, seed: number): Promise<SimulatorState> {
     return this.#serialize(() => {
-      const next = this.scenarios.load(scenario, seed);
+      const next = this.#bindVehicle(this.scenarios.load(scenario, seed));
       this.#resetEpoch += 1;
       this.#state = next;
       this.#history = [next];
@@ -133,6 +141,14 @@ export class VehicleSimulator {
       this.faults.setSeed(seed);
       return this.state();
     });
+  }
+
+  #bindVehicle(state: SimulatorState): SimulatorState {
+    if (state.vehicle.vehicleId === this.#vehicleId) return state;
+    return validateSimulatorState(
+      { ...state, vehicle: { ...state.vehicle, vehicleId: this.#vehicleId as VehicleId } },
+      this.clock.nowMs(),
+    );
   }
 
   async setVehicleSpeed(speedKph: number, resetEpoch?: number): Promise<SimulatorState> {

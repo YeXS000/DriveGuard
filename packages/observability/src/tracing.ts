@@ -160,7 +160,7 @@ export class DriveGuardTracing {
   }
 
   snapshot(): Readonly<Record<string, number>> {
-    return Object.freeze({
+    const snapshot = {
       trace_parents: this.#traceParents.size,
       agents: this.#agents.size,
       context_loads: this.#contextLoads.size,
@@ -177,6 +177,13 @@ export class DriveGuardTracing {
         this.#urgentProcesses.size +
         this.#urgentContexts.size +
         this.#urgentPolicies.size,
+      finished_in_memory: this.#inMemoryExporter?.getFinishedSpans().length ?? 0,
+    };
+    return Object.freeze({
+      ...snapshot,
+      active_total: Object.entries(snapshot)
+        .filter(([kind]) => kind !== "trace_parents" && kind !== "finished_in_memory")
+        .reduce((total, [, value]) => total + value, 0),
     });
   }
 

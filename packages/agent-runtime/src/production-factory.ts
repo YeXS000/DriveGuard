@@ -62,6 +62,8 @@ export interface CreateProductionRuntimeOptions {
   readonly model: Model<string>;
   readonly streamFn: StreamFn;
   readonly simulatorBaseUrl: string;
+  /** Vehicle identity bound by the trusted API/session boundary. */
+  readonly vehicleId?: string;
   readonly capabilities: VehicleCapabilities;
   readonly serviceAvailability: ServiceAvailability;
   readonly clock?: Clock;
@@ -258,7 +260,10 @@ export function createProductionDriveGuardRuntime(
     }
   }
   const clock = options.clock ?? new SystemClock();
-  const simulator = new SimulatorClient({ baseUrl: options.simulatorBaseUrl });
+  const simulator = new SimulatorClient({
+    baseUrl: options.simulatorBaseUrl,
+    ...(options.vehicleId === undefined ? {} : { vehicleId: options.vehicleId }),
+  });
   const recoveryManager = new RecoveryManager();
   const contextProvider = new SimulatorContextProvider({
     simulator,

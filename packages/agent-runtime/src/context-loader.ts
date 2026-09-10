@@ -25,6 +25,12 @@ import type { SimulatorClient } from "@driveguard/tools";
 import { AgentRuntimeError } from "./runtime-errors.js";
 
 export interface ContextProvider {
+  /** Atomically sampled vehicle and trip state when the provider supports it. */
+  loadVehicleTripState?(): Promise<{
+    readonly vehicle: VehicleState;
+    readonly trip: TripState;
+    readonly simulationVersion: number;
+  }>;
   loadVehicleState(): Promise<VehicleState>;
   loadTripState(): Promise<TripState>;
   loadWeatherState(): Promise<WeatherState>;
@@ -44,6 +50,8 @@ export interface LoadedRuntimeContext {
   readonly snapshot: ContextSnapshot;
   readonly freshness: ContextFreshnessReport;
   readonly services: ServiceAvailability;
+  readonly loadAttempts: number;
+  readonly simulatorGeneration?: number;
 }
 
 export interface ContextLoaderOptions {
@@ -53,6 +61,25 @@ export interface ContextLoaderOptions {
   readonly freshnessRequirement?: FreshnessRequirement;
   readonly latestVersionProvider?: (snapshot: ContextSnapshot) => unknown;
   readonly recoveryManager?: RecoveryManager;
+}
+
+interface LoadedContextSource {
+  readonly vehicle: VehicleState;
+  readonly trip: TripState;
+  readonly weather: WeatherState;
+  readonly user: DrivingUser;
+  readonly capabilities: VehicleCapabilities;
+  readonly services: ServiceAvailability;
+  readonly simulationVersion?: number;
+}
+
+function isFutureTimestampValidationError(error: unknown): boolean {
+  return (
+    error instanceof DomainValidationError &&
+    error.issues.some(
+      (issue) => issue.code === "INVALID_TIMESTAMP" && /future/iu.test(issue.message),
+    )
+  );
 }
 
 export class ContextLoadFailure extends AgentRuntimeError {
@@ -107,79 +134,94 @@ export class ContextLoader {
   }
 
   async load(): Promise<LoadedRuntimeContext> {
-    let source: {
-      vehicle: VehicleState;
-      trip: TripState;
-      weather: WeatherState;
-      user: DrivingUser;
-      capabilities: VehicleCapabilities;
-      services: ServiceAvailability;
-    };
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const source = await this.#loadSource();
+      try {
+        const snapshot = this.#snapshotBuilder.create({
+          vehicle: source.vehicle,
+          trip: source.trip,
+          weather: source.weather,
+          user: source.user,
+          capabilities: source.capabilities,
+        });
+        const context = this.#freshnessEvaluator.evaluate(
+          snapshot,
+          this.#requirement,
+          this.#latestVersionProvider(snapshot),
+        );
+        const sourceRequirement = {
+          maxAgeMs: this.#requirement.maxAgeMs,
+          requiresLatest: false,
+        } as const;
+        const vehicle = this.#freshnessEvaluator.evaluate(
+          { ...snapshot, capturedAt: snapshot.vehicle.timestamp },
+          sourceRequirement,
+        );
+        const trip = this.#freshnessEvaluator.evaluate(
+          { ...snapshot, capturedAt: snapshot.trip.timestamp },
+          sourceRequirement,
+        );
+        return Object.freeze({
+          snapshot,
+          services: structuredClone(source.services),
+          loadAttempts: attempt + 1,
+          ...(source.simulationVersion === undefined
+            ? {}
+            : { simulatorGeneration: source.simulationVersion }),
+          freshness: Object.freeze({
+            status: selectEffectiveFreshness([context, vehicle, trip]).status,
+            context,
+            vehicle,
+            trip,
+          }),
+        });
+      } catch (error) {
+        if (attempt === 0 && isFutureTimestampValidationError(error)) continue;
+        if (error instanceof AgentRuntimeError) throw error;
+        if (isFutureTimestampValidationError(error)) {
+          throw new AgentRuntimeError(
+            "POLICY_REPLAN_REQUIRED",
+            "Context clock skew remained after one bounded refresh",
+            true,
+          );
+        }
+        throw new AgentRuntimeError("CONTEXT_INVALID", "Current context failed runtime validation");
+      }
+    }
+    throw new AgentRuntimeError("POLICY_REPLAN_REQUIRED", "Context refresh was exhausted", true);
+  }
+
+  async #loadSource(): Promise<LoadedContextSource> {
     try {
-      const [vehicle, trip, weather, user, capabilities, services] = await Promise.all([
-        this.#recoveryManager.executeRead(() => this.#provider.loadVehicleState()),
-        this.#recoveryManager.executeRead(() => this.#provider.loadTripState()),
+      const atomic = this.#provider.loadVehicleTripState?.bind(this.#provider);
+      const [states, weather, user, capabilities, services] = await Promise.all([
+        atomic === undefined
+          ? Promise.all([
+              this.#recoveryManager.executeRead(() => this.#provider.loadVehicleState()),
+              this.#recoveryManager.executeRead(() => this.#provider.loadTripState()),
+            ])
+          : this.#recoveryManager.executeRead(atomic),
         this.#provider.loadWeatherState(),
         this.#provider.loadUser(),
         this.#provider.loadCapabilities(),
         this.#provider.loadServiceAvailability(),
       ]);
-      source = { vehicle, trip, weather, user, capabilities, services };
+      const [vehicle, trip] = Array.isArray(states)
+        ? states
+        : ([states.vehicle, states.trip] as const);
+      return {
+        vehicle,
+        trip,
+        weather,
+        user,
+        capabilities,
+        services,
+        ...(Array.isArray(states) ? {} : { simulationVersion: states.simulationVersion }),
+      };
     } catch (error) {
       throw new ContextLoadFailure(
         error instanceof RecoveryExhaustedError ? error.receipt : undefined,
       );
-    }
-
-    try {
-      const snapshot = this.#snapshotBuilder.create({
-        vehicle: source.vehicle,
-        trip: source.trip,
-        weather: source.weather,
-        user: source.user,
-        capabilities: source.capabilities,
-      });
-      const context = this.#freshnessEvaluator.evaluate(
-        snapshot,
-        this.#requirement,
-        this.#latestVersionProvider(snapshot),
-      );
-      const sourceRequirement = {
-        maxAgeMs: this.#requirement.maxAgeMs,
-        requiresLatest: false,
-      } as const;
-      const vehicle = this.#freshnessEvaluator.evaluate(
-        { ...snapshot, capturedAt: snapshot.vehicle.timestamp },
-        sourceRequirement,
-      );
-      const trip = this.#freshnessEvaluator.evaluate(
-        { ...snapshot, capturedAt: snapshot.trip.timestamp },
-        sourceRequirement,
-      );
-      return Object.freeze({
-        snapshot,
-        services: structuredClone(source.services),
-        freshness: Object.freeze({
-          status: selectEffectiveFreshness([context, vehicle, trip]).status,
-          context,
-          vehicle,
-          trip,
-        }),
-      });
-    } catch (error) {
-      if (error instanceof AgentRuntimeError) throw error;
-      if (
-        error instanceof DomainValidationError &&
-        error.issues.some(
-          (issue) => issue.code === "INVALID_TIMESTAMP" && /future/iu.test(issue.message),
-        )
-      ) {
-        throw new AgentRuntimeError(
-          "CONTEXT_INVALID",
-          "Current context freshness is INVALID_FUTURE_TIMESTAMP",
-        );
-      }
-      throw new AgentRuntimeError("CONTEXT_INVALID", "Current context failed runtime validation");
     }
   }
 }
@@ -211,6 +253,14 @@ export class SimulatorContextProvider implements ContextProvider {
     this.#services = structuredClone(options.serviceAvailability);
     this.#capabilitiesProvider = options.capabilitiesProvider;
     this.#serviceAvailabilityProvider = options.serviceAvailabilityProvider;
+  }
+
+  async loadVehicleTripState(): Promise<{
+    readonly vehicle: VehicleState;
+    readonly trip: TripState;
+    readonly simulationVersion: number;
+  }> {
+    return this.#simulator.getContextState();
   }
 
   loadVehicleState(): Promise<VehicleState> {

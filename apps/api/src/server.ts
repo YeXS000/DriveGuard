@@ -201,6 +201,10 @@ async function main(): Promise<void> {
         natsPending,
         natsAckPending,
       });
+      observability.observeRuntimeResources({
+        activeRequests: service.activeRequestCount,
+        ...runtimeFactory.resourceSnapshot(),
+      });
     },
     onClose: async () => {
       await urgentConsumer.stop();

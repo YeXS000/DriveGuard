@@ -65,6 +65,7 @@
     "test:phase13.1": "vitest run tests/unit/phase13.1-*.test.ts tests/contract/phase13.1-*.test.ts tests/integration/phase13.1-*.test.ts tests/unit/scorer-v2.test.ts",
     "test:phase13.2.1": "vitest run tests/unit/critical-path-guard.test.ts tests/integration/critical-path-runtime.test.ts tests/unit/fault-lifetime.test.ts tests/unit/fault-metrics-v2.1.test.ts tests/unit/phase13.2-*.test.ts tests/unit/scorer-v2.test.ts",
     "test:phase14": "vitest run tests/unit/load-capacity.test.ts tests/integration/load-fault-isolation.test.ts tests/integration/load-resilience.test.ts tests/unit/phase8-executor.test.ts tests/unit/phase8-reliability-performance.test.ts tests/unit/phase6-matrix-performance.test.ts tests/unit/phase7-security-performance.test.ts tests/unit/phase13.2-recovery-gate.test.ts tests/unit/phase13.2-recovery-manager.test.ts",
+    "test:phase15.1": "vitest run tests/unit/phase15.1-*.test.ts tests/integration/phase15.1-*.test.ts",
     "load:phase14": "node benchmarks/load/run-k6-matrix.mjs",
     "eval:phase13:native": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode deterministic",
     "eval:phase13:native:live": "npm run build --silent && node dist/evals/runner/cli.js --track native --mode live",

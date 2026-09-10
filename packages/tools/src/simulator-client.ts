@@ -34,9 +34,19 @@ const ReservationResponseSchema = Type.Object(
   { reservation: ChargingReservationSchema },
   { additionalProperties: false },
 );
+const ContextStateResponseSchema = Type.Object(
+  {
+    vehicle: VehicleStateSchema,
+    trip: TripStateSchema,
+    simulationVersion: Type.Integer({ minimum: 1 }),
+  },
+  { additionalProperties: false },
+);
 
 export interface SimulatorClientOptions {
   readonly baseUrl: string;
+  /** Bound vehicle identity forwarded to the Simulator data plane. */
+  readonly vehicleId?: string;
   readonly fetchImplementation?: typeof fetch;
   readonly defaultTimeoutMs?: number;
 }
@@ -71,11 +81,19 @@ function timeoutValue(value: number): number {
 
 export class SimulatorClient {
   readonly #baseUrl: string;
+  readonly #vehicleId: string | undefined;
   readonly #fetch: typeof fetch;
   readonly #defaultTimeoutMs: number;
 
   constructor(options: SimulatorClientOptions) {
     this.#baseUrl = normalizeBaseUrl(options.baseUrl);
+    if (
+      options.vehicleId !== undefined &&
+      !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(options.vehicleId)
+    ) {
+      throw new TypeError("Simulator vehicleId must be a valid DriveGuard identity");
+    }
+    this.#vehicleId = options.vehicleId;
     this.#fetch = options.fetchImplementation ?? fetch;
     this.#defaultTimeoutMs = timeoutValue(options.defaultTimeoutMs ?? 2_000);
   }
@@ -89,6 +107,13 @@ export class SimulatorClient {
 
   getTripState(timeoutMs?: number, context?: SimulatorRequestContext) {
     return this.#request("get_trip_state", "GET", "/trip/state", TripStateSchema, {
+      timeoutMs,
+      ...context,
+    });
+  }
+
+  getContextState(timeoutMs?: number, context?: SimulatorRequestContext) {
+    return this.#request("get_context_state", "GET", "/context/state", ContextStateResponseSchema, {
       timeoutMs,
       ...context,
     });
@@ -271,6 +296,7 @@ export class SimulatorClient {
           : AbortSignal.any([controller.signal, options.signal]);
       const headers = {
         ...(options.body === undefined ? {} : { "content-type": "application/json" }),
+        ...(this.#vehicleId === undefined ? {} : { "x-driveguard-vehicle-id": this.#vehicleId }),
         ...(options.idempotencyKey === undefined
           ? {}
           : { "idempotency-key": options.idempotencyKey }),

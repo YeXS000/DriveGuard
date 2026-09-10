@@ -69,6 +69,18 @@ describe("Phase 3 health and data-plane HTTP contract", () => {
     });
   });
 
+  it("GET /context/state atomically returns vehicle, trip, and simulator generation", async () => {
+    const { app, simulator } = createApi();
+    const response = await app.inject({ method: "GET", url: "/context/state" });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({
+      vehicle: simulator.state().vehicle,
+      trip: simulator.state().trip,
+      simulationVersion: simulator.state().simulationVersion,
+    });
+  });
+
   it.each([
     ["/cabin/temperature", { temperatureC: 24 }, "cabinTemperature", 24],
     ["/media/volume", { volume: 65 }, "volume", 65],

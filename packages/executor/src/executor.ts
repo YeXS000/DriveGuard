@@ -74,6 +74,11 @@ export interface ReliableToolExecutorOptions {
   readonly reconciler?: ExecutionReconciler;
 }
 
+export interface ExecutorRetentionSnapshot {
+  readonly executionRecords: number;
+  readonly idempotencyEntries: number;
+}
+
 function safeIdentity(value: unknown, fallback: string): string {
   return typeof value === "string" && safeId.test(value) ? value : fallback;
 }
@@ -121,6 +126,13 @@ export class ReliableToolExecutor {
     return this.#records.get(executionId);
   }
 
+  retentionSnapshot(): ExecutorRetentionSnapshot {
+    return Object.freeze({
+      executionRecords: this.#records.size,
+      idempotencyEntries: this.#idempotency.size,
+    });
+  }
+
   async execute(request: ExecutionRequest): Promise<ExecutionResult> {
     const fallbackAt = toUtcTimestamp(this.#clock.nowMs());
     let definition: ToolDefinition;
@@ -144,19 +156,30 @@ export class ReliableToolExecutor {
     }
 
     if (this.#durableCoordinator !== undefined && this.#durableOwnerContext.getStore() !== true) {
-      return this.#durableCoordinator.execute(request, requestBinding, async () =>
-        this.#durableOwnerContext.run(true, async () => {
-          const result = await this.execute(request);
-          const record = this.#records.get(request.executionId);
-          if (record === undefined) {
-            throw new ExecutorFault(
-              "INTERNAL_EXECUTION_ERROR",
-              "Durable execution owner did not produce an ExecutionRecord",
-            );
-          }
-          return { result, record };
-        }),
-      );
+      try {
+        return await this.#durableCoordinator.execute(request, requestBinding, async () =>
+          this.#durableOwnerContext.run(true, async () => {
+            const result = await this.execute(request);
+            const record = this.#records.get(request.executionId);
+            if (record === undefined) {
+              throw new ExecutorFault(
+                "INTERNAL_EXECUTION_ERROR",
+                "Durable execution owner did not produce an ExecutionRecord",
+              );
+            }
+            return { result, record };
+          }),
+        );
+      } finally {
+        // Durable storage owns completed replay/audit history in durable mode. These
+        // maps provide only single-flight state while the owner is executing.
+        this.#records.delete(request.executionId);
+        this.#idempotency.release(
+          request.idempotencyKey,
+          request.actionFingerprint,
+          requestBinding,
+        );
+      }
     }
 
     const acquisition = this.#idempotency.acquire(

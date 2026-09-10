@@ -103,6 +103,7 @@ class ActualRuntimeFactory implements Phase10RuntimeFactory {
       model: faux.getModel(),
       streamFn: models.streamSimple.bind(models),
       simulatorBaseUrl,
+      vehicleId: input.identity.vehicleId,
       capabilities: DEFAULT_PHASE_5_CAPABILITIES,
       serviceAvailability: DEFAULT_PHASE_5_SERVICES,
       user: { userId: input.identity.userId as never, role: "driver" },

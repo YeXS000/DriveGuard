@@ -131,7 +131,7 @@ class MutableProvider implements ContextProvider {
 
 function loader(
   provider: ContextProvider,
-  clock = new MutableClock(baseMs),
+  clock: Clock = new MutableClock(baseMs),
   options: {
     maxAgeMs?: number;
     latestVersionProvider?: (snapshot: ContextSnapshot) => unknown;
@@ -185,6 +185,33 @@ describe("Phase 5 ContextLoader", () => {
     expect(loaded.snapshot.user).toEqual(user);
     expect(loaded.snapshot.capabilities).toEqual(capabilities);
     for (const spy of Object.values(provider.calls)) expect(spy).toHaveBeenCalledOnce();
+  });
+
+  it("uses one atomic simulator state read rather than mixed vehicle and trip reads", async () => {
+    const provider = new MutableProvider();
+    const atomic = vi.fn(() =>
+      Promise.resolve({
+        vehicle: structuredClone(provider.currentVehicle),
+        trip: structuredClone(provider.currentTrip),
+        simulationVersion: 41,
+      }),
+    );
+    const atomicProvider: ContextProvider = {
+      loadVehicleTripState: atomic,
+      loadVehicleState: provider.loadVehicleState.bind(provider),
+      loadTripState: provider.loadTripState.bind(provider),
+      loadWeatherState: provider.loadWeatherState.bind(provider),
+      loadUser: provider.loadUser.bind(provider),
+      loadCapabilities: provider.loadCapabilities.bind(provider),
+      loadServiceAvailability: provider.loadServiceAvailability.bind(provider),
+    };
+
+    const loaded = await loader(atomicProvider).load();
+
+    expect(loaded.simulatorGeneration).toBe(41);
+    expect(atomic).toHaveBeenCalledOnce();
+    expect(provider.calls.vehicle).not.toHaveBeenCalled();
+    expect(provider.calls.trip).not.toHaveBeenCalled();
   });
 
   it("reloads world state and creates a new snapshot on every invocation", async () => {
@@ -287,14 +314,29 @@ describe("Phase 5 ContextLoader", () => {
     expect((await contextLoader.load()).freshness.status).toBe("STALE");
   });
 
-  it("maps a future source timestamp to a structured CONTEXT_INVALID failure", async () => {
+  it("maps a persistent future source timestamp to bounded REPLAN_REQUIRED", async () => {
     const provider = new MutableProvider();
     provider.currentVehicle = vehicle(new Date(baseMs + 1).toISOString());
 
     await expect(loader(provider).load()).rejects.toMatchObject({
-      code: "CONTEXT_INVALID",
-      message: "Current context freshness is INVALID_FUTURE_TIMESTAMP",
+      code: "POLICY_REPLAN_REQUIRED",
+      message: "Context clock skew remained after one bounded refresh",
     });
+  });
+
+  it("reloads source state once when only a transient future timestamp is observed", async () => {
+    const provider = new MutableProvider();
+    provider.currentVehicle = vehicle(new Date(baseMs + 1).toISOString());
+    const timestamps = [baseMs, baseMs + 1, baseMs + 1, baseMs + 1];
+    const clock: Clock = {
+      nowMs: () => timestamps.shift() ?? baseMs + 1,
+    };
+
+    const loaded = await loader(provider, clock).load();
+
+    expect(loaded.snapshot.vehicle.timestamp).toBe(new Date(baseMs + 1).toISOString());
+    expect(provider.calls.vehicle).toHaveBeenCalledTimes(2);
+    expect(provider.calls.trip).toHaveBeenCalledTimes(2);
   });
 
   it.each(["vehicle", "trip", "weather", "user", "capabilities", "services"] as const)(
