@@ -2,7 +2,7 @@ name: driveguard
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: postgres:17-alpine@sha256:ae8a26b5b27ef277b46284a0faa2f0059e36a0b40b4064e3353e1bbaaaa2b214
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-driveguard}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
@@ -18,9 +18,10 @@ services:
       retries: 15
       start_period: 5s
     restart: unless-stopped
+    mem_limit: 512m
 
   redis:
-    image: redis:8-alpine
+    image: redis:8-alpine@sha256:642d3031f9c79ebc20ccbb4dca457a30dd06725b2f40c10b1ec0e17df90a5697
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis-data:/data
@@ -33,9 +34,10 @@ services:
       retries: 15
       start_period: 3s
     restart: unless-stopped
+    mem_limit: 256m
 
   nats:
-    image: nats:2.11-alpine
+    image: nats:2.11-alpine@sha256:8e9da4a39fad71bc91237fbe4cc68c2fefe7126c7608a0b3ee94f2084aacfd8c
     command: ["-js", "-m", "8222", "--store_dir", "/data/jetstream"]
     volumes:
       - nats-data:/data/jetstream
@@ -50,9 +52,10 @@ services:
       retries: 15
       start_period: 3s
     restart: unless-stopped
+    mem_limit: 256m
 
   api:
-    image: driveguard-api:phase12
+    image: driveguard-api:${DRIVEGUARD_IMAGE_TAG:-dev}
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
@@ -112,9 +115,12 @@ services:
       retries: 15
       start_period: 5s
     restart: unless-stopped
+    init: true
+    stop_grace_period: ${DRIVEGUARD_SHUTDOWN_TIMEOUT_MS:-30}s
+    mem_limit: 512m
 
   persistence-migrate:
-    image: driveguard-api:phase12
+    image: driveguard-api:${DRIVEGUARD_IMAGE_TAG:-dev}
     build:
       context: .
       dockerfile: infra/docker/api.Dockerfile
@@ -131,9 +137,10 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
+    mem_limit: 256m
 
   vehicle-simulator:
-    image: driveguard-vehicle-simulator:phase3
+    image: driveguard-vehicle-simulator:${DRIVEGUARD_IMAGE_TAG:-dev}
     build:
       context: .
       dockerfile: infra/docker/vehicle-simulator.Dockerfile
@@ -154,9 +161,12 @@ services:
       retries: 15
       start_period: 3s
     restart: unless-stopped
+    init: true
+    stop_grace_period: 10s
+    mem_limit: 256m
 
   hmi:
-    image: driveguard-hmi:phase10
+    image: driveguard-hmi:${DRIVEGUARD_IMAGE_TAG:-dev}
     build:
       context: .
       dockerfile: infra/docker/hmi.Dockerfile
@@ -180,9 +190,13 @@ services:
       retries: 15
       start_period: 3s
     restart: unless-stopped
+    init: true
+    stop_grace_period: 10s
+    mem_limit: 128m
 
   prometheus:
     image: prom/prometheus:v3.13.1
+    profiles: ["observability"]
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus
@@ -204,6 +218,7 @@ services:
 
   grafana:
     image: grafana/grafana:13.2.0
+    profiles: ["observability"]
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}

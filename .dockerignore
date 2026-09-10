@@ -23,12 +23,14 @@ coverage/
 *.tsbuildinfo
 .cache/
 
-# Files not required to build the Phase 0 API image.
+# Repository planning and development-only material is never part of a release image.
 AGENTS.md
 DriveGuard.md
 docs/
 evals/
 tests/
+artifacts/
+benchmarks/
 
 # Generated benchmark outputs are not application source.
 benchmarks/reports/

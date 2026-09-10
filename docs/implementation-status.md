@@ -40,6 +40,14 @@
 - Historical worktrees intentionally retain their historical internal layouts.
   See `docs/repository-layout.md` and ADR 0020 for the source-only integration rule.
 
+## Phase 16 — Containerization, CI/CD & Reproducible Release
+
+- Status: COMPLETE; final Stage Gate **PASS**.
+- Scope: immutable-tag production images, minimum Compose release topology, configuration and secret boundaries, bootstrap/recovery validation, SHA-tag CI, release metadata, and operator documentation. No Policy, confirmation state-machine, executor, or capability-registry behavior changed.
+- Delivered: lockfile-only multi-stage Dockerfiles for API, vehicle simulator, and HMI; non-root runtime users; digest-pinned PostgreSQL/Redis/NATS; observability profile; SHA image-tag contract; CI safety/full-regression/build/audit/secret-scan gates; release smoke and manifest generator; operator and CI documentation.
+- Measured validation: clean `npm ci` succeeded with `0 vulnerabilities`; format, lint, typecheck, build, Compose config, layout, and local secret-pattern scan passed. Targeted safety regression passed 469/469. Full regression passed 2,290/2,290 with 45 opt-in integration tests explicitly skipped. A no-cache image build produced all three SHA-tagged images as non-root. Fresh isolated Compose bootstrap passed, including migration rerun and NATS bootstrap on API restart. Readiness returned 503 with Redis stopped and 200 after recovery. Release smoke passed protected action confirmation with bypass 0 and duplicate effect 0, then verified session/pending-action recovery across API restart. SIGTERM exited API with code 0 and readiness returned after restart.
+- Evidence and generated release metadata are retained only on this phase branch under `artifacts/16-containerization-ci-cd-reproducible-release/`. No release tag, remote push, or merge to `main` was created.
+
 ## Phase 15.1 — Performance Qualification Closure
 
 - Status: IMPLEMENTED; final Stage Gate **FAIL**.

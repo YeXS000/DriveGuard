@@ -1,13 +1,4 @@
-FROM node:22.22.1-bookworm-slim AS build
-
-WORKDIR /workspace
-
-COPY . .
-
-RUN npm ci --ignore-scripts \
-  && npm run build
-
-FROM node:22.22.1-bookworm-slim AS production-deps
+FROM node:22.22.1-bookworm-slim AS dependencies
 
 WORKDIR /workspace
 
@@ -15,10 +6,15 @@ COPY package.json package-lock.json ./
 COPY apps ./apps
 COPY packages ./packages
 COPY services ./services
+RUN npm ci --ignore-scripts
 
-RUN npm ci --omit=dev --ignore-scripts \
-  --workspace @driveguard/vehicle-simulator \
-  --include-workspace-root=false
+FROM dependencies AS build
+
+COPY tsconfig*.json ./
+RUN npm run build \
+  && npm prune --omit=dev --ignore-scripts \
+  && find packages services -type f \( -name '*.ts' -o -name 'tsconfig.json' \) -delete \
+  && find packages services -type d -empty -delete
 
 FROM node:22.22.1-bookworm-slim AS runtime
 
@@ -27,11 +23,9 @@ ENV PORT=3001
 
 WORKDIR /app
 
-COPY --from=production-deps /workspace/node_modules ./node_modules
-COPY --from=build /workspace/packages/domain ./packages/domain
-COPY --from=build /workspace/packages/shared ./packages/shared
-COPY --from=build /workspace/services/vehicle-simulator ./services/vehicle-simulator
-COPY --from=build /workspace/services/vehicle-simulator/package.json ./package.json
+COPY --chown=node:node --from=build /workspace/node_modules ./node_modules
+COPY --chown=node:node --from=build /workspace/packages ./packages
+COPY --chown=node:node --from=build /workspace/services/vehicle-simulator ./services/vehicle-simulator
 
 EXPOSE 3001
 

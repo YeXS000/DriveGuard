@@ -3,7 +3,10 @@ import { stat } from "node:fs/promises";
 import { createServer, request as proxyRequest } from "node:http";
 import { extname, resolve, sep } from "node:path";
 
-const port = 8080;
+const port = Number(process.env.PORT ?? "8080");
+if (!Number.isInteger(port) || port < 1 || port > 65_535) {
+  throw new Error("PORT must be an integer between 1 and 65535");
+}
 const publicRoot = resolve("/app/public");
 const apiOrigin = new URL(process.env.DRIVEGUARD_API_ORIGIN ?? "http://api:3000");
 const contentTypes = Object.freeze({
@@ -65,7 +68,19 @@ async function serveStatic(req, res) {
   }
 }
 
-createServer((req, res) => {
+const server = createServer((req, res) => {
   if (req.url?.startsWith("/api/")) proxy(req, res);
   else void serveStatic(req, res);
-}).listen(port, "0.0.0.0");
+});
+
+let closing = false;
+function shutdown() {
+  if (closing) return;
+  closing = true;
+  server.close(() => process.exit(0));
+  setTimeout(() => process.exit(1), 8_000).unref();
+}
+
+process.once("SIGTERM", shutdown);
+process.once("SIGINT", shutdown);
+server.listen(port, "0.0.0.0");
