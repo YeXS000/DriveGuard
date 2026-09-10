@@ -29,6 +29,8 @@ jobs:
       - run: npm test
       - run: npm audit --audit-level=high
       - run: npm run check:layout
+        env:
+          DRIVEGUARD_ALLOW_STAGE_ARTIFACTS: ${{ github.event_name == 'pull_request' && '1' || '0' }}
 
   container-build:
     name: Immutable image builds
