@@ -1,0 +1,20 @@
+title = "DriveGuard Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Synthetic API-key-shaped values required by legacy unit and integration fixtures"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+paths = [
+  '''^tests/integration/phase7-runtime-lifecycle\.test\.ts$''',
+  '''^tests/unit/phase15\.1-runtime-retention\.test\.ts$''',
+  '''^tests/integration/phase9-postgres-redis-recovery\.test\.ts$''',
+]
+regexes = [
+  '''^\s*const faux = fauxProvider\(\{ provider: "phase7-default", api: ".*" \}\);$''',
+  '''^\s*const faux = fauxProvider\(\{ provider: "phase15-retention", api: ".*" \}\);$''',
+  '''^\s*tokenHash:\s*".*",\s*$''',
+]
