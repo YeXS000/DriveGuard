@@ -1,0 +1,16 @@
+{
+  "name": "@driveguard/memory",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "dependencies": {
+    "@driveguard/domain": "0.0.0",
+    "redis": "6.2.1"
+  }
+}

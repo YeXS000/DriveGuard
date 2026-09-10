@@ -1,0 +1,26 @@
+[
+  {
+    "name": "postgres",
+    "listen": "0.0.0.0:15432",
+    "upstream": "postgres:5432",
+    "enabled": true
+  },
+  {
+    "name": "redis",
+    "listen": "0.0.0.0:16379",
+    "upstream": "redis:6379",
+    "enabled": true
+  },
+  {
+    "name": "nats",
+    "listen": "0.0.0.0:14222",
+    "upstream": "nats:4222",
+    "enabled": true
+  },
+  {
+    "name": "simulator",
+    "listen": "0.0.0.0:13001",
+    "upstream": "vehicle-simulator:3001",
+    "enabled": true
+  }
+]
