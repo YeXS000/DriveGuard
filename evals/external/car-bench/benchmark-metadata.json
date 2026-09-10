@@ -1,0 +1,28 @@
+{
+  "repository": "https://github.com/CAR-bench/car-bench",
+  "commit": "54990894241f2c07e9b523928c2a29e9b693d313",
+  "commitDate": "2026-08-27T14:59:48+02:00",
+  "benchmarkVersion": "0.1.0",
+  "license": "MIT",
+  "datasetRepository": "https://huggingface.co/datasets/johanneskirmayr/car-bench-dataset",
+  "datasetCommit": "1fcf24ad802c42e04a0d8fe05b5ca0d481a4e7af",
+  "taskSplit": {
+    "train": {
+      "base": 50,
+      "hallucination": 48,
+      "disambiguation": 31,
+      "total": 129
+    },
+    "test": {
+      "base": 50,
+      "hallucination": 50,
+      "disambiguation": 25,
+      "total": 125
+    },
+    "publicTotal": 254
+  },
+  "toolCount": 58,
+  "policyCount": 19,
+  "integrationBoundary": "evaluation-only dynamic CAR-bench tools; DriveGuard production Tool Registry, Policy, Confirmation, Executor and persistence are not replaced or claimed as covered",
+  "evaluatorSemanticsModified": false
+}

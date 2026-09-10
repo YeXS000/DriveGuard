@@ -1,0 +1,12 @@
+api_key.md
+DriveGuard.md
+node_modules/
+dist/
+coverage/
+package-lock.json
+
+# Generated benchmark outputs are not application source.
+benchmarks/reports/
+
+# Phase evidence is immutable once collected; it is retained outside source-only integration.
+artifacts/

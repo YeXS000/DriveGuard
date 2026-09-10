@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DriveGuard HMI</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">Safety-aware service orchestration</p>
+        <h1>DriveGuard</h1>
+      </div>
+      <div class="identity">
+        <label>User <input id="user-id" value="phase5-driver" /></label>
+        <label>Vehicle <input id="vehicle-id" value="simulator-vehicle-001" /></label>
+        <button id="create-session">New session</button>
+        <button id="restore-session" class="secondary">Restore</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel chat-panel">
+        <div class="panel-heading">
+          <div>
+            <span>01</span>
+            <h2>Conversation</h2>
+          </div>
+          <code id="session-id">No active session</code>
+        </div>
+        <div id="conversation" class="conversation" aria-live="polite"></div>
+        <form id="message-form">
+          <textarea
+            id="message"
+            rows="3"
+            placeholder="Ask DriveGuard about the vehicle or request a service…"
+          ></textarea>
+          <button type="submit">Send</button>
+        </form>
+      </section>
+
+      <section class="panel compact">
+        <div class="panel-heading">
+          <div>
+            <span>02</span>
+            <h2>Vehicle State</h2>
+          </div>
+        </div>
+        <div id="vehicle-state" class="status-copy">
+          Loaded afresh by the Runtime on every turn.
+        </div>
+      </section>
+
+      <section class="panel compact">
+        <div class="panel-heading">
+          <div>
+            <span>03</span>
+            <h2>Current Context</h2>
+          </div>
+        </div>
+        <dl id="context-state">
+          <dt>Version</dt>
+          <dd>—</dd>
+          <dt>Snapshot</dt>
+          <dd>—</dd>
+        </dl>
+      </section>
+
+      <section class="panel action-panel">
+        <div class="panel-heading">
+          <div>
+            <span>04</span>
+            <h2>Pending Confirmation</h2>
+          </div>
+        </div>
+        <div id="action-empty" class="empty">No action is waiting for confirmation.</div>
+        <div id="action-card" hidden>
+          <div class="risk" id="action-risk">R2</div>
+          <h3 id="action-tool"></h3>
+          <p id="action-summary"></p>
+          <pre id="action-parameters"></pre>
+          <p class="expiry" id="action-expiry"></p>
+          <div class="button-row">
+            <button id="confirm-action">Confirm</button>
+            <button id="reject-action" class="danger">Reject</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel timeline-panel">
+        <div class="panel-heading">
+          <div>
+            <span>05</span>
+            <h2>Action Timeline</h2>
+          </div>
+        </div>
+        <ol id="timeline" class="timeline">
+          <li class="muted">Waiting for a run.</li>
+        </ol>
+      </section>
+
+      <section class="panel result-panel">
+        <div class="panel-heading">
+          <div>
+            <span>06</span>
+            <h2>Policy / Execution Result</h2>
+          </div>
+        </div>
+        <div id="execution-status" class="state-pill idle">Idle</div>
+        <pre id="result">No execution result.</pre>
+      </section>
+
+      <section class="panel timeline-panel">
+        <div class="panel-heading">
+          <div>
+            <span>07</span>
+            <h2>Urgent Events</h2>
+          </div>
+        </div>
+        <ol id="urgent-events" class="timeline">
+          <li class="muted">Waiting for validated vehicle events.</li>
+        </ol>
+      </section>
+    </main>
+
+    <footer>DEVELOPMENT_IDENTITY_BOUNDARY · HMI never calls the Vehicle Simulator directly.</footer>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

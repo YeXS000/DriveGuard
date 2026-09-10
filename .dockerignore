@@ -1,0 +1,36 @@
+# Secrets must never enter the Docker build context.
+api_key.md
+api-key.md
+.env
+.env.*
+**/.env
+**/.env.*
+.secrets
+.secrets.*
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local and generated content.
+.git/
+.github/
+node_modules/
+dist/
+coverage/
+*.log
+*.tsbuildinfo
+.cache/
+
+# Repository planning and development-only material is never part of a release image.
+AGENTS.md
+DriveGuard.md
+docs/
+evals/
+tests/
+artifacts/
+benchmarks/
+
+# Generated benchmark outputs are not application source.
+benchmarks/reports/

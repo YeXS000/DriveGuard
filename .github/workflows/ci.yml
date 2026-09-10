@@ -1,0 +1,65 @@
+name: DriveGuard CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Format, safety regression, and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.1
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run format
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run test:ci:safety
+      - run: npm test
+      - run: npm audit --audit-level=high
+      - run: npm run check:layout
+        env:
+          DRIVEGUARD_ALLOW_STAGE_ARTIFACTS: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+
+  container-build:
+    name: Immutable image builds
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DRIVEGUARD_IMAGE_TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - run: docker build --file infra/docker/api.Dockerfile --tag driveguard-api:${DRIVEGUARD_IMAGE_TAG} .
+      - run: docker build --file infra/docker/vehicle-simulator.Dockerfile --tag driveguard-vehicle-simulator:${DRIVEGUARD_IMAGE_TAG} .
+      - run: docker build --file infra/docker/hmi.Dockerfile --tag driveguard-hmi:${DRIVEGUARD_IMAGE_TAG} .
+      - run: docker compose config --quiet
+        env:
+          POSTGRES_PASSWORD: ci-postgres-password
+          POSTGRES_APP_PASSWORD: ci-application-password
+          URGENT_CONFIRMATION_SECRET: ci-urgent-confirmation-secret-at-least-32-characters
+          GRAFANA_ADMIN_PASSWORD: ci-grafana-password
+
+  secret-scan:
+    name: Committed secret scan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Gitleaks source scan
+        uses: docker://zricethezav/gitleaks:v8.24.3
+        with:
+          args: detect --source=/github/workspace --no-git --config=/github/workspace/.gitleaks.toml --redact --exit-code=2
