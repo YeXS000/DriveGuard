@@ -1,0 +1,122 @@
+groups:
+  - name: driveguard-operational-readiness
+    rules:
+      - alert: DriveGuardApiUnavailable
+        expr: up{job="driveguard-api"} == 0
+        for: 1m
+        labels:
+          severity: page
+          service: api
+        annotations:
+          summary: DriveGuard API is not scrapeable
+          runbook: docs/operations.md#dependency-outage
+
+      - alert: DriveGuardUnexpectedHttp5xx
+        expr: sum(rate(driveguard_http_requests_total{status_code=~"5..",status_code!="503",route!~"^/health/.*"}[5m])) > 0
+        for: 2m
+        labels:
+          severity: page
+          service: api
+        annotations:
+          summary: DriveGuard returned unexpected HTTP 5xx responses
+          runbook: docs/operations.md#api-unhealthy
+
+      - alert: DriveGuardApiP95LatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(driveguard_http_request_duration_seconds_bucket{route!~"^/health/.*"}[5m]))) > 2
+        for: 5m
+        labels:
+          severity: ticket
+          service: api
+        annotations:
+          summary: DriveGuard API P95 latency exceeds 2 seconds
+          runbook: docs/operations.md#service_busy-or-queue-saturation
+
+      - alert: DriveGuardApiRestarted
+        expr: changes(process_start_time_seconds{job="driveguard-api"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: ticket
+          service: api
+        annotations:
+          summary: DriveGuard API process restarted
+          runbook: docs/operations.md#restart
+
+      - alert: DriveGuardDependencyUnavailable
+        expr: min(driveguard_dependency_up) == 0
+        for: 30s
+        labels:
+          severity: page
+          service: dependency
+        annotations:
+          summary: A required DriveGuard dependency is unavailable
+          runbook: docs/operations.md#dependency-outage
+
+      - alert: DriveGuardServiceBusy
+        expr: increase(driveguard_admission_rejected_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: ticket
+          service: api
+        annotations:
+          summary: DriveGuard is rejecting requests at bounded admission
+          runbook: docs/operations.md#service_busy-or-queue-saturation
+
+      - alert: DriveGuardQueueSaturation
+        expr: driveguard_admission_queued >= 26 or driveguard_executor_queued >= 205
+        for: 30s
+        labels:
+          severity: page
+          service: api
+        annotations:
+          summary: DriveGuard request or executor queue is near the configured default limit
+          runbook: docs/operations.md#service_busy-or-queue-saturation
+
+      - alert: DriveGuardDatabasePoolSaturation
+        expr: driveguard_postgres_pool_connections{state="waiting"} > 0 or driveguard_postgres_pool_connections{state="total"} >= 16
+        for: 2m
+        labels:
+          severity: page
+          service: postgres
+        annotations:
+          summary: DriveGuard PostgreSQL pool is saturated or waiting
+          runbook: docs/operations.md#dependency-outage
+
+      - alert: DriveGuardNatsBacklog
+        expr: driveguard_nats_consumer_messages{state="pending"} > 0 or driveguard_nats_consumer_messages{state="ack_pending"} > 0
+        for: 5m
+        labels:
+          severity: ticket
+          service: nats
+        annotations:
+          summary: DriveGuard JetStream durable consumer has a sustained backlog
+          runbook: docs/operations.md#dependency-outage
+
+      - alert: DriveGuardConfirmationBypass
+        expr: increase(driveguard_safety_hard_failures_total{event="confirmation_bypass"}[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: safety
+        annotations:
+          summary: DriveGuard recorded a confirmation bypass
+          runbook: docs/operations.md#safety-hard-failure
+
+      - alert: DriveGuardForbiddenActionExecuted
+        expr: increase(driveguard_safety_hard_failures_total{event="forbidden_action_executed"}[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: safety
+        annotations:
+          summary: DriveGuard recorded a forbidden action execution
+          runbook: docs/operations.md#safety-hard-failure
+
+      - alert: DriveGuardDuplicateSideEffect
+        expr: increase(driveguard_safety_hard_failures_total{event="duplicate_side_effect"}[5m]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          service: safety
+        annotations:
+          summary: DriveGuard recorded a duplicate side effect
+          runbook: docs/operations.md#safety-hard-failure

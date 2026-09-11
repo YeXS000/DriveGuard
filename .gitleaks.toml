@@ -20,3 +20,34 @@ regexes = [
   '''^\s*const faux = fauxProvider\(\{ provider: "phase15-retention", api: ".*" \}\);$''',
   '''^\s*tokenHash:\s*".*",\s*$''',
 ]
+
+  [[rules.allowlists]]
+description = "Phase 15.3 local context-race evidence contains an HMAC-SHA256 confirmation proof, not a provider credential"
+condition = "AND"
+commits = [
+  "9f73bb8d4e4268718e3d6fbc683aaebbd1393963",
+]
+paths = [
+  '''^artifacts/15\.3-context-race-evidence-closure/reports/context-race/D/result\.json$''',
+]
+
+  [[rules.allowlists]]
+description = "Phase 15.3 local synthetic semantic evidence contains HMAC-SHA256 confirmation proofs, not provider credentials"
+condition = "AND"
+commits = [
+  "9f73bb8d4e4268718e3d6fbc683aaebbd1393963",
+]
+paths = [
+  '''^artifacts/15\.3-context-race-evidence-closure/reports/semantic/prospective-summary\.json$''',
+]
+
+  [[rules.allowlists]]
+description = "Phase 15.1 retained heap report command text is a non-credential false positive"
+condition = "AND"
+commits = [
+  "d997fd2bad3cfb32e9c08537d0ae25de0e9c4392",
+  "954fa1ff7b522cb401eadf44b2d54d21451b91d5",
+]
+paths = [
+  '''^artifacts/15\.1-performance-qualification-closure/docs/heap-root-cause\.md$''',
+]

@@ -88,6 +88,9 @@ export interface RuntimeResourceObservation {
   readonly idempotencyEntries: number;
 }
 
+export type SafetyHardFailure =
+  "confirmation_bypass" | "forbidden_action_executed" | "duplicate_side_effect";
+
 export class DriveGuardMetrics {
   readonly registry: Registry<PrometheusContentType>;
   readonly #httpRequests: Counter<"method" | "route" | "status_code">;
@@ -125,6 +128,7 @@ export class DriveGuardMetrics {
   readonly #natsConsumer: Gauge<"state">;
   readonly #tracingState: Gauge<"kind">;
   readonly #runtimeResources: Gauge<"kind">;
+  readonly #safetyHardFailures: Counter<"event">;
   readonly #agentStarted = new Map<string, number>();
   readonly #toolStarted = new Map<string, number>();
   readonly #policyStarted = new Map<string, number>();
@@ -346,6 +350,12 @@ export class DriveGuardMetrics {
       labelNames: ["kind"] as const,
       registers,
     });
+    this.#safetyHardFailures = new Counter({
+      name: "driveguard_safety_hard_failures_total",
+      help: "Safety hard failures. Any non-zero value requires immediate investigation.",
+      labelNames: ["event"] as const,
+      registers,
+    });
     for (const status of ["succeeded", "failed", "cancelled"]) {
       this.#agentRuns.labels({ status }).inc(0);
       this.#agentDuration.zero({ status });
@@ -358,6 +368,13 @@ export class DriveGuardMetrics {
     this.#admissionActive.set(0);
     this.#admissionQueued.set(0);
     this.#admissionAccepting.set(1);
+    for (const event of [
+      "confirmation_bypass",
+      "forbidden_action_executed",
+      "duplicate_side_effect",
+    ] as const) {
+      this.#safetyHardFailures.labels({ event }).inc(0);
+    }
     this.#admissionRejected.inc(0);
     this.#executorActive.set({ kind: "read" }, 0);
     this.#executorActive.set({ kind: "write" }, 0);
@@ -496,6 +513,13 @@ export class DriveGuardMetrics {
     >) {
       this.#runtimeResources.set({ kind }, value);
     }
+  }
+
+  // This is intentionally a narrow, explicit operational signal. It must only be
+  // called by a detector after a safety invariant has been violated; it does not
+  // alter the Policy, confirmation, or Executor decision path.
+  observeSafetyHardFailure(event: SafetyHardFailure): void {
+    this.#safetyHardFailures.inc({ event });
   }
 
   observeAction(event: ActionLifecycleEvent): void {

@@ -1835,3 +1835,55 @@ Measured Phase 6 coverage (barrel export file excluded because it contains no ex
 - Review closure: unresolved critical safety-boundary issues 0. No secret was read from
   `api_key.md`, persisted, printed, or committed.
 - Final Stage Gate **PASS**. No commit or merge to `main` was made, and no later phase was started.
+
+## Phase 17 — Staging Deployment, Release & Operational Readiness
+
+- Status: IMPLEMENTED; final Stage Gate **FAIL**.
+- Scope: SHA-bound release manifest, isolated Compose lifecycle operations, upgrade/rollback durable-state probes, operational runbook, backup/restore procedure, structured readiness checklist, and Prometheus alert rules. Policy, confirmation semantics, Executor behavior, Ground Truth, and Scorer are unchanged.
+
+### Implemented modules
+
+- `scripts/staging-operations.mjs` constrains the staging project name, requires explicit clean-volume acknowledgement, operates only SHA-tagged images, and verifies readiness after deploy, upgrade, or rollback.
+- `scripts/release-manifest.mjs`, `docker-compose.yml`, and `infra/operations`: the API, simulator, and HMI release images use immutable SHA tags; candidate content identity and checklist are structured and secret-safe.
+- `infra/observability`: Prometheus evaluates availability, 5xx, latency, restart, dependency, admission, queue, PostgreSQL, NATS, and critical safety alerts with bounded labels.
+- `tests/contract/phase17-operational-readiness.test.ts` and the durable-state smoke validate the operational contract and the preservation criteria for pending confirmation, receipt, and duplicate effect.
+- `docs/operations.md` and ADR 0022 provide operator commands and record the no-safety-path-change decision.
+
+### Measured verification
+
+| Check                          | Result                                                                                                       |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| Phase 17 contract              | 4 / 4 PASS                                                                                                   |
+| Critical safety regression     | 472 / 472 PASS                                                                                               |
+| Format, lint, typecheck, build | PASS                                                                                                         |
+| Compose static configuration   | PASS                                                                                                         |
+| Candidate build/manifest       | PASS; SHA `19c1f7c8a2504b8479168741eac7a03bef57dee8`, three SHA-tagged image digests recorded                |
+| Clean deployment/migration     | PASS; fresh isolated network/volumes, migration exit 0, and all service health checks passed                 |
+| Release smoke                  | PASS; read/Tool/R2 confirmation/execution/API restart recovery; bypass and duplicate effect 0                |
+| Upgrade                        | PASS; same stable SHA versioned recreate preserved pending confirmation and receipt without simulator replay |
+| Rollback                       | PASS; an intentionally absent image failed under `--no-build`; known-good recovery preserved durable state   |
+| Backup                         | PASS; PostgreSQL SQL, Redis RDB, and JetStream archive captured with SHA-256                                 |
+| Prometheus alert rules         | VERIFIED; all 12 rules loaded                                                                                |
+| Restore, alert firing/recovery | NOT RUN                                                                                                      |
+| API/PostgreSQL/NATS drills     | NOT RUN                                                                                                      |
+| Gitleaks/image security        | NOT RUN; `npm audit --audit-level=high` passed with 0 vulnerabilities                                        |
+
+The required restore, alert firing/recovery, operational failure drills, and complete security evidence are `NOT RUN`; the Phase 17 Stage Gate is therefore **FAIL**. No merge to `main`, GitHub release, or Git tag was created.
+
+## Phase 17.1 — Operational Evidence & Security Closure
+
+- Status: IMPLEMENTED; final Stage Gate **FAIL** because Gitleaks history scanning found unverified findings and formal image scanning found unresolved Critical/High CVEs.
+- Scope: isolated operational evidence closure for the unchanged Phase 17 release candidate `19c1f7c8a2504b8479168741eac7a03bef57dee8`, plus minimal restore-runbook and Prometheus-rule corrections. No Policy, confirmation, action-state-machine, Executor, capability-registry, Ground Truth, or Scorer behavior changed.
+- Restore validation: **PASS**. The retained Phase 17 PostgreSQL SQL, Redis RDB, and JetStream archive were restored to empty project `driveguard-phase171`; bootstrap/readiness passed. The first import exposed a real ACL prerequisite (`driveguard_app` did not exist), so the runbook now bootstraps that role, clears only the empty target schemas, and imports before application startup. Durable pending confirmation and receipt verification passed; five succeeded records retained a completed idempotency record; simulator replay and duplicate side effect were both 0.
+- Alert validation: **PASS** for firing and recovery. `DriveGuardApiUnavailable` fired after an API stop and resolved after restart. `DriveGuardDependencyUnavailable` fired after PostgreSQL stop/readiness 503 and resolved after recovery. A real 40-request bounded-admission drill returned 39 safe `SERVICE_BUSY` responses, caused `DriveGuardServiceBusy` to fire, and resolved after its five-minute rate window. The related corrections exclude health and expected safe 503 responses from unexpected-5xx/latency alerts and align queue saturation to 26 of the reviewed 32 request slots with a 30-second sustained condition.
+- Operational drills: **PASS**. API interruption changed readiness 200 -> unavailable -> 200. PostgreSQL interruption changed readiness 200 -> 503 -> 200 and a stateful request safely returned 500 during the outage. NATS interruption changed readiness 200 -> 503 -> 200; the Phase 12 durable-consumer smoke passed after recovery, including consumer restart recovery, recovered attempt count 2, and duplicate event side effects 0.
+- Security evidence: `npm audit --audit-level=high` passed with 0 vulnerabilities; SPDX SBOMs were generated for all three local candidate images and each image runs as non-root `node`. Docker Scout 1.17.1 recorded 4 Critical and 52 High findings per image (46 unique CVEs). The formal Trivy 0.67.0 image scan then found 9 Critical and 92 High vulnerabilities per candidate image, with 0 secret findings and 0 Critical/High misconfigurations; no reachability or documented-exception evidence exists, so the vulnerabilities remain unresolved. Gitleaks 8.24.3 was run in its pinned container with redacted SARIF: an isolated `git archive HEAD` plus the current tracked diff passed with 0 findings (about 6.15 MB), while the reachable 63-commit history scan reported 9 `generic-api-key` findings in retained Phase 15 artifacts. Their contents remain redacted and unverified; no allowlist was added without false-positive evidence.
+- Regression: Phase 17 contract 4/4 PASS; build and targeted Phase 12/16/17 smoke evidence PASS. The source image code is unchanged from the Phase 17 candidate (the `19c1f7c..0c98016` diff is documentation only), so existing Phase 17 deployment/upgrade/rollback/backup evidence remains applicable; the changed monitoring rules were separately validated above.
+- Gate result: **FAIL**. Restore, alerts, and API/PostgreSQL/NATS drills are closed, with Confirmation Bypass 0, Forbidden Action Executed 0, Duplicate Side Effect 0, and False Success 0 in executed evidence. The 9 unverified Gitleaks history findings require triage with redacted false-positive evidence or incident handling, and the Trivy-confirmed 9 Critical plus 92 High findings per image require remediation or explicit reachability/not-applicable exceptions before Phase 17 or 17.1 can pass. No merge to `main`, release, tag, or Phase 18 work was performed.
+
+## Phase 17.2 — Security Remediation & Release Gate Closure
+
+- Status: IMPLEMENTED; final evidence is retained in `artifacts/17.2-security-remediation-closure/`.
+- Security: final Trivy is 3 Critical and 50 High raw findings per image, all no-fixed-version and CVE-level NOT_REACHABLE; image secrets and Critical/High misconfigurations are 0. Current-source Gitleaks is 0 and the 64-commit reachable-history scan is 0.
+- Verification: format, lint, typecheck, build, Compose config, Phase 17 contract 4/4, critical safety regression 472/472, release smoke, and API restart/durable-state smoke passed. Confirmation Bypass, Forbidden Action, Duplicate Side Effect, and False Success are all 0.
+- Gate result: **PASS**. Overall Phase 17 — Staging Deployment, Release & Operational Readiness — is **PASS**. No merge to `main`, Git tag, GitHub Release, or Phase 18 work was performed.

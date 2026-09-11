@@ -5,6 +5,8 @@ const apiBaseUrl = process.env.DRIVEGUARD_API_BASE_URL ?? "http://127.0.0.1:3000
 const hmiBaseUrl = process.env.DRIVEGUARD_HMI_BASE_URL ?? "http://127.0.0.1:3002";
 const applicationBaseUrl = `${hmiBaseUrl}/api`;
 const simulatorBaseUrl = process.env.SIMULATOR_BASE_URL ?? "http://127.0.0.1:3001";
+const dockerCommand = process.env.DRIVEGUARD_DOCKER_COMMAND ?? "docker";
+const composeProjectName = process.env.COMPOSE_PROJECT_NAME;
 const identityHeaders = Object.freeze({
   "x-driveguard-user-id": "user:phase10-docker",
   "x-driveguard-vehicle-id": "simulator-vehicle-001",
@@ -116,12 +118,21 @@ invariant(
   "Unconfirmed R2 action produced a side effect",
 );
 
-execFileSync("docker", ["compose", "restart", "api"], {
-  cwd: process.cwd(),
-  env: process.env,
-  stdio: "pipe",
-  timeout: 60_000,
-});
+execFileSync(
+  dockerCommand,
+  [
+    "compose",
+    ...(composeProjectName === undefined ? [] : ["--project-name", composeProjectName]),
+    "restart",
+    "api",
+  ],
+  {
+    cwd: process.cwd(),
+    env: process.env,
+    stdio: "pipe",
+    timeout: 60_000,
+  },
+);
 await waitFor(`${apiBaseUrl}/health/ready`);
 
 const restoredSession = await requestJson(`${applicationBaseUrl}/v1/sessions/${sessionId}`, {
