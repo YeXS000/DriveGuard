@@ -1,5 +1,60 @@
 # DriveGuard implementation status
 
+## Phase 20 — Final HMI Upgrade & Release Closure
+
+- Status: implementation and local Stage Gate **PASS**. Project **COMPLETE** and Production Release
+  Readiness **READY** are declared only with the final external closure record: source-only `main`,
+  green hosted CI for that exact SHA, annotated `v1.0.0`, and the GitHub Release.
+- Scope: professional responsive cockpit HMI, authenticated live vehicle-context adapter,
+  dedicated protected-action confirmation lifecycle, bounded tool/execution feedback, receipts,
+  health/error/reconnect states, README screenshot, release notes, and final repository/release
+  closure. No Agent, Policy, confirmation state machine, Recovery Manager, Scorer, capability, or
+  safety-boundary semantics changed.
+- HMI validation: real isolated Compose stack verified session creation, normal chat, a simple
+  tool, vehicle-state refresh, protected action, explicit confirmation, execution receipt,
+  `SERVICE_BUSY`, session error, backend unavailable, and automatic reconnect. Confirmation bypass
+  = 0, duplicate side effect = 0, and false success = 0.
+- Frontend/repository validation: format, lint, typecheck, build, development and production
+  Compose config, npm audit (0 vulnerabilities), diff check, and phase-branch layout check PASS;
+  critical safety regression 472/472 PASS; full regression 2,319/2,319 PASS with 45 existing
+  external-service tests skipped by design.
+- Expensive evidence: the 30-minute soak, load/stress, CAR-bench, and Phase 14/15 benchmarks were
+  not rerun because Phase 20 did not change the Agent runtime or their frozen semantics. Phase 19
+  final metrics remain authoritative.
+- Evidence: `artifacts/20-final-hmi-upgrade-release-closure/`; screenshot at
+  `docs/assets/driveguard-hmi.png`. The final closure report records the immutable main/tag SHAs,
+  hosted CI result, Release URL, and worktree disposition because those external facts cannot be
+  self-recorded in the source commit they identify.
+
+## Phase 19 — Final Acceptance, Release Readiness & Project Closure
+
+- Status: COMPLETE; final Stage Gate **PASS**. DriveGuard Project **COMPLETE** and Production
+  Release Readiness **READY** under the project-defined gate.
+- Scope: final acceptance/metrics matrix, architecture and README closure, documentation/ADR/link
+  integrity, reproducible Quick Start checks, known limitations, release notes, portfolio and
+  engineering summaries, immutable candidate identity, final checklist, manifest, and minimal
+  main-compatible validation. No Agent, Policy, confirmation, Recovery Manager, Executor, Ground
+  Truth, Scorer, authentication model, performance limit, or production service runtime changed.
+- Baseline: `d4ea9ca130e20bd486475df199b9acccdd56c821`; immutable production image source
+  `e7f8e19616a4c14d1609608f92e4094c4e6d001e`. Three Phase 18.3 local image digests and SPDX 2.3
+  SBOMs are reused because Phase 19 changes no production image input.
+- Validation: clean `npm ci --ignore-scripts` (356 packages, audit 0); format, lint, typecheck,
+  build; Phase 17 4/4; Phase 18 6/6; Phase 18.1 13/13; critical safety 472/472; full regression
+  2,314/2,314 with 45 external-service skips; development/production Compose config; release
+  manifest identity; Markdown links; ADR 0001–0025 sequence; npm audit; diff/layout checks all PASS.
+- Final hard metrics: Critical Policy Recall and Safety Enforcement 100%; authentication bypass,
+  confirmation bypass, forbidden action, duplicate side effect, false success, cross-user
+  execution, and cross-vehicle execution all 0.
+- Historical integrity: Phase 13.2, 14/14.1, 15/15.1/15.2, 17/17.1, and 18/18.1/18.2 FAIL
+  checkpoints remain disclosed; later closure phases do not rewrite them. Phase 15.1's three
+  unrecoverable mismatch payloads and all 43 raw no-fix High rows per image remain documented.
+- Release boundary: no merge to `main`, tag, GitHub Release, registry publication, or worktree
+  archive. The latest observed hosted green run is Phase 16 source-only commit `3c6526f…`; the
+  eventual authorized pushed/tagged SHA must pass hosted CI before publication.
+- Evidence: `artifacts/19-final-acceptance-project-closure/`; formal documents at
+  `docs/final-acceptance.md`, `docs/final-metrics.md`, `docs/known-limitations.md`, and
+  `docs/final-report.md`.
+
 ## Phase 15.3 -- Context Race & Evidence Closure
 
 - Status: COMPLETE; final Stage Gate **PASS**. Phase 16 was not started.

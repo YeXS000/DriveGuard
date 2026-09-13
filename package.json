@@ -72,6 +72,7 @@
     "test:phase18": "vitest run tests/contract/phase18-production-security.test.ts",
     "test:phase18.1": "vitest run tests/contract/phase18.1-authentication.test.ts",
     "test:phase18.3:production": "node tests/smoke/phase18.3-production-release-smoke.mjs",
+    "test:phase20:hmi": "node tests/smoke/phase20-hmi-smoke.mjs",
     "compose:config": "docker compose config --quiet",
     "release:manifest": "node scripts/release-manifest.mjs",
     "staging:operations": "node scripts/staging-operations.mjs",

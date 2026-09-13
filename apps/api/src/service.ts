@@ -7,7 +7,13 @@ import {
   type ProductionDriveGuardRuntime,
   type RuntimeEventSink,
 } from "@driveguard/agent-runtime";
-import { toUtcTimestamp, timestampToEpochMs, type UtcTimestamp } from "@driveguard/domain";
+import {
+  toUtcTimestamp,
+  timestampToEpochMs,
+  type TripState,
+  type UtcTimestamp,
+  type VehicleState,
+} from "@driveguard/domain";
 import type { ExecutionEventSink, ExecutionResult } from "@driveguard/executor";
 import type {
   ConversationMemory,
@@ -44,6 +50,13 @@ export interface Phase10RuntimeFactoryInput {
 
 export interface Phase10RuntimeFactory {
   create(input: Phase10RuntimeFactoryInput): ProductionDriveGuardRuntime;
+  loadContext?(identity: DevelopmentIdentity): Promise<ApiVehicleContextView>;
+}
+
+export interface ApiVehicleContextView {
+  readonly vehicle: VehicleState;
+  readonly trip: TripState;
+  readonly simulationVersion: number;
 }
 
 export interface ApiActionView {
@@ -198,6 +211,26 @@ export class DriveGuardApiService {
       throw new ApiError(
         "DEPENDENCY_UNAVAILABLE",
         "Session persistence is temporarily unavailable",
+        503,
+      );
+    }
+  }
+
+  async getVehicleContext(identity: DevelopmentIdentity): Promise<ApiVehicleContextView> {
+    try {
+      if (this.#runtimeFactory.loadContext === undefined) {
+        throw new ApiError(
+          "DEPENDENCY_UNAVAILABLE",
+          "Current vehicle context is temporarily unavailable",
+          503,
+        );
+      }
+      return await this.#runtimeFactory.loadContext(identity);
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(
+        "DEPENDENCY_UNAVAILABLE",
+        "Current vehicle context is temporarily unavailable",
         503,
       );
     }

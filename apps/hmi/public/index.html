@@ -3,132 +3,365 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>DriveGuard HMI</title>
+    <meta name="theme-color" content="#0b1118" />
+    <meta
+      name="description"
+      content="DriveGuard safety-aware driving service orchestration assistant"
+    />
+    <title>DriveGuard HMI — Driving Assistant</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header>
-      <div>
-        <p class="eyebrow">Safety-aware service orchestration</p>
-        <h1>DriveGuard</h1>
+    <a class="skip-link" href="#message">Skip to assistant input</a>
+    <header class="topbar">
+      <div class="brand-lockup" aria-label="DriveGuard home">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32">
+            <path d="M16 3.5 26 7v7.2c0 6.4-3.8 11.7-10 14.3-6.2-2.6-10-7.9-10-14.3V7l10-3.5Z" />
+            <path d="m10.8 16 3.2 3.2 7.2-7.2" />
+          </svg>
+        </div>
+        <div><strong>DriveGuard</strong><span>Safety-aware driving assistant</span></div>
       </div>
-      <div class="identity">
-        <label>User (development only) <input id="user-id" value="phase5-driver" /></label>
-        <label>Vehicle <input id="vehicle-id" value="simulator-vehicle-001" /></label>
-        <label
-          >Bearer token
-          <input id="bearer-token" type="password" autocomplete="off" spellcheck="false" />
-        </label>
-        <button id="create-session">New session</button>
-        <button id="restore-session" class="secondary">Restore</button>
+      <div class="topbar-status" aria-label="System status">
+        <div id="connection-badge" class="status-badge is-checking" role="status">
+          <span class="status-dot" aria-hidden="true"></span
+          ><span id="connection-label">Connecting</span>
+        </div>
+        <div id="readiness-badge" class="status-badge is-neutral">
+          <span class="status-dot" aria-hidden="true"></span
+          ><span id="readiness-label">Checking systems</span>
+        </div>
+        <div class="identity-summary" title="Current vehicle and identity boundary">
+          <span class="identity-icon" aria-hidden="true">DG</span
+          ><span
+            ><strong id="top-vehicle-id">simulator-vehicle-001</strong
+            ><small id="identity-boundary">Development identity</small></span
+          >
+        </div>
+        <button
+          id="settings-toggle"
+          class="icon-button"
+          type="button"
+          aria-label="Open connection settings"
+          aria-expanded="false"
+          aria-controls="connection-settings"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6" />
+          </svg>
+        </button>
       </div>
     </header>
 
-    <main>
-      <section class="panel chat-panel">
-        <div class="panel-heading">
+    <section id="connection-settings" class="settings-panel" hidden>
+      <div class="settings-copy">
+        <strong>Connection settings</strong
+        ><span
+          >Use a verified Bearer token in production. Identity headers are development-only.</span
+        >
+      </div>
+      <label
+        ><span>User ID <small>development only</small></span
+        ><input id="user-id" value="phase5-driver" autocomplete="username"
+      /></label>
+      <label><span>Vehicle ID</span><input id="vehicle-id" value="simulator-vehicle-001" /></label>
+      <label class="token-field"
+        ><span>Bearer token <small>kept in memory only</small></span
+        ><input
+          id="bearer-token"
+          type="password"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Optional in development"
+      /></label>
+      <button id="apply-identity" class="button secondary" type="button">Apply</button>
+    </section>
+
+    <main class="workspace">
+      <section
+        class="assistant-shell"
+        aria-labelledby="assistant-heading"
+        data-region="Conversation"
+      >
+        <div class="section-header assistant-header">
           <div>
-            <span>01</span>
-            <h2>Conversation</h2>
+            <span class="section-kicker">Assistant</span>
+            <h1 id="assistant-heading">How can I help on this drive?</h1>
           </div>
-          <code id="session-id">No active session</code>
+          <div class="session-controls">
+            <span id="session-id" class="session-chip" title="Active session"
+              >No active session</span
+            ><button id="restore-session" class="button ghost" type="button">Restore</button
+            ><button id="create-session" class="button secondary" type="button">New session</button>
+          </div>
         </div>
-        <div id="conversation" class="conversation" aria-live="polite"></div>
-        <form id="message-form">
+
+        <div id="global-alert" class="alert" role="alert" hidden>
+          <div class="alert-icon" aria-hidden="true">!</div>
+          <div>
+            <strong id="alert-title">Connection unavailable</strong>
+            <p id="alert-message"></p>
+          </div>
+          <button id="alert-retry" class="button ghost" type="button">Retry</button>
+        </div>
+
+        <div
+          id="run-progress"
+          class="run-progress"
+          aria-label="Action Timeline and request progress"
+          hidden
+        >
+          <div class="progress-item" data-stage="understanding">
+            <span class="progress-marker" aria-hidden="true"></span><span>Understanding</span>
+          </div>
+          <div class="progress-item" data-stage="checking">
+            <span class="progress-marker" aria-hidden="true"></span><span>Checking vehicle</span>
+          </div>
+          <div class="progress-item" data-stage="executing">
+            <span class="progress-marker" aria-hidden="true"></span><span>Executing</span>
+          </div>
+          <div class="progress-item" data-stage="completed">
+            <span class="progress-marker" aria-hidden="true"></span><span>Completed</span>
+          </div>
+        </div>
+
+        <div id="conversation" class="conversation" aria-live="polite">
+          <div id="conversation-empty" class="conversation-empty">
+            <div class="assistant-avatar large" aria-hidden="true">DG</div>
+            <h2>Ready when you are</h2>
+            <p>
+              Ask about the vehicle or request a supported comfort, navigation, charging, or
+              assistance service. Protected actions always require your confirmation.
+            </p>
+            <div class="prompt-suggestions" aria-label="Suggested requests">
+              <button type="button" data-prompt="What is the current vehicle and trip state?">
+                Check vehicle state
+              </button>
+              <button type="button" data-prompt="Show my current navigation status.">
+                Navigation status
+              </button>
+              <button type="button" data-prompt="Find available charging options nearby.">
+                Charging options
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <section
+          id="confirmation-panel"
+          class="confirmation-card"
+          hidden
+          aria-live="assertive"
+          aria-label="Pending Confirmation"
+        >
+          <div class="confirmation-accent" aria-hidden="true"></div>
+          <div class="confirmation-heading">
+            <div class="risk-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3 2.8 20h18.4L12 3Zm0 6v5m0 3.3v.2" /></svg>
+            </div>
+            <div>
+              <span class="section-kicker">Protected action</span>
+              <h2>Review before continuing</h2>
+            </div>
+            <span id="confirmation-status" class="state-chip pending">Pending</span>
+          </div>
+          <dl class="confirmation-details">
+            <div>
+              <dt>Action</dt>
+              <dd id="action-tool">—</dd>
+            </div>
+            <div>
+              <dt>Target</dt>
+              <dd id="action-target">—</dd>
+            </div>
+            <div>
+              <dt>Risk</dt>
+              <dd><span id="action-risk" class="risk-badge">R2</span></dd>
+            </div>
+            <div class="reason-row">
+              <dt>Reason</dt>
+              <dd id="action-summary">—</dd>
+            </div>
+          </dl>
+          <div class="confirmation-footer">
+            <p id="action-expiry" class="expiry"></p>
+            <div class="button-row">
+              <button id="reject-action" class="button ghost danger" type="button">Cancel</button
+              ><button id="confirm-action" class="button warning" type="button">
+                Confirm action
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <section
+          id="receipt-panel"
+          class="receipt-card"
+          hidden
+          aria-labelledby="receipt-heading"
+          aria-label="Policy / Execution Result"
+        >
+          <div class="receipt-heading">
+            <div>
+              <span class="section-kicker">Execution receipt</span>
+              <h2 id="receipt-heading">Action result</h2>
+            </div>
+            <span id="receipt-status" class="state-chip">—</span>
+          </div>
+          <dl id="receipt-details" class="receipt-details"></dl>
+          <details>
+            <summary>Technical details</summary>
+            <pre id="result">No execution result.</pre>
+          </details>
+        </section>
+
+        <form id="message-form" class="composer">
+          <label class="sr-only" for="message">Message DriveGuard</label>
           <textarea
             id="message"
-            rows="3"
-            placeholder="Ask DriveGuard about the vehicle or request a service…"
+            rows="1"
+            maxlength="32000"
+            placeholder="Ask about your drive or request a service…"
+            aria-describedby="composer-note"
           ></textarea>
-          <button type="submit">Send</button>
+          <button id="send-message" class="send-button" type="submit" aria-label="Send message">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="m5 12 14-7-4.5 14-2.7-5.2L5 12Zm6.8 1.8L19 5" />
+            </svg>
+          </button>
+          <p id="composer-note">
+            DriveGuard can request services but never directly controls steering, throttle, or
+            braking.
+          </p>
         </form>
       </section>
 
-      <section class="panel compact">
-        <div class="panel-heading">
+      <aside
+        class="vehicle-panel"
+        aria-labelledby="vehicle-heading"
+        aria-label="Vehicle State and Current Context"
+      >
+        <div class="section-header vehicle-header">
           <div>
-            <span>02</span>
-            <h2>Vehicle State</h2>
+            <span class="section-kicker">Live context</span>
+            <h2 id="vehicle-heading">Vehicle</h2>
           </div>
+          <button
+            id="refresh-vehicle"
+            class="icon-button"
+            type="button"
+            aria-label="Refresh vehicle state"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M20 7v5h-5M4 17v-5h5M18.6 9A7 7 0 0 0 6.8 6.8L4 9m16 6-2.8 2.2A7 7 0 0 1 5.4 15"
+              />
+            </svg>
+          </button>
         </div>
-        <div id="vehicle-state" class="status-copy">
-          Loaded afresh by the Runtime on every turn.
+        <div id="vehicle-loading" class="panel-state">
+          <span class="spinner" aria-hidden="true"></span><span>Loading vehicle state…</span>
         </div>
-      </section>
-
-      <section class="panel compact">
-        <div class="panel-heading">
-          <div>
-            <span>03</span>
-            <h2>Current Context</h2>
+        <div id="vehicle-content" hidden>
+          <div class="vehicle-hero">
+            <div class="speed-gauge"><strong id="vehicle-speed">—</strong><span>km/h</span></div>
+            <div class="battery-block">
+              <div class="battery-heading">
+                <span>Battery</span><strong id="vehicle-soc">—%</strong>
+              </div>
+              <div class="battery-track" aria-hidden="true"><span id="battery-level"></span></div>
+              <small><span id="vehicle-range">—</span> km estimated range</small>
+            </div>
           </div>
-        </div>
-        <dl id="context-state">
-          <dt>Version</dt>
-          <dd>—</dd>
-          <dt>Snapshot</dt>
-          <dd>—</dd>
-        </dl>
-      </section>
-
-      <section class="panel action-panel">
-        <div class="panel-heading">
-          <div>
-            <span>04</span>
-            <h2>Pending Confirmation</h2>
+          <div class="vehicle-facts">
+            <div><span>Gear</span><strong id="vehicle-gear">—</strong></div>
+            <div><span>Mode</span><strong id="vehicle-mode">—</strong></div>
+            <div><span>Cabin</span><strong id="cabin-temperature">—</strong></div>
+            <div><span>Outside</span><strong id="outside-temperature">—</strong></div>
           </div>
+          <section class="side-card" aria-labelledby="trip-heading">
+            <div class="side-card-heading">
+              <div class="side-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path
+                    d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Zm0-8.5A2.5 2.5 0 1 0 12 7a2.5 2.5 0 0 0 0 5.5Z"
+                  />
+                </svg>
+              </div>
+              <div>
+                <span>Trip &amp; navigation</span>
+                <h3 id="trip-heading">No active route</h3>
+              </div>
+            </div>
+            <div class="trip-metrics">
+              <div><strong id="trip-distance">—</strong><span>Distance</span></div>
+              <div><strong id="trip-eta">—</strong><span>ETA</span></div>
+            </div>
+          </section>
+          <section class="side-card" aria-labelledby="charging-heading">
+            <div class="side-card-heading">
+              <div class="side-icon charging" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M13 2 6 13h5l-1 9 8-12h-5V2Z" /></svg>
+              </div>
+              <div>
+                <span>Charging</span>
+                <h3 id="charging-heading">Not charging</h3>
+              </div>
+              <span id="charging-indicator" class="mini-status">Idle</span>
+            </div>
+          </section>
+          <section class="side-card health-card" aria-labelledby="health-heading">
+            <div class="side-card-heading">
+              <div class="side-icon health" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 12h3l2-5 4 10 2-5h5" /></svg>
+              </div>
+              <div>
+                <span>System health</span>
+                <h3 id="health-heading">Checking services</h3>
+              </div>
+            </div>
+            <ul id="dependency-list" class="dependency-list">
+              <li><span>Backend</span><strong class="checking">Checking</strong></li>
+            </ul>
+          </section>
+          <details class="context-details">
+            <summary>Context details</summary>
+            <dl>
+              <div>
+                <dt>Snapshot</dt>
+                <dd id="context-snapshot">—</dd>
+              </div>
+              <div>
+                <dt>Vehicle version</dt>
+                <dd id="vehicle-version">—</dd>
+              </div>
+              <div>
+                <dt>Trip version</dt>
+                <dd id="trip-version">—</dd>
+              </div>
+              <div>
+                <dt>Updated</dt>
+                <dd id="context-updated">—</dd>
+              </div>
+            </dl>
+          </details>
         </div>
-        <div id="action-empty" class="empty">No action is waiting for confirmation.</div>
-        <div id="action-card" hidden>
-          <div class="risk" id="action-risk">R2</div>
-          <h3 id="action-tool"></h3>
-          <p id="action-summary"></p>
-          <pre id="action-parameters"></pre>
-          <p class="expiry" id="action-expiry"></p>
-          <div class="button-row">
-            <button id="confirm-action">Confirm</button>
-            <button id="reject-action" class="danger">Reject</button>
+        <section class="urgent-card" aria-labelledby="urgent-heading">
+          <div class="side-card-heading">
+            <div class="side-icon urgent" aria-hidden="true">!</div>
+            <div>
+              <span>Validated events</span>
+              <h3 id="urgent-heading">Urgent events</h3>
+            </div>
           </div>
-        </div>
-      </section>
-
-      <section class="panel timeline-panel">
-        <div class="panel-heading">
-          <div>
-            <span>05</span>
-            <h2>Action Timeline</h2>
-          </div>
-        </div>
-        <ol id="timeline" class="timeline">
-          <li class="muted">Waiting for a run.</li>
-        </ol>
-      </section>
-
-      <section class="panel result-panel">
-        <div class="panel-heading">
-          <div>
-            <span>06</span>
-            <h2>Policy / Execution Result</h2>
-          </div>
-        </div>
-        <div id="execution-status" class="state-pill idle">Idle</div>
-        <pre id="result">No execution result.</pre>
-      </section>
-
-      <section class="panel timeline-panel">
-        <div class="panel-heading">
-          <div>
-            <span>07</span>
-            <h2>Urgent Events</h2>
-          </div>
-        </div>
-        <ol id="urgent-events" class="timeline">
-          <li class="muted">Waiting for validated vehicle events.</li>
-        </ol>
-      </section>
+          <ol id="urgent-events" class="urgent-list" aria-live="polite">
+            <li class="empty-state">No urgent event received.</li>
+          </ol>
+        </section>
+      </aside>
     </main>
-
-    <footer>
+    <footer class="footer-boundary">
       JWT_VERIFIED_PRINCIPAL in production · DEVELOPMENT_IDENTITY_BOUNDARY only without a Bearer
       token · HMI never calls the Vehicle Simulator directly.
     </footer>

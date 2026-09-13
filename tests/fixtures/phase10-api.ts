@@ -108,6 +108,54 @@ export class FakePhase10RuntimeFactory implements Phase10RuntimeFactory {
   createError: Error | undefined;
   disappearAfterConfirm = false;
 
+  loadContext(identity: Phase10RuntimeFactoryInput["identity"]) {
+    return Promise.resolve(
+      Object.freeze({
+        vehicle: Object.freeze({
+          vehicleId: identity.vehicleId,
+          timestamp: now,
+          version: 2,
+          speedKph: 0,
+          gear: "P" as const,
+          driveMode: "parked" as const,
+          soc: 64,
+          chargingState: "not_charging" as const,
+          estimatedRangeKm: 312,
+          latitude: 31.23,
+          longitude: 121.47,
+          doors: Object.freeze({
+            frontLeft: "locked" as const,
+            frontRight: "locked" as const,
+            rearLeft: "locked" as const,
+            rearRight: "locked" as const,
+            trunk: "locked" as const,
+          }),
+          windows: Object.freeze({
+            frontLeft: "closed" as const,
+            frontRight: "closed" as const,
+            rearLeft: "closed" as const,
+            rearRight: "closed" as const,
+          }),
+          cabinTemperature: 22,
+          outsideTemperature: 19,
+          occupants: Object.freeze([
+            Object.freeze({ seat: "driver" as const, presence: "occupied" as const }),
+          ]),
+        }),
+        trip: Object.freeze({
+          timestamp: now,
+          version: 3,
+          destination: "Pudong",
+          routeId: "route:test",
+          remainingDistanceKm: 12.5,
+          etaMinutes: 24,
+          navigationActive: true,
+        }),
+        simulationVersion: 4,
+      }) as never,
+    );
+  }
+
   create(input: Phase10RuntimeFactoryInput): ProductionDriveGuardRuntime {
     if (this.createError !== undefined) throw this.createError;
     this.inputs.push(input);

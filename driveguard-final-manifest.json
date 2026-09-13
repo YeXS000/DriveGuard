@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "project": "DriveGuard",
+  "recommendedVersion": "v1.0.0",
+  "finalSourceSha": "d4ea9ca130e20bd486475df199b9acccdd56c821",
+  "productionCandidateSourceSha": "e7f8e19616a4c14d1609608f92e4094c4e6d001e",
+  "documentationClosureSha": "8eec917cf54d6bbd46f1438f83cfca2ee74f5d07",
+  "quality": {
+    "status": "PASS",
+    "developmentCasePassPercent": 90.0,
+    "holdoutCasePassPercent": 92.22,
+    "requiredToolRecallPercent": 100,
+    "toolPrecisionPercent": 100,
+    "argumentValidityPercent": 100
+  },
+  "safety": {
+    "status": "PASS",
+    "criticalPolicyRecallPercent": 100,
+    "safetyEnforcementPercent": 100,
+    "authenticationBypass": 0,
+    "confirmationBypass": 0,
+    "forbiddenActionExecuted": 0,
+    "duplicateSideEffect": 0,
+    "falseSuccess": 0,
+    "crossUserExecution": 0,
+    "crossVehicleExecution": 0
+  },
+  "performance": {
+    "status": "PASS",
+    "backendP95Ms": 3.28,
+    "qualifiedConcurrencyVu": 20,
+    "qualifiedThroughputRequestsPerSecond": 96.53,
+    "soakDurationMinutes": 30,
+    "soakAccepted": 140297,
+    "soakThroughputRequestsPerSecond": 77.936,
+    "soakLatencyRatio": 0.983,
+    "soakThroughputRatio": 1.019
+  },
+  "reliability": {
+    "status": "PASS",
+    "faultCasesRecovered": "9/9",
+    "restartPersistence": "PASS",
+    "backupRestore": "PASS",
+    "upgradeRollback": "PASS",
+    "alertFiringRecovery": "PASS",
+    "fullRegression": "2319/2319 PASS; 45 environment-gated skips",
+    "criticalSafetyRegression": "472/472 PASS",
+    "environmentGatedSkips": 45
+  },
+  "security": {
+    "status": "PASS",
+    "gitleaksControlledSourceFindings": 0,
+    "gitleaksHistoryFindings": 26,
+    "gitleaksHistoryTriaged": 26,
+    "gitleaksUnresolved": 0,
+    "criticalCve": 0,
+    "fixableCriticalHigh": 0,
+    "residualNoFixHighRowsPerImage": 43,
+    "reachableHigh": 0,
+    "unclassifiedHigh": 0,
+    "imageSecrets": 0,
+    "criticalHighMisconfiguration": 0
+  },
+  "deployment": {
+    "status": "PASS",
+    "productionSmoke": "PASS",
+    "authentication": "JWT_JWKS_PASS",
+    "authorizationIsolation": "PASS",
+    "onlyHostPublishedService": "hmi",
+    "registryPublication": "NOT_PERFORMED"
+  },
+  "imageDigests": {
+    "api": "sha256:6927b269ca3b318ad091fc886363d713eec5bf52af152f2716ae4022addd07a9",
+    "hmi": "sha256:084101f89e6cc39f78c3d951e3f334c38e9c0dc42f7866d96a9ec5336fa18bea",
+    "simulator": "sha256:3193ca93f054203da72f2df4bdc967e2db86aaf9460df7d2b4e59a2ed3674c4a"
+  },
+  "sbomReferences": [
+    "codex/18.3-least-privilege-storage-release-closure:artifacts/18.3-least-privilege-storage-release-closure/reports/sbom/driveguard-api-e7f8e19616a4c14d1609608f92e4094c4e6d001e.spdx.json",
+    "codex/18.3-least-privilege-storage-release-closure:artifacts/18.3-least-privilege-storage-release-closure/reports/sbom/driveguard-hmi-e7f8e19616a4c14d1609608f92e4094c4e6d001e.spdx.json",
+    "codex/18.3-least-privilege-storage-release-closure:artifacts/18.3-least-privilege-storage-release-closure/reports/sbom/driveguard-simulator-e7f8e19616a4c14d1609608f92e4094c4e6d001e.spdx.json"
+  ],
+  "knownLimitations": "docs/known-limitations.md",
+  "releaseStatus": "READY_UNDER_DRIVEGUARD_PROJECT_GATE",
+  "phase13To18Status": {
+    "phase13": "ENGINEERING_PASS_QUALITY_4_OF_10",
+    "phase13_1": "PASS",
+    "phase13_2": "FAIL_HISTORICAL",
+    "phase13_2_1": "PASS_FINAL_QUALITY_CLOSURE",
+    "phase14": "FAIL_HISTORICAL",
+    "phase14_1": "FAIL_HISTORICAL",
+    "phase14_2": "PASS_FINAL_LOAD_CLOSURE",
+    "phase15": "FAIL_HISTORICAL",
+    "phase15_1": "FAIL_HISTORICAL",
+    "phase15_2": "FAIL_HISTORICAL_EVIDENCE_CLOSURE",
+    "phase15_3": "PASS_OVERALL_PHASE15",
+    "phase16": "PASS",
+    "phase17": "FAIL_HISTORICAL",
+    "phase17_1": "FAIL_HISTORICAL",
+    "phase17_2": "PASS_OVERALL_PHASE17",
+    "phase18": "FAIL_HISTORICAL",
+    "phase18_1": "FAIL_HISTORICAL",
+    "phase18_2": "FAIL_HISTORICAL",
+    "phase18_3": "PASS_OVERALL_PHASE18"
+  },
+  "phase19Status": "PASS",
+  "phase20Status": "LOCAL_GATE_PASS_RELEASE_CLOSURE_REQUIRES_EXTERNAL_RECORD",
+  "hmi": {
+    "status": "PASS",
+    "realApiAuthConfirmationFlow": "PASS",
+    "confirmationBypass": 0,
+    "duplicateSideEffect": 0,
+    "falseSuccess": 0,
+    "screenshot": "docs/assets/driveguard-hmi.png"
+  },
+  "releaseControl": {
+    "version": "v1.0.0",
+    "requiredMainHostedCi": "GREEN_BEFORE_TAGGING",
+    "publicationEvidence": "annotated Git tag and GitHub Release metadata",
+    "registryPublication": "NOT_PERFORMED"
+  }
+}

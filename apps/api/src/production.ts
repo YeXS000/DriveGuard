@@ -20,6 +20,7 @@ import type { DriveGuardObservability } from "@driveguard/observability";
 import type { ActionLifecycleEventSink } from "@driveguard/action-lifecycle";
 import type { RuntimeEventSink } from "@driveguard/agent-runtime";
 import type { CircuitBreaker, ExecutionConcurrencyController } from "@driveguard/executor";
+import { SimulatorClient } from "@driveguard/tools";
 
 import { ApiError } from "./errors.js";
 import type { Phase10RuntimeFactory, Phase10RuntimeFactoryInput } from "./service.js";
@@ -311,6 +312,21 @@ export class ProductionPhase10RuntimeFactory implements Phase10RuntimeFactory {
       }
     }
     return runtime;
+  }
+
+  async loadContext(identity: Phase10RuntimeFactoryInput["identity"]) {
+    try {
+      return await new SimulatorClient({
+        baseUrl: this.#simulatorBaseUrl,
+        vehicleId: identity.vehicleId,
+      }).getContextState();
+    } catch {
+      throw new ApiError(
+        "DEPENDENCY_UNAVAILABLE",
+        "Current vehicle context is temporarily unavailable",
+        503,
+      );
+    }
   }
 
   resourceSnapshot(): RuntimeFactoryResourceSnapshot {

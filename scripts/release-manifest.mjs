@@ -52,7 +52,7 @@ const manifest = {
   docker: {
     version: process.env.DRIVEGUARD_DOCKER_VERSION ?? "not-recorded",
     baseImages: [
-      "node:22.22.1-bookworm-slim",
+      "node:22.23.2-trixie-slim@sha256:7b8a0c89c54499bee567618f96578e1a12a800f062fbdbfd1fb6a443fa6f6284",
       "postgres:17-alpine@sha256:ae8a26b5b27ef277b46284a0faa2f0059e36a0b40b4064e3353e1bbaaaa2b214",
       "redis:8-alpine@sha256:642d3031f9c79ebc20ccbb4dca457a30dd06725b2f40c10b1ec0e17df90a5697",
       "nats:2.11-alpine@sha256:8e9da4a39fad71bc91237fbe4cc68c2fefe7126c7608a0b3ee94f2084aacfd8c",

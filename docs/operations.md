@@ -15,6 +15,17 @@ docker compose version
 npm run compose:config
 ```
 
+For production, also validate the hardened overlay with all required deployment variables supplied
+through the process environment:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.production.yml config --quiet
+```
+
+Never source example values as production credentials. The production deployment must provide the
+JWT issuer/audience/JWKS/algorithm/vehicle-claim settings, HMI bind address, LLM provider, and all
+secrets explicitly.
+
 The commands refuse a project name not beginning with `driveguard-phase17`. A clean deployment additionally requires an explicit acknowledgement because it removes only that project's named volumes.
 
 On a Windows-hosted WSL checkout without the Docker Desktop WSL CLI integration, set `DRIVEGUARD_DOCKER_COMMAND=docker.exe` and set the _Windows-host_ `DRIVEGUARD_IMAGE_TAG` to the same full release SHA before invoking WSL; production Linux uses the default `docker`.

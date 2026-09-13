@@ -116,6 +116,19 @@ export function registerPhase10Routes(
     }),
   );
 
+  app.get<{ Querystring: VehicleQuery }>(
+    "/v1/context",
+    {
+      schema: {
+        querystring: vehicleQuerySchema,
+        response: { 200: dataResponseSchema },
+      },
+    },
+    async (request) => ({
+      data: await service.getVehicleContext(identity(request, request.query.vehicleId)),
+    }),
+  );
+
   app.post<{ Params: SessionParams; Querystring: VehicleQuery; Body: MessageBody }>(
     "/v1/sessions/:sessionId/messages",
     {
