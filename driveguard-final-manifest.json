@@ -2,7 +2,8 @@
   "schemaVersion": 1,
   "project": "DriveGuard",
   "recommendedVersion": "v1.0.0",
-  "finalSourceSha": "d4ea9ca130e20bd486475df199b9acccdd56c821",
+  "finalSourceSha": "cf92c6593adbe4e8972e75491517a151260cbd14",
+  "phase20EvidenceCommitSha": "3d07f0c6594ad41153d53b6e8a4d4f30d2a4f1c7",
   "productionCandidateSourceSha": "e7f8e19616a4c14d1609608f92e4094c4e6d001e",
   "documentationClosureSha": "8eec917cf54d6bbd46f1438f83cfca2ee74f5d07",
   "quality": {
