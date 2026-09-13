@@ -12,6 +12,7 @@ import {
   setRequestObservation,
 } from "./request-observability.js";
 import type { RequestAdmissionController, RequestAdmissionPermit } from "./admission-control.js";
+import { createDevelopmentAuthentication, type RequestAuthentication } from "./authentication.js";
 
 export interface BuildApiOptions {
   readonly dependencies?: readonly DependencyProbe[];
@@ -23,6 +24,8 @@ export interface BuildApiOptions {
   readonly admissionController?: RequestAdmissionController;
   readonly resourceSampler?: () => void | Promise<void>;
   readonly onClose?: () => void | Promise<void>;
+  /** Defaults to the explicitly isolated development header boundary. */
+  readonly authentication?: RequestAuthentication;
 }
 
 const liveResponseSchema = {
@@ -68,11 +71,18 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
     },
   });
   const admissionPermits = new WeakMap<object, RequestAdmissionPermit>();
+  const authentication = options.authentication ?? createDevelopmentAuthentication();
 
   const releaseAdmission = (request: object): void => {
     admissionPermits.get(request)?.release();
     admissionPermits.delete(request);
   };
+
+  app.addHook("onRequest", async (request) => {
+    if (options.service !== undefined && request.url.startsWith("/v1/")) {
+      request.driveGuardPrincipal = await authentication.authenticate(request.headers);
+    }
+  });
 
   app.addHook("onRequest", async (request, reply) => {
     if (options.observability !== undefined && request.url !== "/metrics") {
@@ -170,7 +180,7 @@ export function buildApi(options: BuildApiOptions = {}): FastifyInstance {
     await options.onClose?.();
   });
 
-  if (options.service !== undefined) registerPhase10Routes(app, options.service);
+  if (options.service !== undefined) registerPhase10Routes(app, options.service, authentication);
   if (options.urgentService !== undefined) registerUrgentRoutes(app, options.urgentService);
 
   app.setNotFoundHandler((_request, reply) =>

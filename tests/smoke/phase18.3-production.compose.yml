@@ -1,0 +1,35 @@
+# Test-only overlay for the Phase 18.3 production release gate. The ephemeral
+# signer remains in the invoking smoke process; only its public JWKS is passed
+# to the isolated in-network test service.
+services:
+  test-jwks:
+    image: node:22.23.2-trixie-slim@sha256:7b8a0c89c54499bee567618f96578e1a12a800f062fbdbfd1fb6a443fa6f6284
+    command:
+      - node
+      - -e
+      - >-
+        require('node:http').createServer((request,response)=>{
+        response.writeHead(request.url === '/.well-known/jwks.json' ? 200 : 404,
+        {'content-type':'application/json'}); response.end(process.env.DRIVEGUARD_TEST_JWKS_DOCUMENT);
+        }).listen(3004,'0.0.0.0')
+    environment:
+      DRIVEGUARD_TEST_JWKS_DOCUMENT: ${DRIVEGUARD_TEST_JWKS_DOCUMENT:?DRIVEGUARD_TEST_JWKS_DOCUMENT must be set}
+    networks: [application]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+
+  api:
+    environment:
+      DRIVEGUARD_LLM_PROVIDER: faux
+      DRIVEGUARD_AUTH_JWKS_URL: http://test-jwks:3004/.well-known/jwks.json
+      # The release overlay remains read-only. This isolated smoke overlay alone
+      # enables the controlled simulator route to exercise the R2 policy and
+      # confirmation boundary; it is never part of a deployed production config.
+      PHASE_5_RUNTIME_MODE: development
+      PHASE_5_DEVELOPMENT_OPT_IN: NON_PRODUCTION
+    depends_on:
+      test-jwks:
+        condition: service_started

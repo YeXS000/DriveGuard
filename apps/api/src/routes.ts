@@ -7,10 +7,11 @@ import { toUtcTimestamp } from "@driveguard/domain";
 import { ApiError } from "./errors.js";
 import { publicEvent, type PublicRunEvent } from "./events.js";
 import {
-  DEVELOPMENT_IDENTITY_BOUNDARY,
-  DriveGuardApiService,
-  type DevelopmentIdentity,
-} from "./service.js";
+  type RequestAuthentication,
+  identityForPrincipal,
+  trustedPrincipal,
+} from "./authentication.js";
+import { DriveGuardApiService, type DevelopmentIdentity } from "./service.js";
 import { requestTraceId } from "./request-observability.js";
 
 const safeId = Type.String({
@@ -18,32 +19,35 @@ const safeId = Type.String({
   maxLength: 128,
   pattern: "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
 });
-const identityHeadersSchema = Type.Object({
-  "x-driveguard-user-id": safeId,
-  "x-driveguard-vehicle-id": safeId,
-});
 const sessionParamsSchema = Type.Object({ sessionId: safeId }, { additionalProperties: false });
 const actionParamsSchema = Type.Object({ actionId: safeId }, { additionalProperties: false });
 const executionParamsSchema = Type.Object({ executionId: safeId }, { additionalProperties: false });
 const sessionBodySchema = Type.Object(
-  { sessionId: Type.Optional(safeId) },
+  { sessionId: Type.Optional(safeId), vehicleId: Type.Optional(safeId) },
   { additionalProperties: false },
 );
 const messageBodySchema = Type.Object(
   { prompt: Type.String({ minLength: 1, maxLength: 32_000 }) },
   { additionalProperties: false },
 );
-const actionBodySchema = Type.Object({ sessionId: safeId }, { additionalProperties: false });
+const actionBodySchema = Type.Object(
+  { sessionId: safeId, vehicleId: Type.Optional(safeId) },
+  { additionalProperties: false },
+);
 const confirmBodySchema = Type.Object(
   {
     sessionId: safeId,
     confirmationCredential: Type.String({ minLength: 8, maxLength: 1_024 }),
+    vehicleId: Type.Optional(safeId),
   },
   { additionalProperties: false },
 );
 const dataResponseSchema = Type.Object({ data: Type.Any() }, { additionalProperties: false });
+const vehicleQuerySchema = Type.Object(
+  { vehicleId: Type.Optional(safeId) },
+  { additionalProperties: false },
+);
 
-type IdentityHeaders = Static<typeof identityHeadersSchema>;
 type SessionParams = Static<typeof sessionParamsSchema>;
 type ActionParams = Static<typeof actionParamsSchema>;
 type ExecutionParams = Static<typeof executionParamsSchema>;
@@ -51,11 +55,13 @@ type SessionBody = Static<typeof sessionBodySchema>;
 type MessageBody = Static<typeof messageBodySchema>;
 type ActionBody = Static<typeof actionBodySchema>;
 type ConfirmBody = Static<typeof confirmBodySchema>;
+type VehicleQuery = Static<typeof vehicleQuerySchema>;
 
-function identity(request: FastifyRequest<{ Headers: IdentityHeaders }>): DevelopmentIdentity {
+function identity(request: FastifyRequest, vehicleId: string | undefined): DevelopmentIdentity {
+  const principal = trustedPrincipal(request);
   return Object.freeze({
-    userId: request.headers["x-driveguard-user-id"],
-    vehicleId: request.headers["x-driveguard-vehicle-id"],
+    ...identityForPrincipal(principal, vehicleId),
+    identityBoundary: principal.identityBoundary,
   });
 }
 
@@ -65,48 +71,57 @@ function writeSse(raw: NodeJS.WritableStream, event: PublicRunEvent): void {
   raw.write(`data: ${JSON.stringify(event)}\n\n`);
 }
 
-export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardApiService): void {
+export function registerPhase10Routes(
+  app: FastifyInstance,
+  service: DriveGuardApiService,
+  authentication: Pick<RequestAuthentication, "identityBoundary">,
+): void {
   app.addHook("onSend", async (request, reply, payload) => {
     if (request.url.startsWith("/v1/")) {
-      void reply.header("x-driveguard-identity-boundary", DEVELOPMENT_IDENTITY_BOUNDARY);
+      void reply.header("x-driveguard-identity-boundary", authentication.identityBoundary);
     }
     return payload;
   });
 
-  app.post<{ Headers: IdentityHeaders; Body: SessionBody }>(
+  app.post<{ Body: SessionBody }>(
     "/v1/sessions",
     {
       schema: {
-        headers: identityHeadersSchema,
         body: sessionBodySchema,
         response: { 200: dataResponseSchema },
       },
     },
     async (request) => ({
-      data: await service.createSession(identity(request), request.body.sessionId),
+      data: await service.createSession(
+        identity(request, request.body.vehicleId),
+        request.body.sessionId,
+      ),
     }),
   );
 
-  app.get<{ Headers: IdentityHeaders; Params: SessionParams }>(
+  app.get<{ Params: SessionParams; Querystring: VehicleQuery }>(
     "/v1/sessions/:sessionId",
     {
       schema: {
-        headers: identityHeadersSchema,
         params: sessionParamsSchema,
+        querystring: vehicleQuerySchema,
         response: { 200: dataResponseSchema },
       },
     },
     async (request) => ({
-      data: await service.getSession(request.params.sessionId, identity(request)),
+      data: await service.getSession(
+        request.params.sessionId,
+        identity(request, request.query.vehicleId),
+      ),
     }),
   );
 
-  app.post<{ Headers: IdentityHeaders; Params: SessionParams; Body: MessageBody }>(
+  app.post<{ Params: SessionParams; Querystring: VehicleQuery; Body: MessageBody }>(
     "/v1/sessions/:sessionId/messages",
     {
       schema: {
-        headers: identityHeadersSchema,
         params: sessionParamsSchema,
+        querystring: vehicleQuerySchema,
         body: messageBodySchema,
         response: { 200: dataResponseSchema },
       },
@@ -116,7 +131,7 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
       const result = await service.sendMessage({
         sessionId: request.params.sessionId,
         prompt: request.body.prompt,
-        identity: identity(request),
+        identity: identity(request, request.query.vehicleId),
         ...(traceId === undefined ? {} : { traceId }),
       });
       const failure = service.failureFor(result);
@@ -125,17 +140,17 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
     },
   );
 
-  app.post<{ Headers: IdentityHeaders; Params: SessionParams; Body: MessageBody }>(
+  app.post<{ Params: SessionParams; Querystring: VehicleQuery; Body: MessageBody }>(
     "/v1/sessions/:sessionId/messages/stream",
     {
       schema: {
-        headers: identityHeadersSchema,
         params: sessionParamsSchema,
+        querystring: vehicleQuerySchema,
         body: messageBodySchema,
       },
     },
     async (request, reply) => {
-      const requestIdentity = identity(request);
+      const requestIdentity = identity(request, request.query.vehicleId);
       const sessionId = request.params.sessionId;
       const traceId = requestTraceId(request);
       let settled = false;
@@ -151,7 +166,7 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
         "cache-control": "no-cache, no-transform",
         connection: "keep-alive",
         "x-accel-buffering": "no",
-        "x-driveguard-identity-boundary": DEVELOPMENT_IDENTITY_BOUNDARY,
+        "x-driveguard-identity-boundary": authentication.identityBoundary,
       });
       reply.raw.flushHeaders();
       try {
@@ -186,25 +201,27 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
     },
   );
 
-  app.get<{ Headers: IdentityHeaders; Params: ActionParams }>(
+  app.get<{ Params: ActionParams; Querystring: VehicleQuery }>(
     "/v1/actions/:actionId",
     {
       schema: {
-        headers: identityHeadersSchema,
         params: actionParamsSchema,
+        querystring: vehicleQuerySchema,
         response: { 200: dataResponseSchema },
       },
     },
     async (request) => ({
-      data: await service.getAction(request.params.actionId, identity(request)),
+      data: await service.getAction(
+        request.params.actionId,
+        identity(request, request.query.vehicleId),
+      ),
     }),
   );
 
-  app.post<{ Headers: IdentityHeaders; Params: ActionParams; Body: ConfirmBody }>(
+  app.post<{ Params: ActionParams; Body: ConfirmBody }>(
     "/v1/actions/:actionId/confirm",
     {
       schema: {
-        headers: identityHeadersSchema,
         params: actionParamsSchema,
         body: confirmBodySchema,
         response: { 200: dataResponseSchema },
@@ -215,17 +232,16 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
         actionId: request.params.actionId,
         sessionId: request.body.sessionId,
         confirmationCredential: request.body.confirmationCredential,
-        identity: identity(request),
+        identity: identity(request, request.body.vehicleId),
       }),
     }),
   );
 
   for (const operation of ["reject", "cancel"] as const) {
-    app.post<{ Headers: IdentityHeaders; Params: ActionParams; Body: ActionBody }>(
+    app.post<{ Params: ActionParams; Body: ActionBody }>(
       `/v1/actions/:actionId/${operation}`,
       {
         schema: {
-          headers: identityHeadersSchema,
           params: actionParamsSchema,
           body: actionBodySchema,
           response: { 200: dataResponseSchema },
@@ -237,28 +253,31 @@ export function registerPhase10Routes(app: FastifyInstance, service: DriveGuardA
             ? await service.rejectAction(
                 request.params.actionId,
                 request.body.sessionId,
-                identity(request),
+                identity(request, request.body.vehicleId),
               )
             : await service.cancelAction(
                 request.params.actionId,
                 request.body.sessionId,
-                identity(request),
+                identity(request, request.body.vehicleId),
               ),
       }),
     );
   }
 
-  app.get<{ Headers: IdentityHeaders; Params: ExecutionParams }>(
+  app.get<{ Params: ExecutionParams; Querystring: VehicleQuery }>(
     "/v1/executions/:executionId",
     {
       schema: {
-        headers: identityHeadersSchema,
         params: executionParamsSchema,
+        querystring: vehicleQuerySchema,
         response: { 200: dataResponseSchema },
       },
     },
     async (request) => ({
-      data: await service.getExecution(request.params.executionId, identity(request)),
+      data: await service.getExecution(
+        request.params.executionId,
+        identity(request, request.query.vehicleId),
+      ),
     }),
   );
 }

@@ -85,6 +85,12 @@ describe("Phase 10 architecture and HMI boundary", () => {
     expect(hmi).toContain("DEVELOPMENT_IDENTITY_BOUNDARY");
   });
 
+  it("uses a Bearer token without development identity headers when one is supplied", () => {
+    expect(hmi).toContain("JWT_VERIFIED_PRINCIPAL in production");
+    expect(hmiScript).toContain("authorization: `Bearer ${bearerToken}`");
+    expect(hmiScript).toContain("body: JSON.stringify({ vehicleId: vehicleId() })");
+  });
+
   it("keeps NATS as infrastructure only with no Phase 10 business subject", () => {
     expect(compose).toContain("nats:");
     expect(`${routes}\n${service}`).not.toMatch(/jetstream|\.publish\(|\.subscribe\(/u);

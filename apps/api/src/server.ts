@@ -19,6 +19,8 @@ import { ProductionPhase10RuntimeFactory } from "./production.js";
 import { DriveGuardApiService } from "./service.js";
 import { UrgentApiService } from "./urgent.js";
 import { RequestAdmissionController } from "./admission-control.js";
+import { assertProductionSecurityConfiguration } from "./production-security.js";
+import { readRequestAuthentication } from "./authentication.js";
 import { gracefulShutdown, GracefulShutdownTimeoutError } from "./shutdown.js";
 
 function readApiPort(environment: NodeJS.ProcessEnv = process.env): number {
@@ -46,6 +48,8 @@ function readBoundedInteger(
 }
 
 async function main(): Promise<void> {
+  assertProductionSecurityConfiguration();
+  const authentication = readRequestAuthentication();
   const apiKey = process.env.DEEPSEEK_API_KEY;
   const observability = new DriveGuardObservability({
     service: "driveguard-api",
@@ -183,6 +187,7 @@ async function main(): Promise<void> {
     observability,
     urgentService,
     admissionController,
+    authentication,
     resourceSampler: async () => {
       let natsPending = 0;
       let natsAckPending = 0;

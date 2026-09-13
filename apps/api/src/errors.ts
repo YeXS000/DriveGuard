@@ -2,6 +2,9 @@ import { ActionLifecycleError } from "@driveguard/action-lifecycle";
 
 export const API_ERROR_CODES = [
   "VALIDATION_ERROR",
+  "AUTHENTICATION_REQUIRED",
+  "AUTHENTICATION_INVALID",
+  "VEHICLE_FORBIDDEN",
   "SESSION_NOT_FOUND",
   "ACTION_NOT_FOUND",
   "EXECUTION_NOT_FOUND",

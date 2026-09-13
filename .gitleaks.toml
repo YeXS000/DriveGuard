@@ -51,3 +51,15 @@ commits = [
 paths = [
   '''^artifacts/15\.1-performance-qualification-closure/docs/heap-root-cause\.md$''',
 ]
+
+  [[rules.allowlists]]
+description = "Phase 17.2 immutable scanner and SBOM evidence has redacted generic-api-key false positives, not credentials"
+condition = "AND"
+commits = [
+  "8c8281fb2d56289e902348893a07b877c63d3cba",
+]
+paths = [
+  '''^artifacts/17\.2-security-remediation-closure/release-candidate\.json$''',
+  '''^artifacts/17\.2-security-remediation-closure/reports/sbom/driveguard-api-a776ce2\.spdx\.json$''',
+  '''^artifacts/17\.2-security-remediation-closure/reports/trivy/driveguard-api-final\.json$''',
+]

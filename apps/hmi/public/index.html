@@ -13,8 +13,12 @@
         <h1>DriveGuard</h1>
       </div>
       <div class="identity">
-        <label>User <input id="user-id" value="phase5-driver" /></label>
+        <label>User (development only) <input id="user-id" value="phase5-driver" /></label>
         <label>Vehicle <input id="vehicle-id" value="simulator-vehicle-001" /></label>
+        <label
+          >Bearer token
+          <input id="bearer-token" type="password" autocomplete="off" spellcheck="false" />
+        </label>
         <button id="create-session">New session</button>
         <button id="restore-session" class="secondary">Restore</button>
       </div>
@@ -124,7 +128,10 @@
       </section>
     </main>
 
-    <footer>DEVELOPMENT_IDENTITY_BOUNDARY · HMI never calls the Vehicle Simulator directly.</footer>
+    <footer>
+      JWT_VERIFIED_PRINCIPAL in production · DEVELOPMENT_IDENTITY_BOUNDARY only without a Bearer
+      token · HMI never calls the Vehicle Simulator directly.
+    </footer>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

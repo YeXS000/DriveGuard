@@ -1,0 +1,209 @@
+# Production overlay. Invoke with: docker compose -f docker-compose.yml -f docker-compose.production.yml.
+# The only host-published service is the HMI gateway. API, stateful dependencies,
+# simulator, and observability remain on internal Compose networks.
+name: driveguard
+
+services:
+  postgres-volume-init:
+    image: postgres:17-alpine@sha256:ae8a26b5b27ef277b46284a0faa2f0059e36a0b40b4064e3353e1bbaaaa2b214
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        owner="$$(stat -c '%u:%g' /var/lib/postgresql/data)"
+        mode="$$(stat -c '%a' /var/lib/postgresql/data)"
+        if [ "$$owner" = "0:0" ] || { [ "$$owner" = "70:70" ] && [ "$$mode" = "1777" ] && [ -z "$$(find /var/lib/postgresql/data -mindepth 1 -maxdepth 1 -print -quit)" ]; }; then
+          chmod 700 /var/lib/postgresql/data
+          if [ "$$owner" = "0:0" ]; then chown 70:70 /var/lib/postgresql/data; fi
+        else
+          test "$$owner" = "70:70"
+          test "$$mode" = "700"
+        fi
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    # Docker named-volume mode changes need FOWNER; ownership transfer needs
+    # CHOWN. The service has no network and exits before PostgreSQL starts.
+    cap_add: [CHOWN, FOWNER]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+    restart: "no"
+
+  postgres:
+    ports: !override []
+    networks: !override [data]
+    read_only: true
+    user: "70:70"
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql:uid=70,gid=70,mode=3775
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+    depends_on:
+      postgres-volume-init:
+        condition: service_completed_successfully
+
+  redis-volume-init:
+    image: redis:8-alpine@sha256:642d3031f9c79ebc20ccbb4dca457a30dd06725b2f40c10b1ec0e17df90a5697
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        owner="$$(stat -c '%u:%g' /data)"
+        mode="$$(stat -c '%a' /data)"
+        if [ "$$owner" = "0:0" ] || { [ "$$owner" = "999:1000" ] && [ "$$mode" = "755" ] && [ -z "$$(find /data -mindepth 1 -maxdepth 1 -print -quit)" ]; }; then
+          if [ ! -e /data/appendonlydir ]; then mkdir /data/appendonlydir; fi
+          chmod 700 /data/appendonlydir
+          chown 999:1000 /data/appendonlydir
+          chmod 700 /data
+          if [ "$$owner" = "0:0" ]; then chown 999:1000 /data; fi
+        else
+          test "$$owner" = "999:1000"
+          test "$$mode" = "700"
+          if [ -e /data/appendonlydir ]; then
+            test -d /data/appendonlydir
+            test "$$(stat -c '%u:%g' /data/appendonlydir)" = "999:1000"
+            test "$$(stat -c '%a' /data/appendonlydir)" = "700"
+          else
+            mkdir /data/appendonlydir
+            chmod 700 /data/appendonlydir
+            chown 999:1000 /data/appendonlydir
+          fi
+        fi
+    volumes:
+      - redis-data:/data
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    # Existing Redis data is not recursively changed. DAC_OVERRIDE is used
+    # only to add a missing AOF directory below an already verified data root.
+    cap_add: [CHOWN, FOWNER, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+    restart: "no"
+
+  redis:
+    ports: !override []
+    networks: !override [data]
+    read_only: true
+    user: "999:1000"
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+    depends_on:
+      redis-volume-init:
+        condition: service_completed_successfully
+
+  nats-volume-init:
+    image: nats:2.11-alpine@sha256:8e9da4a39fad71bc91237fbe4cc68c2fefe7126c7608a0b3ee94f2084aacfd8c
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        if [ "$$(stat -c '%u:%g' /data/jetstream)" = "0:0" ]; then
+          chmod 700 /data/jetstream
+          chown 1000:1000 /data/jetstream
+        else
+          test "$$(stat -c '%u:%g' /data/jetstream)" = "1000:1000"
+          test "$$(stat -c '%a' /data/jetstream)" = "700"
+        fi
+    volumes:
+      - nats-data:/data/jetstream
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+    restart: "no"
+
+  nats:
+    ports: !override []
+    networks: !override [data]
+    read_only: true
+    user: "1000:1000"
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+    depends_on:
+      nats-volume-init:
+        condition: service_completed_successfully
+
+  persistence-migrate:
+    networks: !override [data]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+
+  vehicle-simulator:
+    ports: !override []
+    networks: !override [application]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+
+  api:
+    ports: !override []
+    networks: !override [application, data]
+    environment:
+      DRIVEGUARD_DEPLOYMENT_ENV: production
+      DRIVEGUARD_AUTH_MODE: jwt
+      DRIVEGUARD_AUTH_ISSUER: ${DRIVEGUARD_AUTH_ISSUER:?DRIVEGUARD_AUTH_ISSUER must be set}
+      DRIVEGUARD_AUTH_AUDIENCE: ${DRIVEGUARD_AUTH_AUDIENCE:?DRIVEGUARD_AUTH_AUDIENCE must be set}
+      DRIVEGUARD_AUTH_JWKS_URL: ${DRIVEGUARD_AUTH_JWKS_URL:?DRIVEGUARD_AUTH_JWKS_URL must be set}
+      DRIVEGUARD_AUTH_ALLOWED_ALGORITHMS: ${DRIVEGUARD_AUTH_ALLOWED_ALGORITHMS:?DRIVEGUARD_AUTH_ALLOWED_ALGORITHMS must be set}
+      DRIVEGUARD_AUTH_VEHICLE_CLAIM: ${DRIVEGUARD_AUTH_VEHICLE_CLAIM:?DRIVEGUARD_AUTH_VEHICLE_CLAIM must be set}
+      DRIVEGUARD_LLM_PROVIDER: ${DRIVEGUARD_LLM_PROVIDER:?DRIVEGUARD_LLM_PROVIDER must be explicitly set}
+      PHASE_5_RUNTIME_MODE: read_only
+      PHASE_5_DEVELOPMENT_OPT_IN: ""
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:?DEEPSEEK_API_KEY must be set}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+
+  hmi:
+    ports: !override
+      - "${DRIVEGUARD_HMI_BIND_ADDRESS:?DRIVEGUARD_HMI_BIND_ADDRESS must be set}:${DRIVEGUARD_HMI_PORT:-8080}:8080"
+    networks: !override [edge, application]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+
+  prometheus:
+    ports: !override []
+    networks: !override [application]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+
+  grafana:
+    ports: !override []
+    networks: !override [application]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    privileged: false
+
+networks:
+  edge:
+    name: driveguard-edge
+  application:
+    internal: true
+  data:
+    internal: true

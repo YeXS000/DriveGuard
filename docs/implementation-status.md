@@ -1887,3 +1887,60 @@ The required restore, alert firing/recovery, operational failure drills, and com
 - Security: final Trivy is 3 Critical and 50 High raw findings per image, all no-fixed-version and CVE-level NOT_REACHABLE; image secrets and Critical/High misconfigurations are 0. Current-source Gitleaks is 0 and the 64-commit reachable-history scan is 0.
 - Verification: format, lint, typecheck, build, Compose config, Phase 17 contract 4/4, critical safety regression 472/472, release smoke, and API restart/durable-state smoke passed. Confirmation Bypass, Forbidden Action, Duplicate Side Effect, and False Success are all 0.
 - Gate result: **PASS**. Overall Phase 17 — Staging Deployment, Release & Operational Readiness — is **PASS**. No merge to `main`, Git tag, GitHub Release, or Phase 18 work was performed.
+
+## Phase 18 — Security Hardening & Production Release Gate
+
+- Status: IMPLEMENTED; final Stage Gate **FAIL**. Scope is an explicit production Compose overlay, production configuration/secret boundary, attack-surface inventory, container/network hardening, exact historical Gitleaks triage, and a fail-closed API startup guard. No Policy, confirmation lifecycle, Executor, capability registry, Ground Truth, or Scorer behavior changed.
+- Production boundary: only the HMI gateway remains host-published; API, PostgreSQL, Redis, NATS, Simulator, Prometheus, and Grafana are internal-only. The overlay declares `read_only`, `tmpfs`, `cap_drop: [ALL]`, `no-new-privileges`, and non-privileged runtime controls. The production API refuses startup because the only existing caller identity is explicitly development-only request headers.
+- Verification: Phase 18 contract 4/4 PASS; Phase 17 contract 4/4 PASS; format, lint, typecheck, build, Compose configuration, and `npm audit --audit-level=high` (0 vulnerabilities) passed. Candidate images were built and locally identified; all three Trivy scans reported 3 Critical/50 High raw rows, 0 secrets, and 0 Critical/High misconfigurations, matching the previously classified no-fixed-version `NOT_REACHABLE` base-image exception set. SPDX SBOMs were generated.
+- Gate result: **FAIL**. Trusted production authentication is not implemented; production/restart smoke and a production audit lifecycle are therefore `NOT RUN` and cannot be bypassed. Clean final history-Gitleaks and critical-safety regression evidence are `NOT VERIFIED`. No merge, tag, GitHub Release, or Phase 19 work was performed.
+
+## Phase 18.1 — Production Authentication & Release Closure
+
+- Status: IMPLEMENTED; final Stage Gate **FAIL**. Scope is production server-side JWT verification, claim-backed vehicle authorization, authenticated identity binding, and the release-closure evidence required to reassess Phase 18. No Policy, confirmation state-machine, Executor, capability registry, Ground Truth, Scorer, or Phase 15 performance behavior changed.
+- Authentication boundary: production startup requires `DRIVEGUARD_AUTH_MODE=jwt`, issuer, audience, JWKS URL, explicit RS256/ES256 allowlist, and vehicle-claim name. The verifier checks signature, issuer, audience, expiry, not-before, subject, and vehicle scope. Production rejects development identity headers; token subject is the only production user identity source.
+- Regression to date: targeted authentication contract **13/13 PASS** (real ephemeral RSA signing and JWKS verification); Phase 10 API regression **156/156 PASS**; Phase 18 production-security contract **5/5 PASS**; typecheck and build PASS. Negative paths return controlled 401/403 with no raw credentials or stack traces.
+- Security evidence: `npm audit --audit-level=high` PASS (0 vulnerabilities). Fixed Gitleaks `v8.24.3` scanned 70 reachable commits (about 123.20 MB) and reported **25 findings**; the findings remain untriaged and no allowlist was created. The tracked working diff scan found 0 findings over about 30.26 KB, but does not close the history gate.
+- Historical Phase 18.1 checkpoint result: its own release-evidence set was
+  incomplete and therefore **FAIL** at that checkpoint. Phase 18.3 has now
+  executed the missing production smoke, current-source/history Gitleaks
+  triage, final Trivy/SBOM, regression, and candidate-binding evidence. The
+  combined Phase 18 / 18.1 / 18.3 release closure is **PASS**; no merge, tag,
+  GitHub Release, or Phase 19 work has been performed.
+
+## Phase 18.3 — Least-Privilege Storage Initialization & Final Release Closure
+
+- Status: IMPLEMENTED; final Stage Gate **PASS**. Scope is persistent-volume
+  initialization for the existing hardened production Compose topology and
+  release-evidence re-execution. No Policy, confirmation state-machine,
+  Executor, capability registry, Ground Truth, or Scorer behavior changed.
+- Storage boundary: PostgreSQL, Redis, and NATS runtimes are non-root,
+  read-only-rootfs, `cap_drop: [ALL]` services. Network-isolated one-shot
+  initializers use only PostgreSQL `CHOWN,FOWNER`, Redis
+  `CHOWN,FOWNER,DAC_OVERRIDE`, and NATS `CHOWN`; unexpected existing-volume
+  ownership or modes fail safely.
+- Measured release smoke: fresh initialization, existing-volume recreation,
+  JWT/JWKS identity binding, cross-user/vehicle/header rejection, R2 Policy and
+  confirmation, API stop/start recovery, durable receipt recovery, and
+  PostgreSQL audit reconstruction all passed. Authentication bypass,
+  confirmation bypass, forbidden action, duplicate side effect, false success,
+  and unexpected HTTP 5xx were all 0.
+- Verification: Phase 18 security contract 6/6 PASS; Phase 17 operational
+  contract 4/4 PASS; Phase 18.1 JWT/JWKS contract 13/13 PASS; critical-safety
+  regression 472/472 PASS; full repository regression 2,314/2,314 PASS with
+  45 external PostgreSQL/Redis tests explicitly skipped. There is no Phase
+  18.2 test target in this source tree. `npm audit --audit-level=high` found 0
+  vulnerabilities; build, typecheck, lint, format, Compose config, diff
+  whitespace, and artifact-aware layout checks passed. The three inherited
+  authentication lint errors were repaired without changing authentication
+  semantics or lint rules.
+- Security and candidate binding: controlled-source Gitleaks found 0 findings;
+  reachable-history Gitleaks scanned 72 commits and triaged all 26 historical
+  evidence matches with 0 unresolved. Final Trivy scans of API, HMI, and
+  simulator each found 0 Critical, 0 fixable High/Critical, 0 image secrets,
+  and 0 Critical/High misconfigurations; 43 non-fixable High rows per image
+  have explicit non-reachability classifications. SPDX 2.3 SBOMs and three
+  local image digests are bound to source
+  `e7f8e19616a4c14d1609608f92e4094c4e6d001e` in the Phase 18.3 candidate.
+  This closes the combined Phase 18 release gate as **PASS**. No merge, tag,
+  release, or Phase 19 work was performed.

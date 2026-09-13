@@ -24,6 +24,7 @@ export const DEVELOPMENT_IDENTITY_BOUNDARY = "DEVELOPMENT_IDENTITY_BOUNDARY";
 export interface DevelopmentIdentity {
   readonly userId: string;
   readonly vehicleId: string;
+  readonly identityBoundary?: typeof DEVELOPMENT_IDENTITY_BOUNDARY | "JWT_VERIFIED_PRINCIPAL";
 }
 
 export interface Phase10RuntimeFactoryInput {
@@ -79,7 +80,7 @@ export interface ApiSessionView {
   readonly createdAt: UtcTimestamp;
   readonly updatedAt: UtcTimestamp;
   readonly messages: readonly ConversationMessage[];
-  readonly identityBoundary: typeof DEVELOPMENT_IDENTITY_BOUNDARY;
+  readonly identityBoundary: typeof DEVELOPMENT_IDENTITY_BOUNDARY | "JWT_VERIFIED_PRINCIPAL";
 }
 
 export interface ApiExecutionView {
@@ -190,7 +191,7 @@ export class DriveGuardApiService {
         createdAt: record.createdAt,
         updatedAt: record.updatedAt,
         messages,
-        identityBoundary: DEVELOPMENT_IDENTITY_BOUNDARY,
+        identityBoundary: identity.identityBoundary ?? DEVELOPMENT_IDENTITY_BOUNDARY,
       });
     } catch (error) {
       if (error instanceof ApiError) throw error;

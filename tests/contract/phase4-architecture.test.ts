@@ -93,7 +93,9 @@ describe("Phase 4 architecture and security boundaries", () => {
       tracked.filter(
         (path) =>
           /(?:^|\/)api[_-]?key\.md$/iu.test(path) ||
-          (/(?:^|\/)\.env(?:\.|$)/u.test(path) && !path.endsWith(".env.example")),
+          (/(?:^|\/)\.env(?:\.|$)/u.test(path) &&
+            !path.endsWith(".env.example") &&
+            !path.endsWith(".env.production.example")),
       ),
     ).toEqual([]);
     expect(

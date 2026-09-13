@@ -12,11 +12,22 @@ class ApiRequestError extends Error {
 }
 
 function headers() {
+  const bearerToken = $("bearer-token").value.trim();
+  if (bearerToken)
+    return { "content-type": "application/json", authorization: `Bearer ${bearerToken}` };
   return {
     "content-type": "application/json",
     "x-driveguard-user-id": $("user-id").value.trim(),
     "x-driveguard-vehicle-id": $("vehicle-id").value.trim(),
   };
+}
+
+function vehicleId() {
+  return $("vehicle-id").value.trim();
+}
+
+function sessionQuery() {
+  return `?vehicleId=${encodeURIComponent(vehicleId())}`;
 }
 
 async function request(path, options = {}) {
@@ -162,7 +173,10 @@ async function readSse(response, assistant) {
 }
 
 async function createSession() {
-  const session = await request("/v1/sessions", { method: "POST", body: "{}" });
+  const session = await request("/v1/sessions", {
+    method: "POST",
+    body: JSON.stringify({ vehicleId: vehicleId() }),
+  });
   setSession(session.sessionId);
   $("conversation").replaceChildren();
   clearAction();
@@ -171,7 +185,7 @@ async function createSession() {
 
 async function restoreSession() {
   if (!sessionId) throw new Error("No saved session to restore");
-  const session = await request(`/v1/sessions/${encodeURIComponent(sessionId)}`);
+  const session = await request(`/v1/sessions/${encodeURIComponent(sessionId)}${sessionQuery()}`);
   setSession(session.sessionId);
   $("conversation").replaceChildren();
   for (const message of session.messages) appendMessage(message.role, message.content);
@@ -193,7 +207,7 @@ async function sendMessage(event) {
   setExecution("Running", "running");
   try {
     const response = await fetch(
-      `${apiBase}/v1/sessions/${encodeURIComponent(sessionId)}/messages/stream`,
+      `${apiBase}/v1/sessions/${encodeURIComponent(sessionId)}/messages/stream${sessionQuery()}`,
       {
         method: "POST",
         headers: headers(),
@@ -227,6 +241,7 @@ async function decide(operation) {
           body: JSON.stringify({
             sessionId: actionSessionId,
             confirmationCredential: pendingAction.confirmation_credential,
+            vehicleId: vehicleId(),
           }),
         },
       );
@@ -243,7 +258,7 @@ async function decide(operation) {
         `/v1/actions/${encodeURIComponent(pendingAction.action_id)}/reject`,
         {
           method: "POST",
-          body: JSON.stringify({ sessionId: actionSessionId }),
+          body: JSON.stringify({ sessionId: actionSessionId, vehicleId: vehicleId() }),
         },
       );
       setExecution("Rejected", "failure", data);
