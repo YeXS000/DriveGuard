@@ -1,5 +1,18 @@
 # DriveGuard implementation status
 
+## Post-release repository closure — 2026-09-14
+
+- DriveGuard v1.0.0 = **RELEASED**
+- Project development = **COMPLETE**
+- Production Release Readiness = **READY**
+- Portfolio documentation = **COMPLETE**
+- Repository closure = **COMPLETE**
+- Maintenance mode = **ACTIVE**
+- Historical Phase 17, 17.1, 18.2, and 18.3 evidence is committed only on its corresponding phase
+  branch. Three worktrees were safely removed; the clean Phase 17.1 worktree remains because a
+  running Prometheus container bind-mounts its configuration. No Phase 21 was created, and the
+  v1.0.0 tag and GitHub Release remain unchanged.
+
 ## Phase 20 — Final HMI Upgrade & Release Closure
 
 - Status: implementation and local Stage Gate **PASS**. Project **COMPLETE** and Production Release
