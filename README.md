@@ -1,9 +1,19 @@
 # DriveGuard
 
+## Project overview
+
 DriveGuard is a safety-aware driving-service orchestration runtime. It lets an LLM understand a
 request and propose capabilities while deterministic software retains authority over validation,
 policy, confirmation, execution, persistence, and audit. It is a simulator-backed engineering
 project and is not evidence of deployment in a production vehicle or of commercial traffic.
+
+| Release snapshot |                                                       Verified result |
+| ---------------- | --------------------------------------------------------------------: |
+| Native case pass |                                    Development 90.00%; Holdout 92.22% |
+| Critical safety  |                                     472/472 PASS; all hard counters 0 |
+| Full regression  |                          2,319/2,319 PASS; 45 environment-gated skips |
+| Release checks   |                          Hosted CI GREEN; npm audit 0 vulnerabilities |
+| Publication      | [`v1.0.0`](https://github.com/YeXS000/DriveGuard/releases/tag/v1.0.0) |
 
 ![DriveGuard cockpit HMI](docs/assets/driveguard-hmi.png)
 
@@ -40,6 +50,17 @@ details.
   observability.
 - JWT/JWKS production authentication, claim-backed vehicle authorization, internal networks, and
   least-privilege containers.
+
+## Key engineering challenges
+
+- **Stable Agent decisions:** capability-aware Tool shortlisting, explicit argument binding, plan
+  completeness checks, and a frozen 600-case evaluation system turn model behavior into measured
+  contracts.
+- **Safety outside the prompt:** deterministic Policy, identity-bound confirmation, and an
+  authorization-consuming executor prevent model text from becoming side-effect authority.
+- **Production failure semantics:** durable idempotency, ambiguous-write reconciliation,
+  per-vehicle serialization, bounded context, admission control, and backpressure preserve truthful
+  outcomes through concurrency, dependency faults, and restart.
 
 ## Cockpit HMI
 
@@ -115,7 +136,7 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml up -d --no
 
 Do not treat the example environment files as production values. Provision secrets through the
 deployment environment and review [known limitations](docs/known-limitations.md) and the
-[final production checklist](docs/final-acceptance.md) before release.
+[final production checklist](docs/final-acceptance.md) before operational deployment or promotion.
 
 ## Evaluation
 
@@ -140,19 +161,22 @@ latency and must not be represented as public production capacity.
 - Vehicle authorization is claim-backed; development identity headers are rejected in production.
 - Runtime containers are non-root with read-only roots, `no-new-privileges`, and all capabilities
   dropped; network-isolated one-shot volume initializers retain only measured capabilities.
-- Final controlled-source Gitleaks findings: 0. Reachable-history findings: 26, all individually
-  triaged historical report matches, 0 unresolved.
-- Final images: 0 Critical, 0 fixable Critical/High, 0 reachable or unclassified High, 0 image
-  secrets, and 0 Critical/High misconfigurations. Each image retains 43 raw no-fixed-version High
-  rows classified `NOT_REACHABLE`; this is not a claim of zero vulnerabilities.
+- Phase 18.3 controlled-source Gitleaks findings: 0. Reachable-history findings: 26, all
+  individually triaged historical report matches, 0 unresolved; the exact `v1.0.0` committed-source
+  CI scan also passed.
+- The Phase 18.3 qualified candidate images recorded 0 Critical, 0 fixable Critical/High, 0
+  reachable or unclassified High, 0 image secrets, and 0 Critical/High misconfigurations. Each
+  image retains 43 raw no-fixed-version High rows classified `NOT_REACHABLE`; this is not a claim
+  that the later `v1.0.0` source images were rescanned or that container vulnerabilities are zero.
 
 ## CI/CD
 
 GitHub Actions runs reproducible installation, format, lint, typecheck, build, targeted safety and
 full regression, npm audit, layout, three SHA-tagged image builds, Compose config, and Gitleaks.
 Expensive load/soak/CAR/live-provider work remains outside PR CI and is bound to retained phase
-evidence. Release candidates use full Git SHA tags. The annotated `v1.0.0` tag and GitHub Release
-are permitted only for the exact final `main` SHA after its hosted workflow is green.
+evidence. Release candidates use full Git SHA tags. The annotated `v1.0.0` tag targets final source
+SHA `87dfe34645b93c64833604bad4ba29029ee3cf00`; its exact-source hosted workflow is
+[green](https://github.com/YeXS000/DriveGuard/actions/runs/34764056549).
 
 ## Repository structure
 
@@ -188,6 +212,8 @@ certification. The GitHub tag and Release are the authoritative publication reco
 
 - [Final acceptance matrix](docs/final-acceptance.md)
 - [Final metrics](docs/final-metrics.md)
+- [Engineering case study](docs/career/case-study.md)
+- [Five-minute interview walkthrough](docs/career/interview-5min.md)
 - [Release notes](RELEASE_NOTES.md)
 - [Final report](docs/final-report.md)
 - [License](LICENSE)

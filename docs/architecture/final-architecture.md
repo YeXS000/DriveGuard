@@ -80,8 +80,9 @@ sets. Unexpected existing ownership/modes fail instead of being recursively repa
 The three application images use the digest-pinned
 `node:22.23.2-trixie-slim@sha256:7b8a0c89c54499bee567618f96578e1a12a800f062fbdbfd1fb6a443fa6f6284`
 base, multi-stage lockfile builds, pruned runtime dependencies, and the `node` account. Images are
-identified by full source SHA and local image digest. Phase 19 reuses the immutable Phase 18.3
-image/SBOM/security evidence because it does not modify production image inputs.
+identified by full source SHA and local image digest. The formal Trivy/SBOM qualification remains
+bound to the Phase 18.3 candidate source `e7f8e196…`; the later `v1.0.0` source was rebuilt by
+exact-SHA hosted CI, but that workflow does not claim a new Trivy/SBOM qualification.
 
 ## Delivery and release workflow
 
@@ -95,3 +96,7 @@ release evidence rather than inferred CI outcomes.
 Relevant decisions are ADR 0006 through 0013 for the runtime safety chain, ADR 0018/0019/0021 for
 capacity and context retention, ADR 0022 for operations, and ADR 0023–0025 for production security,
 JWT/JWKS, and least-privilege storage.
+
+The published `v1.0.0` identity is source SHA `87dfe346…`, annotated tag object `d7a8a5df…`, and
+hosted CI run 34764056549. Registry publication, multi-host orchestration, hardware-in-the-loop,
+and real-vehicle certification remain outside this release.

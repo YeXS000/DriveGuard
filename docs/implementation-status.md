@@ -5,6 +5,10 @@
 - Status: implementation and local Stage Gate **PASS**. Project **COMPLETE** and Production Release
   Readiness **READY** are declared only with the final external closure record: source-only `main`,
   green hosted CI for that exact SHA, annotated `v1.0.0`, and the GitHub Release.
+- External closure: **COMPLETE**. Final source `87dfe34645b93c64833604bad4ba29029ee3cf00`
+  passed hosted CI run 34764056549; annotated tag object `d7a8a5df7b8918d882b374613e42424e9651ec0e`
+  and the GitHub Release were published. Registry publication and real-vehicle deployment remain
+  outside scope.
 - Scope: professional responsive cockpit HMI, authenticated live vehicle-context adapter,
   dedicated protected-action confirmation lifecycle, bounded tool/execution feedback, receipts,
   health/error/reconnect states, README screenshot, release notes, and final repository/release

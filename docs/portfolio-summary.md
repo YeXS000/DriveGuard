@@ -47,7 +47,7 @@ PostgreSQL, Redis, NATS JetStream, Docker Compose, GitHub Actions, Prometheus, a
   50 VU with 3,975 controlled 503 and 0 HTTP 500.
 - Final 30-minute soak: 140,297/140,297 accepted at 77.936/s with zero mismatch/restart/fatal heap;
   latency ratio 0.983, throughput ratio 1.019.
-- Final regression: 2,314/2,314 executed tests and 472/472 critical safety tests; 45 external
+- Final regression: 2,319/2,319 executed tests and 472/472 critical safety tests; 45 external
   PostgreSQL/Redis tests disclosed as environment-gated skips.
 - Security: controlled-source leaks 0; reachable-history findings 26/26 triaged, unresolved 0;
   Critical/fixable/reachable/unclassified High 0; raw no-fix High retained at 43 rows/image.

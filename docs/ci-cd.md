@@ -7,8 +7,9 @@ Image builds are tagged with `github.sha`; `latest` is never the release identif
 The PR workflow intentionally excludes soak/load/CAR and live-LLM evaluation. Those are performance or provider qualification workflows, not a packaging regression; their historical evidence must remain separately scoped.
 
 The canonical application image names are `driveguard-api`, `driveguard-simulator`, and
-`driveguard-hmi`, matching Compose and release manifests. The latest observed hosted green run is
-DriveGuard CI run 34470398420 for source-only main commit
-`3c6526f8cbbf07e8ffc4ccf43b40c09286688a57`. Phase 18 and Phase 19 final validation was also
-executed locally using the repository commands; a release operator must require a hosted green run
-for the eventual authorized integration/tag SHA before publication.
+`driveguard-hmi`, matching Compose and release manifests. DriveGuard CI run
+[34764056549](https://github.com/YeXS000/DriveGuard/actions/runs/34764056549) passed for exact source
+`87dfe34645b93c64833604bad4ba29029ee3cf00` before the annotated `v1.0.0` tag and GitHub Release
+were published. The final local release gate recorded 2,319/2,319 regression and 472/472 critical
+safety tests. Load, soak, external benchmark, Trivy, and SBOM evidence retain their separately
+documented source scopes.

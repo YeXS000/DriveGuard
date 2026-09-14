@@ -1,7 +1,9 @@
 # Final metrics freeze
 
-Phase 19 does not recompute or select new benchmark rounds. Values below are copied from the final
-accepted evidence for each metric. Failed predecessor rounds remain in the historical-integrity
+The release closure does not recompute or select new benchmark rounds. Values below are copied from
+the final accepted evidence for each metric. Phase 20 changed the HMI/API adapter but did not change
+the Agent, Policy, confirmation, recovery, scorer, or frozen performance semantics; it added five
+tests and reran the repository gates. Failed predecessor rounds remain in the historical-integrity
 section of [final acceptance](final-acceptance.md).
 
 ## Agent quality and safety
@@ -64,23 +66,25 @@ or public-QPS claim.
 
 ## Reliability and production
 
-| Metric                          | Value                                                                                            | Source                                                      |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| Fault recovery                  | 9/9 production-topology cases recovered                                                          | Phase 14.2                                                  |
-| Restart/persistence             | pending action and receipt survived two restarts; ambiguous write `EXECUTED`; duplicate effect 0 | Phase 14.2                                                  |
-| Cross-session/vehicle isolation | 20 identities; confirmation/state/receipt/idempotency contamination 0                            | Phase 14.2                                                  |
-| Backup/restore                  | PostgreSQL, Redis, JetStream backup and isolated restore PASS                                    | Phase 17 + 17.1                                             |
-| Upgrade/rollback                | same-SHA upgrade and known-good rollback PASS with durable-state verification                    | Phase 17                                                    |
-| Alerts                          | 12 rules loaded; API/dependency/backpressure firing and recovery PASS                            | Phase 17 + 17.1                                             |
-| Production authentication       | JWT/JWKS and cross-user/vehicle/header rejection PASS                                            | Phase 18.3                                                  |
-| Full repository regression      | 2,314/2,314 PASS; 45 environment-gated skips                                                     | Phase 18.3                                                  |
-| Critical safety regression      | 472/472 PASS                                                                                     | Phase 18.3                                                  |
-| Hosted CI                       | run 34470398420, source `3c6526f…`, PASS                                                         | Phase 16 source-only main integration; not the Phase 19 SHA |
+| Metric                          | Value                                                                                            | Source                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------- |
+| Fault recovery                  | 9/9 production-topology cases recovered                                                          | Phase 14.2                      |
+| Restart/persistence             | pending action and receipt survived two restarts; ambiguous write `EXECUTED`; duplicate effect 0 | Phase 14.2                      |
+| Cross-session/vehicle isolation | 20 identities; confirmation/state/receipt/idempotency contamination 0                            | Phase 14.2                      |
+| Backup/restore                  | PostgreSQL, Redis, JetStream backup and isolated restore PASS                                    | Phase 17 + 17.1                 |
+| Upgrade/rollback                | same-SHA upgrade and known-good rollback PASS with durable-state verification                    | Phase 17                        |
+| Alerts                          | 12 rules loaded; API/dependency/backpressure firing and recovery PASS                            | Phase 17 + 17.1                 |
+| Production authentication       | JWT/JWKS and cross-user/vehicle/header rejection PASS                                            | Phase 18.3                      |
+| Full repository regression      | 2,319/2,319 PASS; 45 environment-gated skips                                                     | Phase 20 release validation     |
+| Critical safety regression      | 472/472 PASS                                                                                     | Phase 20 release validation     |
+| Hosted CI                       | run 34764056549, source `87dfe346…`, PASS                                                        | exact published `v1.0.0` source |
 
 ## Security
 
 Source: Phase 18.3 candidate `e7f8e19616a4c14d1609608f92e4094c4e6d001e`, Gitleaks 8.24.3,
-Trivy 0.67.0, and SPDX 2.3 SBOMs.
+Trivy 0.67.0, and SPDX 2.3 SBOMs. These Trivy/SBOM rows are candidate-scoped, not a claim that the
+later `v1.0.0` HMI/API source was rescanned; exact-source CI separately passed committed-source
+Gitleaks, npm audit, and three image builds.
 
 | Metric                              |                       Frozen value | Status                                               |
 | ----------------------------------- | ---------------------------------: | ---------------------------------------------------- |

@@ -1,5 +1,18 @@
 # Phase 19 final report
 
+## Published release closure
+
+Phase 19 was a pre-publication acceptance record. The later authorized release closure completed:
+
+- final source `87dfe34645b93c64833604bad4ba29029ee3cf00` on `main`;
+- hosted DriveGuard CI run 34764056549: GREEN on that exact source;
+- annotated `v1.0.0` tag object `d7a8a5df7b8918d882b374613e42424e9651ec0e`;
+- GitHub Release `DriveGuard v1.0.0`, published 2026-09-13 15:04:44 UTC;
+- final local regression 2,319/2,319 and critical safety 472/472 PASS.
+
+The remaining Phase 19 text is retained as the historical gate record. No registry publication,
+commercial traffic, real-vehicle deployment, or production-vehicle certification is claimed.
+
 ## Scope
 
 Phase 19 performs final acceptance, evidence consolidation, documentation closure, release-candidate
